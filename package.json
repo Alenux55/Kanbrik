@@ -1,0 +1,44 @@
+{
+  "name": "kanbrik",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.11.0 <25"
+  },
+  "packageManager": "npm@12.0.2",
+  "scripts": {
+    "dev": "next dev --hostname 127.0.0.1",
+    "build": "next build",
+    "start": "next start --hostname 127.0.0.1",
+    "lint": "eslint .",
+    "typecheck": "next typegen && tsc --noEmit",
+    "check": "npm run lint && npm run typecheck",
+    "test": "vitest run --passWithNoTests",
+    "test:e2e": "playwright test",
+    "db:validate": "prisma validate",
+    "db:up": "docker compose up -d db",
+    "db:down": "docker compose down"
+  },
+  "dependencies": {
+    "clsx": "2.1.1",
+    "next": "16.4.5",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "tailwind-merge": "3.7.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.0",
+    "@tailwindcss/postcss": "4.3.4",
+    "@types/node": "24.19.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "dotenv": "18.0.9",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.4.5",
+    "prisma": "7.10.1",
+    "tailwindcss": "4.3.4",
+    "typescript": "5.9.3",
+    "vitest": "5.1.0"
+  }
+}

@@ -1,0 +1,4 @@
+// Domain and authentication models/migrations are deferred to workspace access.
+datasource db {
+  provider = "postgresql"
+}
