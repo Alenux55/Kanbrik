@@ -9,5 +9,5 @@ const commands = {
 };
 const args = commands[process.argv[2]];
 if (!args) throw new Error('Expected migrate, integration, or browser');
-const child = spawn(process.execPath, args, { env, stdio: 'inherit' });
+const child = spawn(process.execPath, [...args, ...process.argv.slice(3)], { env, stdio: 'inherit' });
 child.on('exit', code => process.exit(code ?? 1));

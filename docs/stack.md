@@ -24,6 +24,8 @@ PostgreSQL **17.11** was downloaded from the [official EDB binary archive page](
 
 Task 002 build result: the default `npm run build` still fails with the Turbopack CSS/helper-process error reproduced by independent review. Its cause remains unresolved. `npm run build -- --webpack` succeeds and supplies the build used by database/auth and browser checks. The default command was retained to keep the unresolved issue visible; no bundler rewrite or broad upgrade was made.
 
+Task 003 uses the same pinned dependencies and schema. The installed Next.js 16.4.5 bundled `error.md`, error-boundary types and implementation document/implement stable `retry()` (refresh plus reset); this replaces reset-only error recovery. [Official error API](https://nextjs.org/docs/app/api-reference/file-conventions/error) was also checked. In task 003's latest verification, both default Turbopack and alternate Webpack builds passed; browser verification uses the Webpack build. The earlier helper-process failures remain unexplained, and no root-cause fix or broad tool upgrade is claimed.
+
 | Area | Recommendation | Reason |
 | --- | --- | --- |
 | Application | TypeScript, React, Next.js App Router on Node.js LTS | One language/application for UI and server operations; self-hostable |

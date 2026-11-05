@@ -27,9 +27,9 @@ export default async function PlannerLayout({ children }: Readonly<{ children: R
             <Link href="/projects" className="inline-block rounded text-2xl font-bold tracking-tight focus-visible:outline-2 focus-visible:outline-teal-700">kanbrik<span className="text-teal-700">.</span></Link>
             <p className="mt-1 text-sm text-neutral-600">Space for what’s next.</p>
             <div className="my-6 rounded-lg border border-dashed border-neutral-300 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wider text-neutral-500">Workspace</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-neutral-500">Your personal space</p>
               <p className="mt-2 text-sm">{workspace.name}</p>
-              <p className="mt-1 text-xs leading-5 text-neutral-600">Private to your account. Shared workspaces are planned.</p>
+              <p className="mt-1 text-xs leading-5 text-neutral-600">Private to your account. Manage shared access in Workspaces.</p>
             </div>
             <Navigation />
           </aside>

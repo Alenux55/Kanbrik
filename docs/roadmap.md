@@ -1,6 +1,6 @@
 # Delivery roadmap
 
-Tasks 001–002 implement the foundation shell, local tooling, development/test identity, and private personal-workspace bootstrap; see their handoffs for verification and limitations. Shared workspace access and all planner-content phases remain planned. This sequence is a proposal and may change with product decisions.
+Tasks 001–003 implement the foundation shell, local tooling, development/test identity, private personal-workspace bootstrap, retry recovery, and shared-workspace membership management; see their handoffs for verification and limitations. Planner content and board/calendar filtering remain planned. This sequence is a proposal and may change with product decisions.
 
 | Phase | Outcome | Evidence required for completion |
 | --- | --- | --- |
@@ -24,3 +24,4 @@ Tasks 001–002 implement the foundation shell, local tooling, development/test 
 
 - [001: application foundation](tasks/001-foundation.md): implemented; see completion evidence and runtime limitations.
 - [002: accounts and automatic personal-workspace creation](tasks/002-accounts-personal-workspace.md): identity and personal-workspace implementation; see its completion evidence and limitations. Shared-workspace membership follows separately.
+- [003: shared workspaces and retry recovery](tasks/003-shared-workspaces-retry.md): implemented retry recovery, shared creation and owner/editor management for existing accounts; see verification evidence and development-policy limitations. Workspace-owned projects/tasks are proposed next.

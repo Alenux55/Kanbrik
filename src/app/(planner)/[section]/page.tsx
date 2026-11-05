@@ -25,7 +25,7 @@ export default async function Section({ params }: { params: Promise<{ section: s
         <Badge className="border-neutral-200 text-neutral-600">Placeholder</Badge>
         <h2 className="mt-6 text-xl font-semibold">This space is still being built</h2>
         <p className="mt-3 max-w-lg leading-7 text-neutral-600">{current.planned}</p>
-        <p className="mt-6 max-w-lg border-t border-neutral-100 pt-6 text-sm leading-6 text-neutral-500">Your account and private workspace are saved. Planner content, sharing, and editing are not available yet. Future edits will require a connection.</p>
+        <p className="mt-6 max-w-lg border-t border-neutral-100 pt-6 text-sm leading-6 text-neutral-500">Your account and workspace access are saved. Planner content and editing are not available yet. Future edits will require a connection.</p>
       </section>
     </>
   );

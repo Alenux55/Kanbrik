@@ -4,7 +4,7 @@ A project and task planner that connects configurable Kanban boards with calenda
 
 ## Project status
 
-The foundation now includes development/test email-password accounts, database-backed sessions, and automatic private personal-workspace creation (task 002). Projects, Board, Calendar, Lists, and Inbox / Notes remain placeholders: planner editing and shared workspaces are not implemented.
+The application includes development/test email-password accounts, database-backed sessions, private personal workspaces, and shared-workspace access management (tasks 002–003). Owners can create a shared workspace and immediately grant editor access to existing accounts; owners can remove editors, and editors can leave. Projects, Board, Calendar, Lists, and Inbox / Notes remain placeholders: planner content, editing, and board/calendar workspace filters are not implemented.
 
 The first version includes personal and shared workspaces, with workspace filters on the calendar and board. It uses fixed task statuses and requires a connection to save edits. Offline editing and custom statuses are deferred. The target host is the owner's always-online Ubuntu server; Docker availability needs verification.
 
@@ -16,7 +16,8 @@ The first version includes personal and shared workspaces, with workspace filter
 - [Agent workflow](docs/agent-workflow.md): model settings and implementation/review handoffs.
 - [Roadmap](docs/roadmap.md): delivery sequence and completion criteria.
 - [First implementation task](docs/tasks/001-foundation.md): application foundation using the recommended stack.
-- [Next implementation task](docs/tasks/002-accounts-personal-workspace.md): accounts, sessions, and automatic private personal-workspace creation.
+- [Accounts and personal workspace](docs/tasks/002-accounts-personal-workspace.md): task 002 implementation and completion handoff.
+- [Shared workspaces and retry recovery](docs/tasks/003-shared-workspaces-retry.md): task 003 implementation, permission contract, and completion evidence.
 - [Agent instructions](AGENTS.md): working agreements for coding agents.
 
 ## Local setup
@@ -34,6 +35,10 @@ npm run dev
 ```
 
 Open [the local app](http://127.0.0.1:3000). Create a local development account, then test refresh, navigation, sign-out, and sign-in. Stop with Ctrl+C. Use `npm run dev -- --webpack` if the default CSS/helper-process failure also occurs in development. No fonts or other assets are fetched at runtime.
+
+To test sharing, create at least two development accounts, using separate browser profiles/private windows to keep their sessions distinct. Open **Workspaces**, create a shared workspace, and use **Add existing account** with the second account's exact email. This grants access immediately as editor; no invitation or email is sent. The second account sees it after refresh and can leave; the owner can remove editor access. Personal workspaces cannot be shared. Emails remain unverified, so this development flow is not a production invitation/identity policy. Management does not select a global active workspace or enable planner content.
+
+If a server request fails temporarily, **Try again** now requests fresh server content in the same session. A continuing failure leaves the error and retry available; recovery does not duplicate the personal workspace.
 
 Configuration is server-only: `BETTER_AUTH_URL` is the exact trusted app origin, `BETTER_AUTH_SECRET` is a generated random secret of at least 32 characters, and `DATABASE_URL` is the development database URL. Generate a secret with `node -e "console.log(require('node:crypto').randomBytes(48).toString('hex'))"` and put it only in the ignored environment file. Restart the server after configuration changes.
 
@@ -66,9 +71,9 @@ The script refuses to overwrite existing data/configuration. `.local` contains b
 npm run check
 npm run db:validate
 npm run db:test:migrate
-# Recheck default build separately; currently fails here with the unresolved Turbopack helper-process error:
+# Recheck default build separately; prior helper-process failures remain unexplained:
 npm run build
-# Verified fallback:
+# Verified alternate/fallback:
 npm run build -- --webpack
 npm run test
 npx playwright install chromium
@@ -78,7 +83,9 @@ npm run start
 
 For a separately provisioned test database, copy `.env.test.example` to `.env.test` and set `TEST_DATABASE_URL`. The portable setup already creates this file. Test commands refuse anything except a loopback PostgreSQL URL with database `kanbrik_test` (or `kanbrik_test_<suffix>`) and the public schema. They never use the development `DATABASE_URL` for tests. Use a separate role without rights on development/production data. Fixtures use generated credentials and clean up only their own accounts; no global reset/truncation runs.
 
-`check` runs ESLint and strict TypeScript checks. `test` runs real PostgreSQL/HTTP integration tests plus test-target guards against a built app; build first and leave port **3110** free. `test:e2e` starts isolated test-configured production-mode servers on **3100** (local registration) and **3102** (registration disabled). Leave both ports free. Browser tests cover accounts, session refresh/revocation, visible errors/pending states, navigation, keyboard, touch emulation, overflow, and 404 responses on desktop and Pixel 7 profiles. They run serially with a deliberate pause to respect Better Auth's shared-loopback-IP rate limit (about 2–3 minutes). Traces/videos are disabled to avoid recording passwords or session tokens. `start` serves the build at [localhost](http://127.0.0.1:3000).
+`check` runs ESLint and strict TypeScript checks. `test` runs real PostgreSQL/HTTP integration tests plus test-target guards against a built app; build first and leave port **3110** free. `test:e2e` starts isolated test-configured production-mode servers on **3100** (local registration) and **3102** (registration disabled). Leave both ports free. Browser tests cover accounts, session revocation, real server-error retry, shared membership management, errors/pending states, navigation, keyboard, touch emulation, overflow, and 404 API responses on desktop and Pixel 7 profiles. They run serially with a deliberate pause to respect Better Auth's shared-loopback-IP rate limit (about 3–4 minutes). Traces/videos are disabled to avoid recording passwords or session tokens. `start` serves the build at [localhost](http://127.0.0.1:3000).
+
+Task 003's latest default Turbopack build passed, as did the Webpack build used for browser verification. Earlier default-build failures remain unexplained; this success is not a root-cause fix. Focused browser checks can be run with `npm run test:e2e -- --grep "retry requests"` or `npm run test:e2e -- --grep "owner grants"`.
 
 The first Prisma validation may download its engine and requires internet access (npm 12 can block its install hook). The current dependency audit has eight moderate development-only linter-chain findings and no production dependency findings; compatibility details are in [stack.md](docs/stack.md#task-001-selection-2026-11-05).
 
@@ -104,4 +111,4 @@ The checked-in migration creates the Better Auth tables, workspace kind/owner, m
 
 The Dockerfile prepares a non-root standalone Next.js runtime. Compose keeps registration disabled and requires application secrets; apply migrations before using a containerized app. Containers and Linux runtime are unverified: Compose is a local scaffold, not a production deployment procedure. Production proxy integration, secrets, migrations, backups, verified restore, and account policy remain prerequisites for later deployment.
 
-See the [task 001 handoff](docs/tasks/001-foundation.md#completion-handoff) and [task 002 handoff](docs/tasks/002-accounts-personal-workspace.md#completion-handoff) for actual verification evidence and limitations.
+See the [task 001 handoff](docs/tasks/001-foundation.md#completion-handoff), [task 002 handoff](docs/tasks/002-accounts-personal-workspace.md#completion-handoff), and [task 003 handoff](docs/tasks/003-shared-workspaces-retry.md#completion-handoff) for actual verification evidence and limitations.
