@@ -1,9 +1,10 @@
 import { notFound } from "next/navigation";
 import { sections } from "@/lib/navigation";
 import { Badge } from "@/components/ui/badge";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { verifiedSession } from "@/server/auth";
 
-export function generateStaticParams() { return sections.map(({ slug }) => ({ section: slug })); }
-export const dynamicParams = false;
 
 export async function generateMetadata({ params }: { params: Promise<{ section: string }> }) {
   const { section } = await params;
@@ -11,6 +12,7 @@ export async function generateMetadata({ params }: { params: Promise<{ section: 
 }
 
 export default async function Section({ params }: { params: Promise<{ section: string }> }) {
+  if (!await verifiedSession(await headers())) redirect("/sign-in");
   const { section } = await params;
   const current = sections.find(({ slug }) => slug === section);
   if (!current) notFound();
@@ -23,7 +25,7 @@ export default async function Section({ params }: { params: Promise<{ section: s
         <Badge className="border-neutral-200 text-neutral-600">Placeholder</Badge>
         <h2 className="mt-6 text-xl font-semibold">This space is still being built</h2>
         <p className="mt-3 max-w-lg leading-7 text-neutral-600">{current.planned}</p>
-        <p className="mt-6 max-w-lg border-t border-neutral-100 pt-6 text-sm leading-6 text-neutral-500">This preview contains no saved work. Accounts, sharing, and editing are not available yet. Future edits will require a connection.</p>
+        <p className="mt-6 max-w-lg border-t border-neutral-100 pt-6 text-sm leading-6 text-neutral-500">Your account and private workspace are saved. Planner content, sharing, and editing are not available yet. Future edits will require a connection.</p>
       </section>
     </>
   );

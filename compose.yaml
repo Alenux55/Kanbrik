@@ -20,6 +20,11 @@ services:
     build: .
     ports:
       - "127.0.0.1:3000:3000"
-    # Foundation shell does not access the database or require any secrets.
+    environment:
+      DATABASE_URL: postgresql://kanbrik_dev:${POSTGRES_PASSWORD}@db:5432/kanbrik_dev?schema=public
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://127.0.0.1:3000}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-}
+      KANBRIK_ENV: production
+      ENABLE_LOCAL_REGISTRATION: "false"
 volumes:
   kanbrik_dev_data:

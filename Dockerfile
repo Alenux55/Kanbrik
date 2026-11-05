@@ -1,6 +1,8 @@
 FROM node:24.19.0-bookworm-slim AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
+COPY prisma ./prisma
+COPY prisma.config.ts ./
 RUN npm ci
 
 FROM deps AS builder

@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 const destinations = [
   ["Projects", "projects"], ["Board", "board"], ["Calendar", "calendar"],

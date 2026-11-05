@@ -7,5 +7,7 @@ test-results/
 *.tsbuildinfo
 .env*
 !.env.example
+!.env.test.example
 generated/
 *.log
+.local/

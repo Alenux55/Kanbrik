@@ -1,6 +1,6 @@
 # Delivery roadmap
 
-Task 001 implements the foundation shell and local tooling; see its handoff for verification and limitations. All product phases remain planned. This sequence is a proposal and may change with product decisions.
+Tasks 001–002 implement the foundation shell, local tooling, development/test identity, and private personal-workspace bootstrap; see their handoffs for verification and limitations. Shared workspace access and all planner-content phases remain planned. This sequence is a proposal and may change with product decisions.
 
 | Phase | Outcome | Evidence required for completion |
 | --- | --- | --- |
@@ -20,4 +20,7 @@ Task 001 implements the foundation shell and local tooling; see its handoff for 
 - Review and integrate each task before considering its dependent workflow complete.
 - Keep unselected product defaults visible. A roadmap entry does not settle an open question in `product.md`.
 
-The first handoff is [001: application foundation](tasks/001-foundation.md).
+## Implementation handoffs
+
+- [001: application foundation](tasks/001-foundation.md): implemented; see completion evidence and runtime limitations.
+- [002: accounts and automatic personal-workspace creation](tasks/002-accounts-personal-workspace.md): identity and personal-workspace implementation; see its completion evidence and limitations. Shared-workspace membership follows separately.

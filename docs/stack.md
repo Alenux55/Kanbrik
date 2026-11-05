@@ -8,7 +8,7 @@ Node.js 24 LTS (local 24.19.0), npm 12.0.2, Next.js 16.4.5, React/React DOM 19.3
 
 Versions were checked using npm registry version, engine, and peer metadata as well as official documentation. Next.js requires Node >=20.9 and accepts React 19. Prisma 7.10.1 accepts Node 24; the selected Node engine is conservatively >=24.11 and <25. TypeScript 5.9.3 is a stable supported baseline; adopting TypeScript 7 is unnecessary for this task. Vitest 5 supports Node 24. Playwright 1.65.0's test package referenced an unavailable `playwright-core@1.65.0` during installation, so the complete stable 1.64.0 dependency chain was selected.
 
-The Prisma `latest` tag resolved to **8.0.0-rc.30**, so it was explicitly rejected in favor of stable **7.10.1**. Better Auth 1.7.18 declares Next 16, React 19, and Prisma 7 compatibility; its official adapter guide uses Prisma 7/PostgreSQL. Better Auth, Prisma Client/pg adapter, and Zod will be installed when server/auth operations need them. FullCalendar and dnd-kit remain uninstalled until their feature tasks. Their integration has not been verified by the shell build.
+The Prisma `latest` tag resolved to **8.0.0-rc.30**, so it was explicitly rejected in favor of stable **7.10.1**. Better Auth 1.7.18 declares Next 16, React 19, and Prisma 7 compatibility; its official adapter guide uses Prisma 7/PostgreSQL. These identity dependencies were subsequently installed in task 002 as recorded below. FullCalendar and dnd-kit remain uninstalled until their feature tasks. Their integration has not been verified by the shell build.
 
 Compose selects PostgreSQL **17.11** (a supported stable minor listed by PostgreSQL) with Debian Bookworm images and Node **24.19.0**. Image pulls and runtime compatibility are unverified because Docker is absent; no claim of database or container integration is made.
 
@@ -17,6 +17,12 @@ Compatibility references: [Node release schedule](https://github.com/nodejs/Rele
 Known tooling limitation: ESLint 9.39.5 reports end of support, but the selected Next config depends on `eslint-plugin-react@7.37.5` and `eslint-plugin-import@2.32.0`, whose declared peer ranges stop at ESLint 9. ESLint 10.14.0 is therefore not selected with unsupported peers. npm audit reports eight moderate development-only findings, all stemming from the TypeScript ESLint chain's minimatch dependency ([advisory](https://github.com/advisories/GHSA-g3hv-75wg-m249)); the suggested automated fix downgrades the Next config to a different major. No forced peer/major overrides were applied. Revisit when upstream publishes compatible fixes.
 
 ## Application
+
+Task 002 additions: Better Auth and `@better-auth/prisma-adapter` **1.7.18**, Prisma Client and `@prisma/adapter-pg` **7.10.1** (matching CLI), `pg` **8.23.1**, Zod **4.6.7**, `server-only` **0.0.1**, and `@types/pg` **8.23.1**. Stable version/engine/peer metadata was checked before installation. Official [Next integration](https://better-auth.com/docs/integrations/next), [email/password](https://better-auth.com/docs/authentication/email-password), and [Prisma adapter](https://better-auth.com/docs/adapters/prisma) APIs were checked against the installed packages. Client generation uses Prisma 7's `prisma-client` generator; authentication models match the adapter's required user/session/account/verification fields.
+
+PostgreSQL **17.11** was downloaded from the [official EDB binary archive page](https://www.enterprisedb.com/download-postgresql-binaries) and run portably on Windows without installing a system service. Separate generated local/test credentials and database roles live only in ignored files. Docker remains unavailable/unverified.
+
+Task 002 build result: the default `npm run build` still fails with the Turbopack CSS/helper-process error reproduced by independent review. Its cause remains unresolved. `npm run build -- --webpack` succeeds and supplies the build used by database/auth and browser checks. The default command was retained to keep the unresolved issue visible; no bundler rewrite or broad upgrade was made.
 
 | Area | Recommendation | Reason |
 | --- | --- | --- |

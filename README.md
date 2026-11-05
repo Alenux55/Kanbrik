@@ -4,7 +4,7 @@ A project and task planner that connects configurable Kanban boards with calenda
 
 ## Project status
 
-Task 001 provides a Next.js application shell with responsive navigation to Projects, Board, Calendar, Lists, and Inbox / Notes. Every view is a placeholder. There are no accounts, saved records, editing, sharing, or database queries yet.
+The foundation now includes development/test email-password accounts, database-backed sessions, and automatic private personal-workspace creation (task 002). Projects, Board, Calendar, Lists, and Inbox / Notes remain placeholders: planner editing and shared workspaces are not implemented.
 
 The first version includes personal and shared workspaces, with workspace filters on the calendar and board. It uses fixed task statuses and requires a connection to save edits. Offline editing and custom statuses are deferred. The target host is the owner's always-online Ubuntu server; Docker availability needs verification.
 
@@ -16,32 +16,69 @@ The first version includes personal and shared workspaces, with workspace filter
 - [Agent workflow](docs/agent-workflow.md): model settings and implementation/review handoffs.
 - [Roadmap](docs/roadmap.md): delivery sequence and completion criteria.
 - [First implementation task](docs/tasks/001-foundation.md): application foundation using the recommended stack.
+- [Next implementation task](docs/tasks/002-accounts-personal-workspace.md): accounts, sessions, and automatic private personal-workspace creation.
 - [Agent instructions](AGENTS.md): working agreements for coding agents.
 
 ## Local setup
 
-Use Node.js 24 LTS (tested with 24.19.0) and npm (tested with 12.0.2). Exact dependencies are in `package.json` and `package-lock.json`.
+Use Node.js 24 LTS (tested with 24.19.0), npm (tested with 12.0.2), and a disposable PostgreSQL database (tested with 17.11). Exact dependencies are in `package.json` and `package-lock.json`. Never use production credentials/data in this checkout.
 
 ```powershell
 npm ci
+Copy-Item .env.example .env
+# Set DATABASE_URL, BETTER_AUTH_URL and a generated BETTER_AUTH_SECRET in .env.
+# Provision a disposable local database before applying migrations.
+npm run db:generate
+npm run db:migrate
 npm run dev
 ```
 
-Open [the local app](http://127.0.0.1:3000). Stop with Ctrl+C. The shell runs without an environment file or database. No fonts or other assets are fetched at runtime.
+Open [the local app](http://127.0.0.1:3000). Create a local development account, then test refresh, navigation, sign-out, and sign-in. Stop with Ctrl+C. Use `npm run dev -- --webpack` if the default CSS/helper-process failure also occurs in development. No fonts or other assets are fetched at runtime.
+
+Configuration is server-only: `BETTER_AUTH_URL` is the exact trusted app origin, `BETTER_AUTH_SECRET` is a generated random secret of at least 32 characters, and `DATABASE_URL` is the development database URL. Generate a secret with `node -e "console.log(require('node:crypto').randomBytes(48).toString('hex'))"` and put it only in the ignored environment file. Restart the server after configuration changes.
+
+URL-encode special characters in database URL passwords. The portable setup generates hexadecimal credentials, which need no escaping.
+
+Registration requires **all** of `KANBRIK_ENV=local` or `test`, `ENABLE_LOCAL_REGISTRATION=true`, and a loopback `BETTER_AUTH_URL`. Otherwise Better Auth rejects sign-up server-side. Unset `KANBRIK_ENV` defaults to `production`; `NODE_ENV` does not enable registration. Email verification, password recovery, and public-registration policy remain deferred; this development baseline is not production-ready identity administration.
+
+### Portable PostgreSQL on Windows (verified alternative to Docker)
+
+Requires PowerShell 7. Download the PostgreSQL 17.11 Windows x64 binary archive from the [official EDB binaries page](https://www.enterprisedb.com/download-postgresql-binaries) and extract so `.local/postgresql/pgsql/bin/pg_ctl.exe` exists. Task 002 used the page's [17.11 archive link](https://sbp.enterprisedb.com/getfile.jsp?fileid=1260616). No system service is installed.
+
+For a fresh checkout **without existing `.env`, `.env.test`, or `.local/pgdata`**, run:
+
+```powershell
+pwsh -File scripts/portable-postgres.ps1 init
+```
+
+This starts PostgreSQL on `127.0.0.1:55432`, creates separate `kanbrik_dev` and `kanbrik_test` roles/databases, and writes generated credentials/secrets only to ignored `.env` and `.env.test` files. Do not copy the example over these generated files. Then run `npm ci`, `npm run db:migrate`, and the test migration command below. On later sessions:
+
+```powershell
+pwsh -File scripts/portable-postgres.ps1 start
+pwsh -File scripts/portable-postgres.ps1 stop
+```
+
+The script refuses to overwrite existing data/configuration. `.local` contains binaries, cluster data and logs and must stay private/ignored. Keep the portable database running while using the app or running tests.
 
 ## Verification and production-mode preview
 
 ```powershell
 npm run check
-npm run test
 npm run db:validate
+npm run db:test:migrate
+# Recheck default build separately; currently fails here with the unresolved Turbopack helper-process error:
 npm run build
+# Verified fallback:
+npm run build -- --webpack
+npm run test
 npx playwright install chromium
 npm run test:e2e
 npm run start
 ```
 
-`check` runs ESLint and strict TypeScript checks, including generated Next.js route types. `test` establishes Vitest for future unit/integration tests; it currently reports no tests, which is not domain coverage. Browser tests run against a built app on port 3100; build first and leave that port free. They exercise navigation, refresh, keyboard access, touch emulation, overflow, and 404 responses on desktop and Pixel 7 profiles. `start` serves the build at [localhost](http://127.0.0.1:3000).
+For a separately provisioned test database, copy `.env.test.example` to `.env.test` and set `TEST_DATABASE_URL`. The portable setup already creates this file. Test commands refuse anything except a loopback PostgreSQL URL with database `kanbrik_test` (or `kanbrik_test_<suffix>`) and the public schema. They never use the development `DATABASE_URL` for tests. Use a separate role without rights on development/production data. Fixtures use generated credentials and clean up only their own accounts; no global reset/truncation runs.
+
+`check` runs ESLint and strict TypeScript checks. `test` runs real PostgreSQL/HTTP integration tests plus test-target guards against a built app; build first and leave port **3110** free. `test:e2e` starts isolated test-configured production-mode servers on **3100** (local registration) and **3102** (registration disabled). Leave both ports free. Browser tests cover accounts, session refresh/revocation, visible errors/pending states, navigation, keyboard, touch emulation, overflow, and 404 responses on desktop and Pixel 7 profiles. They run serially with a deliberate pause to respect Better Auth's shared-loopback-IP rate limit (about 2–3 minutes). Traces/videos are disabled to avoid recording passwords or session tokens. `start` serves the build at [localhost](http://127.0.0.1:3000).
 
 The first Prisma validation may download its engine and requires internet access (npm 12 can block its install hook). The current dependency audit has eight moderate development-only linter-chain findings and no production dependency findings; compatibility details are in [stack.md](docs/stack.md#task-001-selection-2026-11-05).
 
@@ -50,8 +87,9 @@ The first Prisma validation may download its engine and requires internet access
 Docker Engine with Compose v2 is required for these steps. Docker is unavailable on the implementation machine, so the following commands and image pulls are **not runtime-verified**:
 
 ```powershell
+# Only if .env has not already been configured:
 Copy-Item .env.example .env
-# Edit .env: replace both local password placeholders with the same disposable password.
+# Set the local password in both database values and generate the auth secret.
 npm run db:up
 docker compose ps
 npm run db:down
@@ -60,8 +98,10 @@ docker compose --profile app up --build -d
 docker compose down
 ```
 
-On Ubuntu, use `cp .env.example .env` instead of `Copy-Item`. The Compose project is `kanbrik-local`; PostgreSQL uses database/user `kanbrik_dev`, binds only to `127.0.0.1:5433`, and persists in its own named development volume. `down` preserves that volume. The optional app binds to `127.0.0.1:3000` and currently needs no database connection. Do not use production credentials or a production database URL for local work.
+On Ubuntu, use `cp .env.example .env` instead of `Copy-Item`. The Compose project is `kanbrik-local`; PostgreSQL uses database/user `kanbrik_dev`, binds only to `127.0.0.1:5433`, and persists in its own named development volume. `down` preserves that volume. The optional app binds to `127.0.0.1:3000` and connects internally to the Compose database. Do not overwrite the portable setup's environment file with Compose settings or use production credentials/data for local work.
 
-The Prisma PostgreSQL datasource is present, but there are no models, generated client, or migrations. Authentication and its Prisma adapter are deferred to workspace access. Do not run migrations until that task defines the schema. The Dockerfile prepares a non-root standalone Next.js runtime; Compose is a local scaffold, not a production deployment procedure. Production proxy integration, secrets, migrations, backups, and a verified restore remain prerequisites for later deployment.
+The checked-in migration creates the Better Auth tables, workspace kind/owner, membership uniqueness, and personal-membership constraints. `db:migrate` applies it to the development database; `db:test:migrate` applies it only to the guarded test target. `npm ci` generates Prisma Client through the project postinstall hook; `db:generate` is available if local script policy blocks it. Schema validation may download its engine on first use.
 
-See the [task 001 handoff](docs/tasks/001-foundation.md#completion-handoff) for actual verification evidence and limitations.
+The Dockerfile prepares a non-root standalone Next.js runtime. Compose keeps registration disabled and requires application secrets; apply migrations before using a containerized app. Containers and Linux runtime are unverified: Compose is a local scaffold, not a production deployment procedure. Production proxy integration, secrets, migrations, backups, verified restore, and account policy remain prerequisites for later deployment.
+
+See the [task 001 handoff](docs/tasks/001-foundation.md#completion-handoff) and [task 002 handoff](docs/tasks/002-accounts-personal-workspace.md#completion-handoff) for actual verification evidence and limitations.

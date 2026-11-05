@@ -6,3 +6,5 @@ test-results
 playwright-report
 coverage
 docs
+.local
+src/generated

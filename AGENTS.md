@@ -24,7 +24,7 @@ Kanbrik is a project and task planner with Kanban boards and calendar time block
 
 ## Verification and handoff
 
-- No application setup or test commands exist yet. Add exact commands to README.md after implementing and verifying them; do not invent command results.
+- Use the verified setup and test commands in README.md, and keep them current after implementing and checking changes; do not invent command results.
 - Verify changed behavior with checks appropriate to its risk. Permissions, shared updates, time-zone behavior, and data relationships require meaningful automated coverage when implemented. Documentation-only changes do not require application tests.
 - Report what changed, what was actually checked, and any limitations. Distinguish implemented behavior from plans.
 - Update the relevant product or architecture documentation when an implementation changes its contract.
