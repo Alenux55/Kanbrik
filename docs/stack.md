@@ -18,6 +18,8 @@ Known tooling limitation: ESLint 9.39.5 reports end of support, but the selected
 
 ## Application
 
+Task 004 adds stable Nodemailer **10.3.1** (Node >=20, compatible with the selected Node 24 runtime), `@types/nodemailer` **8.0.2**, and test-only `smtp-server` **3.21.3** / `@types/smtp-server` **3.5.13**. Registry version/engine metadata and the used TypeScript API were checked. [Better Auth email/password recovery](https://better-auth.com/docs/authentication/email-password) and [Nodemailer SMTP/TLS options](https://nodemailer.com/smtp) were checked against installed source/types. The existing Prisma adapter supports explicit transactions; no ORM/schema upgrade or new migration is needed.
+
 Task 002 additions: Better Auth and `@better-auth/prisma-adapter` **1.7.18**, Prisma Client and `@prisma/adapter-pg` **7.10.1** (matching CLI), `pg` **8.23.1**, Zod **4.6.7**, `server-only` **0.0.1**, and `@types/pg` **8.23.1**. Stable version/engine/peer metadata was checked before installation. Official [Next integration](https://better-auth.com/docs/integrations/next), [email/password](https://better-auth.com/docs/authentication/email-password), and [Prisma adapter](https://better-auth.com/docs/adapters/prisma) APIs were checked against the installed packages. Client generation uses Prisma 7's `prisma-client` generator; authentication models match the adapter's required user/session/account/verification fields.
 
 PostgreSQL **17.11** was downloaded from the [official EDB binary archive page](https://www.enterprisedb.com/download-postgresql-binaries) and run portably on Windows without installing a system service. Separate generated local/test credentials and database roles live only in ignored files. Docker remains unavailable/unverified.

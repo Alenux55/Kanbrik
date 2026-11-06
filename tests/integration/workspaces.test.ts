@@ -5,6 +5,7 @@ import { PrismaClient } from "../../src/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { assertTestDatabase } from "../../scripts/test-target.mjs";
 import { failFixtureMembership } from "../database";
+import { startMailCapture } from "../mail-capture.mjs";
 
 const url = assertTestDatabase(process.env.TEST_DATABASE_URL);
 const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: url }), log: [] });
@@ -13,6 +14,7 @@ const run = randomUUID();
 const userIds: string[] = [];
 const sharedIds: string[] = [];
 let server: ChildProcess;
+let mail: Awaited<ReturnType<typeof startMailCapture>>;
 
 async function post(path: string, body: object, cookie = "") {
   return fetch(`${origin}${path}`, { method: "POST", headers: { "Content-Type": "application/json", origin, cookie }, body: JSON.stringify(body) });
@@ -34,8 +36,9 @@ async function bootstrap(cookie: string) {
 }
 
 beforeAll(async () => {
+  mail = await startMailCapture();
   server = spawn(process.execPath, ["node_modules/next/dist/bin/next", "start", "--hostname", "127.0.0.1", "--port", "3110"], {
-    env: { ...process.env, DATABASE_URL: url, BETTER_AUTH_URL: origin, KANBRIK_ENV: "test", ENABLE_LOCAL_REGISTRATION: "true" }, stdio: "ignore", windowsHide: true,
+    env: { ...process.env, DATABASE_URL: url, BETTER_AUTH_URL: origin, KANBRIK_ENV: "test", ENABLE_LOCAL_REGISTRATION: "true", SMTP_PORT: String(mail.port) }, stdio: "ignore", windowsHide: true,
   });
   let ready = false;
   for (let attempt = 0; attempt < 80; attempt++) {
@@ -46,11 +49,67 @@ beforeAll(async () => {
   expect(ready).toBe(true);
 });
 afterAll(async () => {
+  await db.verification.deleteMany({ where: { value: { in: userIds } } });
   await db.workspace.deleteMany({ where: { id: { in: sharedIds } } });
   // Delete only this run's users; cascades remove their own workspaces/sessions.
   await db.user.deleteMany({ where: { id: { in: userIds } } });
   await db.$disconnect();
   server?.kill();
+  await mail?.close();
+});
+
+describe("SMTP password recovery with real PostgreSQL sessions", () => {
+  async function requestToken(user: Awaited<ReturnType<typeof account>>) {
+    const response = await post("/api/auth/request-password-reset", { email: user.email, redirectTo: `${origin}/reset-password` });
+    expect(response.status).toBe(200);
+    const message = mail.messages.filter(message => message.to.includes(user.email)).at(-1);
+    expect(!!message).toBe(true);
+    const link = new URL(message!.text.match(/http[^\s]+/)![0]);
+    expect(link.origin).toBe(origin); expect(link.pathname).toBe("/reset-password");
+    expect(link.search.length).toBe(0);
+    return new URLSearchParams(link.hash.slice(1)).get("token")!;
+  }
+  it("sends a real SMTP reset link, changes credentials once, and revokes existing sessions", async () => {
+    const user = await account();
+    const workspace = await bootstrap(user.cookie);
+    const token = await requestToken(user);
+    const newPassword = randomUUID() + randomUUID();
+    expect((await post("/api/auth/reset-password", { token, newPassword })).status).toBe(200);
+    expect((await post("/api/workspaces/personal", {}, user.cookie)).status).toBe(401);
+    expect((await post("/api/auth/sign-in/email", { email: user.email, password: user.password })).status).toBe(401);
+    const login = await post("/api/auth/sign-in/email", { email: user.email, password: newPassword });
+    expect(login.status).toBe(200);
+    const cookie = login.headers.getSetCookie().map(value => value.split(";")[0]).join("; ");
+    expect((await bootstrap(cookie)).id).toBe(workspace.id);
+    expect((await post("/api/auth/reset-password", { token, newPassword: randomUUID() + randomUUID() })).status).toBe(400);
+  });
+  it("rejects expired/invalid tokens and short passwords without changing existing sessions", async () => {
+    const user = await account();
+    const token = await requestToken(user);
+    expect((await post("/api/auth/reset-password", { token, newPassword: "short" })).status).toBe(400);
+    await db.verification.updateMany({ where: { identifier: `reset-password:${token}` }, data: { expiresAt: new Date(0) } });
+    expect((await post("/api/auth/reset-password", { token, newPassword: randomUUID() + randomUUID() })).status).toBe(400);
+    expect((await post("/api/auth/reset-password", { token: randomUUID(), newPassword: randomUUID() + randomUUID() })).status).toBe(400);
+    await bootstrap(user.cookie);
+  });
+  it("returns the same generic request response for unknown emails and rejects hostile redirects/origins", async () => {
+    const user = await account();
+    const known = await post("/api/auth/request-password-reset", { email: user.email, redirectTo: `${origin}/reset-password` });
+    const unknown = await post("/api/auth/request-password-reset", { email: `${randomUUID()}@example.invalid`, redirectTo: `${origin}/reset-password` });
+    expect(known.status).toBe(200); expect(unknown.status).toBe(200);
+    expect(await known.json()).toEqual(await unknown.json());
+    expect((await post("/api/auth/request-password-reset", { email: user.email, redirectTo: "https://hostile.invalid/reset" })).status).toBe(403);
+    const hostile = await fetch(`${origin}/api/auth/request-password-reset`, { method: "POST", headers: { origin: "https://hostile.invalid", "content-type": "application/json" }, body: JSON.stringify({ email: user.email }) });
+    expect(hostile.status).toBe(403);
+  });
+  it("consumes one reset token atomically under simultaneous reset requests", async () => {
+    const user = await account(); const token = await requestToken(user);
+    const newPassword = randomUUID() + randomUUID();
+    const responses = await Promise.all([post("/api/auth/reset-password", { token, newPassword }), post("/api/auth/reset-password", { token, newPassword })]);
+    expect(responses.map(response => response.status).sort()).toEqual([200, 400]);
+    expect((await post("/api/workspaces/personal", {}, user.cookie)).status).toBe(401);
+    expect((await post("/api/auth/sign-in/email", { email: user.email, password: newPassword })).status).toBe(200);
+  });
 });
 
 describe("shared workspace permissions through real HTTP sessions", () => {

@@ -11,6 +11,7 @@
 - Fixed task statuses initially; custom statuses can be considered later.
 - Online-only editing initially; offline editing is deferred.
 - Host on the owner's always-online Ubuntu server. Docker is expected but unverified.
+- Password confirmation during account creation and automatic recovery links, using owner-configured SMTP.
 
 ## Recommended initial statuses
 

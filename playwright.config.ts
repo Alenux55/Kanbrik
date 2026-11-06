@@ -15,7 +15,8 @@ export default defineConfig({
     { name: "android", use: { ...devices["Pixel 7"] } },
   ],
   webServer: [
+    { command: "node tests/mail-capture.mjs", url: "http://127.0.0.1:3126/health", reuseExistingServer: false, env: testEnvironment() },
     { command: "npm run start -- --port 3100", url: "http://127.0.0.1:3100/sign-in", reuseExistingServer: false, env: testEnvironment() },
-    { command: "npm run start -- --port 3102", url: "http://127.0.0.1:3102/sign-in", reuseExistingServer: false, env: { ...testEnvironment(), KANBRIK_ENV: "production", BETTER_AUTH_URL: "http://127.0.0.1:3102", ENABLE_LOCAL_REGISTRATION: "true" } },
+    { command: "npm run start -- --port 3102", url: "http://127.0.0.1:3102/sign-in", reuseExistingServer: false, env: { ...testEnvironment(), KANBRIK_ENV: "production", BETTER_AUTH_URL: "http://127.0.0.1:3102", ENABLE_LOCAL_REGISTRATION: "true", PASSWORD_RESET_ENABLED: "false" } },
   ],
 });

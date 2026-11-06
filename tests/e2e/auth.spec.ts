@@ -11,6 +11,14 @@ test("signup, session refresh, sign-out/back, invalid login, and sign-in", async
   await page.getByLabel("Name", { exact: true }).fill("Browser auth user");
   await page.getByLabel("Email", { exact: true }).fill(email);
   await page.getByLabel("Password", { exact: true }).fill(password);
+  let signups = 0;
+  page.on("request", request => { if (new URL(request.url()).pathname === "/api/auth/sign-up/email") signups++; });
+  await page.getByLabel("Confirm your password", { exact: true }).fill(randomUUID());
+  await page.getByRole("button", { name: "Create account", exact: true }).click();
+  await expect(page.getByRole("main").getByRole("alert")).toContainText("Passwords do not match");
+  await expect(page.getByLabel("Confirm your password", { exact: true })).toBeFocused();
+  expect(signups).toBe(0);
+  await page.getByLabel("Confirm your password", { exact: true }).fill(password);
   const submit = page.getByRole("button", { name: "Create account", exact: true });
   let release!: () => void;
   const gate = new Promise<void>(resolve => { release = resolve; });
@@ -59,4 +67,16 @@ test("untrusted auth origins are rejected and forms remain usable with keyboard"
   await page.keyboard.press("Tab");
   await expect(page.getByLabel("Email", { exact: true })).toBeFocused();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test("forgot password explains missing SMTP configuration and rejects requests server-side", async ({ page, request }) => {
+  await page.goto("http://127.0.0.1:3102/sign-in");
+  await page.getByRole("link", { name: "Forgot your password?", exact: true }).click();
+  await expect(page.getByText("Email password recovery is not configured yet.", { exact: false })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Send reset link", exact: true })).toHaveCount(0);
+  const response = await request.post("http://127.0.0.1:3102/api/auth/request-password-reset", { headers: { origin: "http://127.0.0.1:3102" }, data: { email: `${randomUUID()}@example.invalid` } });
+  expect(response.status()).toBe(400);
+  await page.goto("/reset-password");
+  await expect(page.getByText("This reset link is missing or invalid.", { exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Request a new reset link", exact: true })).toBeVisible();
 });

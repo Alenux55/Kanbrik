@@ -18,6 +18,7 @@ The first version includes personal and shared workspaces, with workspace filter
 - [First implementation task](docs/tasks/001-foundation.md): application foundation using the recommended stack.
 - [Accounts and personal workspace](docs/tasks/002-accounts-personal-workspace.md): task 002 implementation and completion handoff.
 - [Shared workspaces and retry recovery](docs/tasks/003-shared-workspaces-retry.md): task 003 implementation, permission contract, and completion evidence.
+- [Password confirmation and recovery](docs/tasks/004-password-recovery.md): confirmation fields and configurable SMTP reset emails.
 - [Agent instructions](AGENTS.md): working agreements for coding agents.
 
 ## Local setup
@@ -44,7 +45,26 @@ Configuration is server-only: `BETTER_AUTH_URL` is the exact trusted app origin,
 
 URL-encode special characters in database URL passwords. The portable setup generates hexadecimal credentials, which need no escaping.
 
-Registration requires **all** of `KANBRIK_ENV=local` or `test`, `ENABLE_LOCAL_REGISTRATION=true`, and a loopback `BETTER_AUTH_URL`. Otherwise Better Auth rejects sign-up server-side. Unset `KANBRIK_ENV` defaults to `production`; `NODE_ENV` does not enable registration. Email verification, password recovery, and public-registration policy remain deferred; this development baseline is not production-ready identity administration.
+Registration requires **all** of `KANBRIK_ENV=local` or `test`, `ENABLE_LOCAL_REGISTRATION=true`, and a loopback `BETTER_AUTH_URL`. Otherwise Better Auth rejects sign-up server-side. Unset `KANBRIK_ENV` defaults to `production`; `NODE_ENV` does not enable registration. Sign-up now requires a matching password confirmation in the UI; that confirmation stays in the browser and is not sent or stored separately. Email verification and public-registration policy remain deferred; this development baseline is not production-ready identity administration.
+
+### Password recovery email
+
+The sign-in screen links to **Forgot your password?**. To enable automatic reset emails, add these settings to your existing ignored `.env` with values from your SMTP provider, then restart Kanbrik:
+
+```dotenv
+PASSWORD_RESET_ENABLED=true
+SMTP_HOST=smtp.your-provider.example
+SMTP_PORT=587
+SMTP_USER=your-smtp-username
+SMTP_PASSWORD="your-smtp-password-or-provider-app-password"
+SMTP_FROM=no-reply@your-domain.example
+```
+
+Replace every placeholder. `SMTP_FROM` must be an email address your provider permits you to send from. Use port 587 for STARTTLS or 465 for implicit TLS; TLS certificate checks remain enabled. No SMTP credentials go in browser code or Git. `SMTP_ALLOW_INSECURE_LOCAL` defaults to false and is allowed only for an explicitly configured loopback mail server in local/test mode; real providers require TLS. Without the enable flag and complete valid settings, the forgot-password screen explains that email recovery is unavailable and the server rejects email requests.
+
+Reset requests show the same generic confirmation for existing and unknown addresses. Delivery failures show a retryable generic error. Better Auth generates one-hour, single-use tokens and changes the password/revokes existing sessions atomically. Users confirm the new password, then sign in again; workspaces and memberships are preserved. No password is sent by email.
+
+Email links use `BETTER_AUTH_URL` and must be reachable by the recipient. For the SSH setup, keep `BETTER_AUTH_URL=http://127.0.0.1:3005` and open the link on the computer with the tunnel running. The reset token is in a URL fragment, stays out of HTTP request URLs/server access logs, and is removed from the visible URL after the page opens. Reopen the original email link if you reload before completing the reset. No real-provider delivery or server configuration is performed automatically; configure and verify your provider before relying on recovery.
 
 ### Portable PostgreSQL on Windows (verified alternative to Docker)
 
@@ -83,7 +103,7 @@ npm run start
 
 For a separately provisioned test database, copy `.env.test.example` to `.env.test` and set `TEST_DATABASE_URL`. The portable setup already creates this file. Test commands refuse anything except a loopback PostgreSQL URL with database `kanbrik_test` (or `kanbrik_test_<suffix>`) and the public schema. They never use the development `DATABASE_URL` for tests. Use a separate role without rights on development/production data. Fixtures use generated credentials and clean up only their own accounts; no global reset/truncation runs.
 
-`check` runs ESLint and strict TypeScript checks. `test` runs real PostgreSQL/HTTP integration tests plus test-target guards against a built app; build first and leave port **3110** free. `test:e2e` starts isolated test-configured production-mode servers on **3100** (local registration) and **3102** (registration disabled). Leave both ports free. Browser tests cover accounts, session revocation, real server-error retry, shared membership management, errors/pending states, navigation, keyboard, touch emulation, overflow, and 404 API responses on desktop and Pixel 7 profiles. They run serially with a deliberate pause to respect Better Auth's shared-loopback-IP rate limit (about 3–4 minutes). Traces/videos are disabled to avoid recording passwords or session tokens. `start` serves the build at [localhost](http://127.0.0.1:3000).
+`check` runs ESLint and strict TypeScript checks. `test` runs real PostgreSQL/HTTP integration tests plus test-target guards against a built app; build first and leave port **3110** free. It uses an in-memory SMTP sink on ephemeral loopback ports. `test:e2e` starts isolated test-configured production-mode servers on **3100** (local registration/recovery) and **3102** (registration/recovery disabled), plus a test-only SMTP sink on **3125** and its protected inbox reader on **3126**. Leave those ports free. Tests override delivery to loopback and never use your real SMTP provider or email addresses. Browser tests cover confirmation/recovery, accounts, session revocation, real server-error retry, shared membership management, errors/pending states, navigation, keyboard, touch emulation, overflow, and 404 API responses on desktop and Pixel 7 profiles. They run serially with a deliberate pause to respect Better Auth's shared-loopback-IP rate limit (about 4–5 minutes). Traces/videos are disabled to avoid recording passwords or session tokens. `start` serves the build at [localhost](http://127.0.0.1:3000).
 
 Task 003's latest default Turbopack build passed, as did the Webpack build used for browser verification. Earlier default-build failures remain unexplained; this success is not a root-cause fix. Focused browser checks can be run with `npm run test:e2e -- --grep "retry requests"` or `npm run test:e2e -- --grep "owner grants"`.
 

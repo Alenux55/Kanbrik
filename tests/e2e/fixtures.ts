@@ -8,7 +8,9 @@ export const test = base.extend<{ signedIn: void }>({
     await page.goto("/sign-up");
     await page.getByRole("textbox", { name: "Name", exact: true }).fill("Browser user");
     await page.getByLabel("Email", { exact: true }).fill(email);
-    await page.getByLabel("Password", { exact: true }).fill(randomUUID() + randomUUID());
+    const password = randomUUID() + randomUUID();
+    await page.getByLabel("Password", { exact: true }).fill(password);
+    await page.getByLabel("Confirm your password", { exact: true }).fill(password);
     await page.getByRole("button", { name: "Create account", exact: true }).click();
     await expect(page).toHaveURL(/\/projects$/);
     await use();
