@@ -1,7 +1,7 @@
 import "server-only";
 import type { z } from "zod";
 import { workspaceContent, WorkspaceDenied } from "./workspaces";
-import type { createProjectInput, createTaskInput, editProjectInput, editTaskInput } from "@/lib/planning-contracts";
+import type { createProjectInput, createTaskInput, editProjectInput, editTaskInput, taskStatusInput } from "@/lib/planning-contracts";
 
 export class PlanningConflict extends Error {
   constructor(public current: unknown) { super("Someone saved a newer version. Your draft has been kept. Review the saved version before retrying."); }
@@ -61,6 +61,16 @@ export function updateTask(headers: Headers, workspaceId: string, id: string, in
     if (!current) throw new WorkspaceDenied(404, "Task not found");
     const { revision, ...values } = input;
     const result = await tx.task.updateMany({ where: { workspaceId, id, revision }, data: { ...values, revision: { increment: 1 } } });
+    if (result.count !== 1) throw new PlanningConflict(current);
+    return tx.task.findUniqueOrThrow({ where: { id } });
+  });
+}
+
+export function updateTaskStatus(headers: Headers, workspaceId: string, id: string, input: z.infer<typeof taskStatusInput>) {
+  return workspaceContent(headers, workspaceId, async tx => {
+    const current = await tx.task.findFirst({ where: { workspaceId, id } });
+    if (!current) throw new WorkspaceDenied(404, "Task not found");
+    const result = await tx.task.updateMany({ where: { workspaceId, id, revision: input.revision }, data: { status: input.status, revision: { increment: 1 } } });
     if (result.count !== 1) throw new PlanningConflict(current);
     return tx.task.findUniqueOrThrow({ where: { id } });
   });

@@ -19,6 +19,7 @@ model User {
   accounts      Account[]
   personalWorkspace Workspace? @relation("PersonalOwner")
   memberships Membership[]
+  boardPreference BoardPreference?
   @@map("user")
 }
 
@@ -105,6 +106,12 @@ enum TaskStatus {
   in_progress
   blocked
   done
+}
+
+model BoardPreference {
+  userId String @id
+  workspaceIds String[]
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Project {

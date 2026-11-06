@@ -1,6 +1,6 @@
 # Delivery roadmap
 
-Tasks 001–005 implement the foundation shell, local tooling, development/test identity, personal/shared workspace access, retry recovery, password confirmation/SMTP recovery, and workspace-owned project/task planning; see their handoffs for verification and limitations. Kanban, calendar, and their workspace filters remain planned. Phase 2 is only partially complete until the board is separately assigned and implemented. This sequence is a proposal and may change with product decisions.
+Tasks 001–008 implement the foundation, development/test identity/recovery, personal/shared access, project/task planning, corrected cross-tab verification, and the Kanban board with saved authorized workspace selection. Phase 2's board implementation is verified and ready for review; Calendar and its selection remain planned. See handoffs for exact evidence and limits. This sequence is a proposal and may change with product decisions.
 
 | Phase | Outcome | Evidence required for completion |
 | --- | --- | --- |
@@ -29,4 +29,4 @@ Tasks 001–005 implement the foundation shell, local tooling, development/test 
 - [005: workspace-owned projects and tasks](tasks/005-projects-tasks.md): implemented and verified explicit-workspace project planning, tasks/subtasks, fixed statuses, and stale-save protection; see exact browser-run evidence and limitations. Kanban and calendar views follow separately.
 - [006: cross-tab session and planning-draft isolation](tasks/006-cross-tab-session-isolation.md): implemented as `0c13917` and independently reviewed; delayed cookie effects require task 007.
 - [007: read-only session verification](tasks/007-read-only-session-verification.md): implemented and verified (55 automated checks, 34 browser cases); coordinator review precedes task 008. Planner probes cannot restore/delete browser auth cookies or renew valid sessions.
-- [008: Kanban board](tasks/008-kanban-board.md): feature write-up prepared, not implemented. Canonical task/status/workspace scope is independent of task 007's internals; runtime implementation/integration follows its independent review.
+- [008: Kanban board](tasks/008-kanban-board.md): implemented over canonical tasks with saved board selection and status-only revision-protected moves, following owner-confirmed 007 approval. Verified 59 automated checks and 40 browser cases; see its completion handoff for evidence/limitations.

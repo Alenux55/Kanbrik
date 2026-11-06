@@ -85,6 +85,94 @@ describe("read-only planner identity probe", () => {
   });
 });
 
+describe("board preferences and canonical status-only operations", () => {
+  let a: Awaited<ReturnType<typeof account>>, b: Awaited<ReturnType<typeof account>>, outsider: Awaited<ReturnType<typeof account>>;
+  let workspaceId: string, personalId: string;
+  let task: { id: string; revision: number; title: string; description: string; projectId: string; parentId: null };
+  const statusPath = () => `/api/workspaces/${workspaceId}/tasks/${task.id}/status`;
+  const request = (path: string, method = "GET", body?: object, cookie = a.cookie, expected?: string) => fetch(origin + path, { method, headers: { cookie, origin, "content-type": "application/json", ...(expected ? { [expectedAccountHeader]: expected } : {}) }, body: body ? JSON.stringify(body) : undefined });
+  beforeAll(async () => {
+    a = await account(); b = await account(); outsider = await account();
+    personalId = (await bootstrap(a.cookie)).id;
+    const shared = await (await post("/api/workspaces", { name: "Board fixture" }, a.cookie)).json();
+    workspaceId = shared.id; sharedIds.push(workspaceId);
+    await post(`/api/workspaces/${workspaceId}/members`, { email: b.email }, a.cookie);
+    const project = await (await post(`/api/workspaces/${workspaceId}/projects`, { title: "Board context" }, a.cookie)).json();
+    task = await (await post(`/api/workspaces/${workspaceId}/tasks`, { title: "Canonical", description: "Keep this text", projectId: project.id }, a.cookie)).json();
+  });
+  it("defaults only to personal space, persists clear-all/deduplicated selection and isolates ownership", async () => {
+    expect((await (await request("/api/board/preferences")).json()).workspaceIds).toEqual([personalId]);
+    expect((await request("/api/board/preferences", "PUT", { workspaceIds: [workspaceId, workspaceId, personalId] })).status).toBe(200);
+    expect((await (await request("/api/board/preferences")).json()).workspaceIds).toEqual([workspaceId, personalId]);
+    const other = await (await request("/api/board/preferences", "GET", undefined, b.cookie)).json();
+    expect(other.workspaceIds).not.toContain(workspaceId);
+    expect((await request("/api/board/preferences", "PUT", { workspaceIds: [] })).status).toBe(200);
+    expect((await (await request("/api/board/preferences")).json()).workspaceIds).toEqual([]);
+    const login = await post("/api/auth/sign-in/email", { email: a.email, password: a.password });
+    expect(login.status).toBe(200);
+    const nextCookie = login.headers.getSetCookie().map(value => value.split(";")[0]).join("; ");
+    expect((await (await request("/api/board/preferences", "GET", undefined, nextCookie)).json()).workspaceIds).toEqual([]);
+    expect((await request("/api/board/preferences", "PUT", { workspaceIds: [], userId: b.id })).status).toBe(400);
+    expect((await request("/api/board/preferences", "PUT", { workspaceIds: [personalId] }, b.cookie)).status).toBe(404);
+    expect((await request("/api/board/preferences", "GET", undefined, "")).status).toBe(401);
+    expect((await request("/api/board/preferences", "PUT", { workspaceIds: [] }, b.cookie, a.id)).status).toBe(412);
+  });
+  it("updates status only, preserving canonical text/context and independent child completion", async () => {
+    const child = await (await post(`/api/workspaces/${workspaceId}/tasks`, { title: "Board child", parentId: task.id }, a.cookie)).json();
+    const response = await request(statusPath(), "PATCH", { status: "done", revision: 1 }, b.cookie);
+    expect(response.status).toBe(200);
+    const updated = await response.json();
+    expect(updated).toMatchObject({ id: task.id, title: task.title, description: task.description, workspaceId, projectId: task.projectId, parentId: null, revision: 2, status: "done" });
+    expect((await db.task.findUniqueOrThrow({ where: { id: child.id } })).status).toBe("todo");
+    for (const body of [{ status: "scheduled", revision: 2 }, { status: "todo", revision: 0 }, { status: "todo", revision: 2, title: "Overwrite" }, { status: "todo", revision: 2, workspaceId: personalId }]) expect((await request(statusPath(), "PATCH", body)).status).toBe(400);
+    expect((await request(statusPath(), "PATCH", { status: "todo", revision: 2 }, outsider.cookie, outsider.id)).status).toBe(404);
+    expect((await request(statusPath(), "PATCH", { status: "todo", revision: 2 }, "")).status).toBe(401);
+    expect((await request(statusPath().replace(workspaceId, personalId), "PATCH", { status: "todo", revision: 2 })).status).toBe(404);
+    const hostile = await fetch(origin + statusPath(), { method: "PATCH", headers: { cookie: a.cookie, origin: "https://invalid.example", "content-type": "application/json" }, body: JSON.stringify({ status: "todo", revision: 2 }) });
+    expect(hostile.status).toBe(403);
+  });
+  it("competes with text edits using the same revision and never copies stale text", async () => {
+    const responses = await Promise.all([
+      request(statusPath(), "PATCH", { status: "blocked", revision: 2 }),
+      request(`/api/workspaces/${workspaceId}/tasks/${task.id}`, "PATCH", { title: "New text", description: "New description", status: "done", revision: 2 }, b.cookie),
+    ]);
+    expect(responses.map(response => response.status).sort()).toEqual([200, 409]);
+    const current = await db.task.findUniqueOrThrow({ where: { id: task.id } });
+    expect(current.revision).toBe(3);
+    expect((await request(statusPath(), "PATCH", { status: "todo", revision: 2 })).status).toBe(409);
+    expect((await request(statusPath(), "PATCH", { status: "in_progress", revision: 3 })).status).toBe(200);
+    const final = await db.task.findUniqueOrThrow({ where: { id: task.id } });
+    expect(final.title).toBe(current.title); expect(final.description).toBe(current.description);
+  });
+  it("blocks a queued move after removal and prunes saved display preferences without granting access", async () => {
+    await request("/api/board/preferences", "PUT", { workspaceIds: [workspaceId] }, b.cookie);
+    let release!: () => void, ready!: (pid: number) => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const locked = new Promise<number>(resolve => { ready = resolve; });
+    const removal = db.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM "Workspace" WHERE id = ${workspaceId} FOR UPDATE`;
+      await tx.membership.deleteMany({ where: { workspaceId, userId: b.id } });
+      const [row] = await tx.$queryRaw<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`;
+      ready(row.pid); await gate;
+    }, { timeout: 15000 });
+    const pid = await locked;
+    const move = request(statusPath(), "PATCH", { status: "todo", revision: 4 }, b.cookie);
+    try {
+      let blocked = false;
+      for (let i = 0; i < 60; i++) {
+        const [row] = await db.$queryRaw<{ blocked: boolean }[]>`SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE ${pid} = ANY(pg_blocking_pids(pid))) AS blocked`;
+        if (row.blocked) { blocked = true; break; }
+        await new Promise(resolve => setTimeout(resolve, 25));
+      }
+      expect(blocked).toBe(true);
+    } finally { release(); await removal; }
+    expect((await move).status).toBe(404);
+    expect((await db.task.findUniqueOrThrow({ where: { id: task.id } })).revision).toBe(4);
+    const preference = await (await request("/api/board/preferences", "GET", undefined, b.cookie)).json();
+    expect(preference.workspaceIds).toEqual([]); expect(preference.workspaces.some((item: { id: string }) => item.id === workspaceId)).toBe(false);
+  });
+});
+
 describe("canonical projects/tasks through real HTTP and PostgreSQL", () => {
   let owner: Awaited<ReturnType<typeof account>>;
   let editor: Awaited<ReturnType<typeof account>>;

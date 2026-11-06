@@ -1,6 +1,6 @@
 # 007: Read-only session verification and delayed-cookie isolation
 
-Status: Implemented and verified. Independent coordinator review remains next, before task 008.
+Status: Implemented and verified as `47993fa`. Owner confirmed independent review approval before task 008 began; review command details were not supplied. The implementation evidence below remains historical.
 
 Suggested model: GPT-6.1 Sol, High effort. Complete and review this fix before implementing task 008. No Kanban or calendar feature work is part of this task.
 

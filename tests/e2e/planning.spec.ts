@@ -101,7 +101,7 @@ test("personal planning persists tasks/subtasks and preserves failed and navigat
   await page.getByLabel("Planning workspace").selectOption(personalId);
   await expect(createTask.getByLabel("Title", { exact: true })).toHaveValue("Keep this workspace's draft");
   await page.getByRole("navigation").getByRole("link", { name: "Board", exact: true }).click();
-  await expect(page.getByText("This space is still being built")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Board", exact: true })).toBeVisible();
   await page.getByRole("navigation").getByRole("link", { name: "Projects", exact: true }).click();
   await expect(createTask.getByLabel("Title", { exact: true })).toHaveValue("Keep this workspace's draft");
   await createTask.getByRole("button", { name: "Discard draft" }).click();
