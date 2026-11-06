@@ -22,6 +22,7 @@ The first version includes personal and shared workspaces, with workspace filter
 - [Shared workspaces and retry recovery](docs/tasks/003-shared-workspaces-retry.md): task 003 implementation, permission contract, and completion evidence.
 - [Password confirmation and recovery](docs/tasks/004-password-recovery.md): confirmation fields and configurable SMTP reset emails.
 - [Projects and tasks](docs/tasks/005-projects-tasks.md): workspace-owned planning, canonical tasks/subtasks, fixed statuses, and shared-edit conflict handling.
+- [Next fix: cross-tab account isolation](docs/tasks/006-cross-tab-session-isolation.md): synchronize planner identity and invalidate old-account drafts after another tab changes the shared session.
 - [Agent instructions](AGENTS.md): working agreements for coding agents.
 
 ## Local setup

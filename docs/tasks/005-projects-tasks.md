@@ -1,6 +1,6 @@
 # 005: Workspace-owned projects and tasks
 
-Status: Implemented and verified. See completion handoff below for actual results, including a browser-environment failure and focused rerun.
+Status: Implemented and independently reviewed at `0929f9a`; cross-tab account/draft isolation needs corrective task 006. See completion evidence and review addendum for exact results.
 
 Suggested model: GPT-6.1 Sol, High effort. Reuse the implementation chat from tasks 001–004, rereading the current instructions, coordinator handoff, and this task. Model choice is not configured by this file.
 
@@ -141,5 +141,9 @@ Final Webpack browser regression: `npm run test:e2e` had **23 passes and 1 failu
 - Scope defaults were implemented as specified: `todo` default, text/length limits, standalone tasks, one-level children with independent completion, equal owner/editor content editing, fixed assignments, and create/read/update only. These remain bounded defaults, not newly user-confirmed product requirements.
 - No production deployment, Ubuntu/Docker runtime check, real-provider send/TLS/inbox test, hardware Android check, backup/restore verification, new dependency audit, or independent second-agent code review was performed. The separate SMTP success remains user-reported. No claim that live collaboration, offline editing, moves, deletion/archive, or remaining planner views are implemented.
 - Next proposed assignment: a separately scoped Kanban view over these canonical tasks, including explicit authorized workspace selection and non-drag controls. It has not been started. Review task 005 and this handoff before assigning it.
+
+### Independent review follow-up
+
+Coordinator review of committed `0929f9a` independently passed lint/types, schema validation, Webpack build, **53/53** unit/database/SMTP checks, and **24/24** browser cases in one full run (4.8 minutes). A separate same-cookie-jar two-tab reproduction found that account A's header and unsaved shared-task draft can remain after account B signs in elsewhere and the original tab navigates away/back. The existing passing cases do not cover that identity transition. The earlier completion claim about account-change draft clearing is therefore incomplete; [task 006](006-cross-tab-session-isolation.md) must fix and test it before closure. Other implementation-era test/migration evidence above is preserved as history.
 
 Stage only this assignment's changed files and provide a commit message. Leave committing, pushing, and deployment to the owner unless explicitly instructed otherwise.
