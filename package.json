@@ -17,6 +17,7 @@
     "test": "node scripts/test-command.mjs integration",
     "test:e2e": "node scripts/test-command.mjs browser",
     "db:generate": "prisma generate",
+    "email:check": "node scripts/check-email-config.mjs",
     "db:migrate": "prisma migrate deploy",
     "db:test:migrate": "node scripts/test-command.mjs migrate",
     "postinstall": "prisma generate",

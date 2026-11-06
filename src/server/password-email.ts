@@ -1,17 +1,9 @@
 import "server-only";
 import nodemailer from "nodemailer";
-import { z } from "zod";
-import { mailSenderSchema } from "./mail-sender";
-
-const smtpSchema = z.object({
-  host: z.string().min(1), port: z.coerce.number().int().min(1).max(65535),
-  user: z.string().min(1), password: z.string().min(1), from: mailSenderSchema,
-});
+import { passwordEmailSettings } from "./password-email-config.mjs";
 
 export function passwordEmailConfig() {
-  if (process.env.PASSWORD_RESET_ENABLED !== "true") return null;
-  const parsed = smtpSchema.safeParse({ host: process.env.SMTP_HOST, port: process.env.SMTP_PORT ?? "587", user: process.env.SMTP_USER, password: process.env.SMTP_PASSWORD, from: process.env.SMTP_FROM });
-  return parsed.success ? parsed.data : null;
+  return passwordEmailSettings().config;
 }
 
 export async function sendPasswordEmail(to: string, token: string, baseURL: string) {

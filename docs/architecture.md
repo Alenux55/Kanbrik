@@ -29,6 +29,8 @@ The domain sections below remain a planning contract, not implemented behavior. 
 
 ### Password confirmation and recovery (task 004)
 
+- `npm run email:check` loads Next's development environment-file precedence and calls the same pure configuration validator as the server. It reports invalid setting names and inherited-shell overrides without values, raw validation errors, or network connections. SMTP connectivity/delivery is a separate check; public recovery pages still expose only the generic configured/unconfigured state.
+
 - `SMTP_FROM` accepts a plain email address or `Display Name <email>` (including a quoted display name). It is validated as one mailbox and passed to Nodemailer as a structured name/address object for safe header formatting. Invalid addresses, multiple mailboxes and embedded control characters are rejected.
 
 - Explicitly requested follow-up to the identity slice: sign-up confirms the password locally before making an auth request; the extra confirmation is not a new stored credential or API authentication mechanism. Sign-in links to public `/forgot-password`; `/reset-password` accepts an emailed token and confirms the new password. Pending/error states retain recoverable input, and successful reset requires a fresh sign-in.
