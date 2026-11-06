@@ -1,8 +1,11 @@
 "use client";
 import { useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { usePlannerSession } from "./planner-session";
 
 export function WorkspaceCreate() {
+  const session = usePlannerSession();
+  const [lease] = useState(session.capture);
   const router = useRouter();
   const [name, setName] = useState("");
   const [pending, setPending] = useState(false);
@@ -13,15 +16,16 @@ export function WorkspaceCreate() {
     if (busy.current) return;
     busy.current = true; setPending(true); setError("");
     try {
-      const response = await fetch("/api/workspaces", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
+      const response = await session.fetch("/api/workspaces", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
       if (!response.ok) {
         if (response.status === 401) router.replace("/sign-in");
         throw new Error("Could not confirm creation. Your name is kept below; check it and retry.");
       }
       const workspace = await response.json();
+      if (!session.isCurrent(lease)) return;
       router.push(`/workspaces/${encodeURIComponent(workspace.id)}`); router.refresh();
-    } catch { setError("Could not confirm creation. Your name is kept below; check it and retry."); }
-    finally { busy.current = false; setPending(false); }
+    } catch { if (session.isCurrent(lease)) setError("Could not confirm creation. Your name is kept below; check it and retry."); }
+    finally { if (session.isCurrent(lease)) { busy.current = false; setPending(false); } }
   }
   return <section className="mt-10 rounded-xl border border-neutral-200 bg-white p-6">
     <h2 className="text-xl font-semibold">Create a shared workspace</h2>

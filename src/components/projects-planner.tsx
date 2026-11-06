@@ -4,6 +4,7 @@ import type { WorkspaceSummary } from "@/lib/workspace-contracts";
 import type { ProjectRecord, TaskRecord } from "@/lib/planning-contracts";
 import { taskStatusIds, taskStatusLabels } from "@/lib/task-statuses";
 import { usePlanningDrafts, type PlanningDraft } from "./planning-drafts";
+import { usePlannerSession } from "./planner-session";
 
 const control = "mt-2 block min-h-12 w-full rounded-lg border border-neutral-400 bg-white px-3 py-2 focus-visible:outline-2 focus-visible:outline-teal-700";
 const button = "min-h-12 rounded-lg border border-neutral-400 px-4 py-2 disabled:opacity-60";
@@ -28,6 +29,8 @@ export function ProjectsPlanner({ workspaces }: { workspaces: WorkspaceSummary[]
 }
 
 function WorkspacePlanning({ workspace }: { workspace: WorkspaceSummary }) {
+  const session = usePlannerSession();
+  const [lease] = useState(session.capture);
   const [data, setData] = useState<PlanningData | null>(null);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [taskId, setTaskId] = useState<string | null>(null);
@@ -45,13 +48,13 @@ function WorkspacePlanning({ workspace }: { workspace: WorkspaceSummary }) {
   useEffect(() => {
     let active = true;
     const sequence = ++refreshSequence.current;
-    Promise.all([fetch(`${path}/projects`, { cache: "no-store" }), fetch(`${path}/tasks`, { cache: "no-store" })]).then(async responses => {
-      if (!active || sequence !== refreshSequence.current) return;
+    Promise.all([session.fetch(`${path}/projects`, { cache: "no-store" }), session.fetch(`${path}/tasks`, { cache: "no-store" })]).then(async responses => {
+      if (!active || !session.isCurrent(lease) || sequence !== refreshSequence.current) return;
       if (responses.some(response => response.status === 401 || response.status === 404)) { accessEnded(); return; }
       if (responses.some(response => !response.ok)) throw new Error();
       const [projects, tasks] = await Promise.all(responses.map(response => response.json()));
-      if (active && sequence === refreshSequence.current) setData({ projects, tasks });
-    }).catch(() => { if (active && sequence === refreshSequence.current) setError("Could not load planning. Try Refresh planning."); });
+      if (active && session.isCurrent(lease) && sequence === refreshSequence.current) setData({ projects, tasks });
+    }).catch(() => { if (active && session.isCurrent(lease) && sequence === refreshSequence.current) setError("Could not load planning. Try Refresh planning."); });
     return () => { active = false; };
     // A new component is mounted for each workspace; drafts live above it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -62,14 +65,14 @@ function WorkspacePlanning({ workspace }: { workspace: WorkspaceSummary }) {
     const sequence = ++refreshSequence.current;
     setPending(true); setError("");
     try {
-      const responses = await Promise.all([fetch(`${path}/projects`, { cache: "no-store" }), fetch(`${path}/tasks`, { cache: "no-store" })]);
-      if (sequence !== refreshSequence.current) return;
+      const responses = await Promise.all([session.fetch(`${path}/projects`, { cache: "no-store" }), session.fetch(`${path}/tasks`, { cache: "no-store" })]);
+      if (!session.isCurrent(lease) || sequence !== refreshSequence.current) return;
       if (responses.some(response => response.status === 401 || response.status === 404)) { accessEnded(); return; }
       if (responses.some(response => !response.ok)) throw new Error();
       const [projects, tasks] = await Promise.all(responses.map(response => response.json()));
-      if (sequence === refreshSequence.current) setData({ projects, tasks });
-    } catch { if (sequence === refreshSequence.current) setError("Could not refresh planning. Drafts have been kept; try again."); }
-    finally { refreshBusy.current = false; setPending(false); }
+      if (session.isCurrent(lease) && sequence === refreshSequence.current) setData({ projects, tasks });
+    } catch { if (session.isCurrent(lease) && sequence === refreshSequence.current) setError("Could not refresh planning. Drafts have been kept; try again."); }
+    finally { if (session.isCurrent(lease)) { refreshBusy.current = false; setPending(false); } }
   }
   function saved(kind: "projects" | "tasks", record: Saved) {
     setData(current => current && ({ ...current, [kind]: [...current[kind].filter(item => item.id !== record.id), record].sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id)) }));
@@ -123,6 +126,8 @@ function PlanningForm({ kind, workspaceId, record, projectId, parentId, heading,
   kind: "projects" | "tasks"; workspaceId: string; record?: Saved; projectId?: string | null; parentId?: string;
   heading: string; onSaved: (record: Saved) => void; onUnavailable: () => void;
 }) {
+  const session = usePlannerSession();
+  const [lease] = useState(session.capture);
   const { drafts, setDrafts, savingKeys, beginSave, finishSave } = usePlanningDrafts();
   const key = `${workspaceId}/${kind}/${record?.id ?? `new-${projectId ?? "standalone"}-${parentId ?? "root"}`}`;
   const initial: PlanningDraft = { title: record?.title ?? "", description: record?.description ?? "", status: record && "status" in record ? record.status : "todo", revision: record?.revision ?? 1, dirty: false };
@@ -148,13 +153,14 @@ function PlanningForm({ kind, workspaceId, record, projectId, parentId, heading,
     setError(""); setMessage("");
     try {
       const payload = { title: draft.title, description: draft.description, ...(kind === "tasks" ? { status: draft.status } : {}), ...(record ? { revision: draft.revision } : kind === "tasks" ? { projectId, parentId } : {}) };
-      const response = await fetch(`/api/workspaces/${encodeURIComponent(workspaceId)}/${kind}${record ? `/${encodeURIComponent(record.id)}` : ""}`, { method: record ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      const response = await session.fetch(`/api/workspaces/${encodeURIComponent(workspaceId)}/${kind}${record ? `/${encodeURIComponent(record.id)}` : ""}`, { method: record ? "PATCH" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       if (response.status === 401 || response.status === 404) { onUnavailable(); return; }
       const result = await response.json();
+      if (!session.isCurrent(lease)) return;
       if (response.status === 409) { setConflict(result.current); throw new Error(result.error); }
       if (!response.ok) throw new Error(result.error ?? "Save not confirmed. Your draft is kept for retry.");
       saved = true; onSaved(result); discard(); setMessage("Saved.");
-    } catch (failure) { setError(failure instanceof Error ? failure.message : "Save not confirmed. Your draft is kept for retry."); }
+    } catch (failure) { if (session.isCurrent(lease)) setError(failure instanceof Error ? failure.message : "Save not confirmed. Your draft is kept for retry."); }
     finally { finishSave(key, saved); }
   }
   return <form aria-label={heading} className={box} aria-busy={pending} onSubmit={event => { event.preventDefault(); void submit(); }}>

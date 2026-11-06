@@ -3,8 +3,11 @@ import Link from "next/link";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { WorkspaceDetail } from "@/lib/workspace-contracts";
+import { usePlannerSession } from "./planner-session";
 
 export function WorkspaceMembers({ initial }: { initial: WorkspaceDetail }) {
+  const session = usePlannerSession();
+  const [lease] = useState(session.capture);
   const router = useRouter();
   const [workspace, setWorkspace] = useState<WorkspaceDetail | null>(initial);
   const [email, setEmail] = useState("");
@@ -15,13 +18,14 @@ export function WorkspaceMembers({ initial }: { initial: WorkspaceDetail }) {
   const path = `/api/workspaces/${encodeURIComponent(initial.id)}`;
 
   async function refresh() {
-    const response = await fetch(path, { cache: "no-store" });
+    const response = await session.fetch(path, { cache: "no-store" });
     if (response.status === 401 || response.status === 404) {
       setWorkspace(null);
       throw new Error("This workspace is no longer accessible. Your change is not confirmed.");
     }
     if (!response.ok) throw new Error("Could not refresh workspace access. Please retry.");
-    setWorkspace(await response.json());
+    const result = await response.json();
+    if (session.isCurrent(lease)) setWorkspace(result);
   }
   async function run(action?: { suffix: string; method: "POST" | "DELETE"; body: object; leave?: boolean }) {
     if (busy.current) return;
@@ -29,7 +33,7 @@ export function WorkspaceMembers({ initial }: { initial: WorkspaceDetail }) {
     let saved = false;
     try {
       if (action) {
-        const response = await fetch(path + action.suffix, { method: action.method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(action.body) });
+        const response = await session.fetch(path + action.suffix, { method: action.method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(action.body) });
         if (!response.ok) {
           if (response.status === 401 || response.status === 404) {
             // A missing account/member is also a 404; recheck workspace access
@@ -39,16 +43,18 @@ export function WorkspaceMembers({ initial }: { initial: WorkspaceDetail }) {
           const result = await response.json();
           throw new Error(result.error ?? "Change not confirmed. Please retry.");
         }
+        if (!session.isCurrent(lease)) return;
         saved = true;
         if (action.leave) { setWorkspace(null); router.replace("/workspaces"); router.refresh(); return; }
         if (action.suffix === "/members") setEmail("");
       }
       await refresh();
+      if (!session.isCurrent(lease)) return;
       setMessage(saved ? "Saved. Workspace access is up to date." : "Workspace access is up to date.");
       router.refresh();
     } catch (failure) {
-      setError(saved ? "Change saved, but details could not refresh. Use Refresh access to check again." : failure instanceof Error ? failure.message : "Change not confirmed. Please retry.");
-    } finally { busy.current = false; setPending(false); }
+      if (session.isCurrent(lease)) setError(saved ? "Change saved, but details could not refresh. Use Refresh access to check again." : failure instanceof Error ? failure.message : "Change not confirmed. Please retry.");
+    } finally { if (session.isCurrent(lease)) { busy.current = false; setPending(false); } }
   }
 
   if (!workspace) return <section><h1 className="text-3xl font-semibold">Workspace unavailable</h1><p role="alert" className="my-5">Your access may have ended, or you may need to sign in again.</p><Link href="/workspaces" className="underline">Back to your workspaces</Link></section>;

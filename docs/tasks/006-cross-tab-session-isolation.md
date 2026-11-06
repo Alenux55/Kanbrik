@@ -1,6 +1,6 @@
 # 006: Cross-tab session and planning-draft isolation
 
-Status: Not started. Focused corrective handoff from the review of `0929f9a`.
+Status: Implemented and verified. Focused corrective handoff from the review of `0929f9a`; ready for independent coordinator review.
 
 Suggested model: GPT-6.1 Sol, High effort. Reuse the implementation chat and reread current repository instructions. This task does not include Kanban implementation.
 
@@ -76,12 +76,33 @@ Respect the existing auth rate limits when arranging repeated logins; do not wea
 
 ## Completion handoff
 
-Not completed. Record after implementation:
+Implemented against `c8fabab` (task 006 preparation, application baseline `0929f9a`) on 2026-11-05. No dependencies, schema/migrations, SMTP/provider settings or membership/registration policy were changed. No server deployment or later planner feature was performed.
 
-- Files/components changed, the verified session boundary, identity-change triggers, and mutation/in-flight handling.
-- Before/after reproduction evidence and new desktop/Android test counts, including same-cookie-jar identity switching and logout.
-- Actual lint/type/build/unit/integration/full-browser results, distinguishing focused reruns and any runtime limitations.
-- Remaining defects or risks and whether task 005's cross-tab draft-isolation limitation can now be closed.
-- Next proposed work, only after this fix is reviewed: a separately bounded Kanban view over canonical tasks with authorized workspace selection and non-drag controls. Do not start it automatically.
+### Implementation and contracts
+
+- Added `src/components/planner-session.tsx` and `src/lib/planner-session.ts`: one verified session boundary around the complete protected layout, including header, workspace options/management, and drafts. Better Auth 1.7.18 installed API/types/source were checked: direct `getSession` with disabled cookie cache/no-store is supported; its storage/focus refresh manager requires a mounted session subscription, and the existing application did not have one. The fix uses explicit verification rather than assuming a layout key/client singleton is live.
+- Initial/pathname, focus/visible resume, pageshow, auth pulse, and pre-mutation checks verify the current server session. `session-signal.ts` emits only a non-secret invalidation nonce after successful signup/sign-in/sign-out/reset. The Better Auth storage key is also treated only as a hint. No background polling, user identity selection from messages, draft broadcast, or durable draft storage.
+- A checking/error boundary hides and makes the protected shell inert without unmounting it. Failed/timed-out verification requests pause editing with Retry session check; only a successful null session confirms logout. Same-user checks preserve drafts, selection, revision/conflict review, and in-flight work. Check versions ignore out-of-order identity responses; a new signal supersedes any old verifier.
+- Confirmed account change advances an epoch, aborts protected fetches, clears provider drafts/selection/save locks, allows document exit without the obsolete draft warning, and replaces the document with Projects/sign-in. Header, authorized workspace options, errors/conflicts and forms are refreshed together. Context guards in planning, workspace creation/membership, sign-out and draft setters/completion callbacks ignore obsolete work. Real unmount disposes the old coordinator without allowing it to navigate a replacement boundary; immediate Strict Mode reattachment keeps the same context usable.
+- Added shared `session-contract.ts` and server `session-precondition.ts`. Protected UI requests carry `X-Kanbrik-Account`; verified server sessions reject a mismatch with safe 412 / `SESSION_CHANGED`. This also applies to reads and sign-out. It is an optional rejection precondition for existing API clients, never authorization or a client-selected acting user. Cookies, session validity, workspace membership and trusted Origin remain authoritative. Body contracts and data ownership are unchanged.
+- Requests verify both before dispatch and after consuming network responses. Account/epoch checks and aborts prevent A-era responses from mutating B's state or releasing B's pending lock. A server transaction authorized before a switch can still commit; cancellation is not rollback. The held-response regression explicitly confirms that distinction.
+
+### Verification evidence
+
+- Before fix: the same-cookie desktop regression against the existing task 005 production build confirmed the shared context was B while tab 1 never acquired B's header (failed the B-header assertion after 5 seconds). Coordinator's prior Board → Projects reproduction remains recorded above. An initial baseline-harness attempt waited for a focus verification that the old implementation did not implement and timed out; the baseline was adjusted to reach the actual account-switch assertion. No passing-old-suite claim substitutes for this reproduction.
+- `npm run check`, `npm run db:validate`, default `npm run build` (Turbopack), and `npm run build -- --webpack` passed. Final HTTP/browser verification uses the Webpack build. Historical default-build helper failures remain unexplained; no root-cause fix claimed. No migration is required for task 006.
+- Final `npm run test`: **54/54 passed** in four files, including all 53 prior database/HTTP/SMTP/safety checks and a real-session expected-account regression. An A expectation with B's authenticated shared-editor cookie cannot read/update/create content, create a workspace or sign B out (412); saved task text/revision and B's session remain unchanged. Correct expectation permits an authorized edit, while matching outsider/anonymous expectations still fail membership/auth checks (404/401).
+- Initial focused browser command `npm run test:e2e -- --grep "same-cookie tabs|session verification failures|obsolete save completion"`: **6/6 passed**, three desktop plus three Pixel 7 cases. Tests use actual form sign-in with two pages in the **same browser context**, owned disposable accounts/shared task, and controlled request/response gates; no test reload of the stale tab. Follow-up assertions add same-user conflict-state retention and lifecycle cleanup coverage to the final run.
+- New journeys cover A → B → A without draft resurrection; effective session/header/empty selection; no stale draft write; foreground/background-tab logout; same-user focus/navigation preservation; failed/repeated checks with retry and retained draft; a held obsolete verifier that cannot dispatch A's draft after B appears; and a committed A-era save response released while B has its own held save, retaining B's text/pending lock and producing B's eventual revision 3.
+- Development/Strict Mode smoke: `node .local/task006-dev-smoke.mjs` (ignored temporary verification harness) started an isolated Next dev/Webpack server on loopback 3114 with guarded test DB and email recovery disabled, exercised actual signup, navigation/focus with retained draft, task save and sign-out, then stopped only its own process tree and deleted its own fixture. It passed. Next generated a dev route-type reference in `next-env.d.ts`; the subsequent normal type generation restored the production reference, with no tracked file diff. Harness is a local artifact, not a new application command.
+
+Final complete browser result: **30/30 passed in one full `npm run test:e2e` run (6.1 minutes)** against the final Webpack build. All six new same-cookie desktop/Android cases and all 24 existing auth/recovery/planning/conflict/revocation/retry/navigation/keyboard/touch cases passed, with no focused recovery rerun needed. Same-user conflict review remains visible and Save stays blocked after revalidation; the original tab is never reloaded by test code to repair an identity switch. The retry tests intentionally emit sanitized bootstrap-failure server logs and then verify recovery. The initial focused 6/6 result is distinct from this final full-suite evidence.
+
+### Limits and next review
+
+- Independent coordinator review remains the next handoff; this implementer did not spawn a separate reviewer. The reproduced task 005 gap is addressed by implementation plus explicit new regressions and final full-suite evidence, ready for that review.
+- Event/action synchronization cannot retract previously downloaded data or run while a browser suspends JavaScript. Notifications may be unavailable; resume/navigation/action verification and server preconditions still apply. Verification-network errors retain the original scoped draft behind a neutral retry screen, not an editable unknown-account form. Aborted responses do not reverse committed work.
+- No production/provider mail, Ubuntu/Docker runtime, hardware Android, dependency audit, backup/restore, or deployment check was performed. Existing guarded PostgreSQL and memory-only loopback SMTP fixtures were retained, with no rate-limit bypass or blanket retry changes.
+- Proposed next work only after review: separately scoped Kanban over canonical tasks with authorized workspace selection and non-drag controls. It was not started.
 
 Stage only this assignment's changed files and provide a commit message. Leave committing/pushing/deployment to the owner unless explicitly instructed otherwise.

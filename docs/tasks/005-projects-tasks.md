@@ -1,6 +1,6 @@
 # 005: Workspace-owned projects and tasks
 
-Status: Implemented and independently reviewed at `0929f9a`; cross-tab account/draft isolation needs corrective task 006. See completion evidence and review addendum for exact results.
+Status: Implemented and independently reviewed at `0929f9a`; the cross-tab account/draft finding is addressed and verified by corrective task 006, ready for its independent review. See both handoffs for exact evidence.
 
 Suggested model: GPT-6.1 Sol, High effort. Reuse the implementation chat from tasks 001–004, rereading the current instructions, coordinator handoff, and this task. Model choice is not configured by this file.
 
@@ -145,5 +145,7 @@ Final Webpack browser regression: `npm run test:e2e` had **23 passes and 1 failu
 ### Independent review follow-up
 
 Coordinator review of committed `0929f9a` independently passed lint/types, schema validation, Webpack build, **53/53** unit/database/SMTP checks, and **24/24** browser cases in one full run (4.8 minutes). A separate same-cookie-jar two-tab reproduction found that account A's header and unsaved shared-task draft can remain after account B signs in elsewhere and the original tab navigates away/back. The existing passing cases do not cover that identity transition. The earlier completion claim about account-change draft clearing is therefore incomplete; [task 006](006-cross-tab-session-isolation.md) must fix and test it before closure. Other implementation-era test/migration evidence above is preserved as history.
+
+Task 006 subsequently implements a server-verified whole-planner session boundary, identity-change invalidation, stale-actor request preconditions, and context-scoped completion guards. Its new same-cookie tests pass within a **30/30** full desktop/Android run, and the real-session suite passes **54/54**. Exact evidence and the independent-review handoff belong to [task 006's completion handoff](006-cross-tab-session-isolation.md#completion-handoff). The original claim is superseded by that verified strategy, rather than by the old layout key alone.
 
 Stage only this assignment's changed files and provide a commit message. Leave committing, pushing, and deployment to the owner unless explicitly instructed otherwise.

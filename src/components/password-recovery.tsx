@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { authClient } from "@/lib/auth-client";
+import { announceSessionChange } from "@/lib/session-signal";
 
 const inputClass = "mt-2 block min-h-12 w-full rounded-lg border border-neutral-400 bg-white px-3 focus-visible:outline-2 focus-visible:outline-teal-700";
 const buttonClass = "min-h-12 rounded-lg bg-teal-900 px-5 py-3 text-white disabled:opacity-60";
@@ -59,6 +60,7 @@ export function ResetPassword() {
       const result = await authClient.resetPassword({ newPassword: String(data.get("password")), token });
       if (result.error) throw new Error();
       form.reset(); setComplete(true); setToken("");
+      announceSessionChange();
     } catch { setError("Could not reset your password. The link may be invalid or expired. Retry or request a new link."); }
     finally { busy.current = false; setPending(false); }
   }

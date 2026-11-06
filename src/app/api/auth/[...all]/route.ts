@@ -1,10 +1,12 @@
-import { authentication } from "@/server/auth";
+import { authentication, verifiedSession } from "@/server/auth";
+import { SessionChanged } from "@/server/session-precondition";
 import { serverConfig } from "@/server/config";
 
 export const dynamic = "force-dynamic";
 async function handler(request: Request) {
   try {
     const url = new URL(request.url);
+    if (request.method === "POST" && url.pathname.endsWith("/sign-out")) await verifiedSession(request.headers);
     const resetRequest = /\/(request-password-reset|reset-password)\/?$/.test(url.pathname);
     const resetCallback = url.pathname.startsWith("/api/auth/reset-password/");
     if (resetRequest || resetCallback) {
@@ -21,6 +23,9 @@ async function handler(request: Request) {
     }
     return await authentication().handler(request);
   }
-  catch { return Response.json({ error: "Authentication is temporarily unavailable. Please retry." }, { status: 503 }); }
+  catch (error) {
+    if (error instanceof SessionChanged) return Response.json({ error: "Account changed. Verify your session.", code: "SESSION_CHANGED" }, { status: 412, headers: { "Cache-Control": "no-store" } });
+    return Response.json({ error: "Authentication is temporarily unavailable. Please retry." }, { status: 503 });
+  }
 }
 export { handler as GET, handler as POST };

@@ -2,6 +2,7 @@
 import { useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
+import { announceSessionChange } from "@/lib/session-signal";
 
 export function AuthForm({ signUp, registrationEnabled }: { signUp: boolean; registrationEnabled: boolean }) {
   const [pending, setPending] = useState(false);
@@ -22,7 +23,7 @@ export function AuthForm({ signUp, registrationEnabled }: { signUp: boolean; reg
       const result = signUp ? await authClient.signUp.email({ ...credentials, name: String(form.get("name")) }) : await authClient.signIn.email(credentials);
       if (result.error) { setError(signUp ? "Could not create this account. Check your details or try signing in." : "Could not sign in. Check your email and password, then retry."); }
       // A full navigation discards any previous account's client router state.
-      else { window.location.replace(new URL("/projects", window.location.origin).href); return; }
+      else { announceSessionChange(); window.location.replace(new URL("/projects", window.location.origin).href); return; }
     } catch { setError("Could not connect. Please retry."); }
     busy.current = false; setPending(false);
   }

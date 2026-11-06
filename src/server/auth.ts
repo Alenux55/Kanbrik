@@ -4,6 +4,7 @@ import { prismaAdapter } from "@better-auth/prisma-adapter";
 import { serverConfig } from "./config";
 import { database } from "./db";
 import { passwordEmailConfig, sendPasswordEmail } from "./password-email";
+import { assertExpectedAccount } from "./session-precondition";
 
 function createAuth() {
   const config = serverConfig();
@@ -26,5 +27,7 @@ let instance: ReturnType<typeof createAuth> | undefined;
 export function authentication() { return instance ??= createAuth(); }
 
 export async function verifiedSession(headers: Headers) {
-  return authentication().api.getSession({ headers, query: { disableCookieCache: true } });
+  const session = await authentication().api.getSession({ headers, query: { disableCookieCache: true } });
+  if (session) assertExpectedAccount(headers, session.user.id);
+  return session;
 }

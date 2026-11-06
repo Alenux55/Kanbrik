@@ -27,6 +27,7 @@ test("navigation reaches every route with one active link and no horizontal over
 
 test("keyboard can skip navigation and activate a destination", async ({ page }) => {
   await page.goto("/projects");
+  await expect(page.getByRole("link", { name: "Skip to content" })).toBeVisible();
   await page.keyboard.press("Tab");
   await expect(page.getByRole("link", { name: "Skip to content" })).toBeFocused();
   await page.keyboard.press("Enter");

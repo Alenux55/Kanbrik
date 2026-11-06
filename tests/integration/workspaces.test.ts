@@ -7,6 +7,7 @@ import { assertTestDatabase } from "../../scripts/test-target.mjs";
 import { failFixtureMembership } from "../database";
 import { startMailCapture } from "../mail-capture.mjs";
 import { taskStatusIds, taskCompleted } from "../../src/lib/task-statuses";
+import { expectedAccountHeader } from "../../src/lib/session-contract";
 
 const url = assertTestDatabase(process.env.TEST_DATABASE_URL);
 const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: url }), log: [] });
@@ -110,6 +111,24 @@ describe("canonical projects/tasks through real HTTP and PostgreSQL", () => {
     expect((await (await get(`${base()}/tasks/${child.id}`, editor.cookie)).json()).projectId).toBe(project.id);
     const rows = await (await get(`${base()}/tasks`)).json();
     expect(rows.map((row: { id: string }) => row.id)).toEqual([parent.id, child.id]);
+  });
+  it("rejects an obsolete account precondition even when the new account is a shared editor", async () => {
+    const task = await create(`${base()}/tasks`, { title: "Account precondition", description: "Saved text" });
+    const request = (path: string, method: string, body?: object, expected = owner.id, cookie = editor.cookie) => fetch(`${origin}${path}`, {
+      method, headers: { cookie, origin, "content-type": "application/json", [expectedAccountHeader]: expected }, body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    expect((await request(`${base()}/tasks/${task.id}`, "PATCH", { ...edit(), description: "Old account draft" })).status).toBe(412);
+    expect((await request(`${base()}/tasks`, "POST", { title: "Old create draft" })).status).toBe(412);
+    expect((await request("/api/workspaces", "POST", { name: "Old workspace draft" })).status).toBe(412);
+    expect((await request(`${base()}/tasks`, "GET")).status).toBe(412);
+    expect((await request("/api/auth/sign-out", "POST", {})).status).toBe(412);
+    expect((await get("/api/workspaces", editor.cookie)).status).toBe(200);
+    const unchanged = await db.task.findUniqueOrThrow({ where: { id: task.id } });
+    expect(unchanged.description).toBe("Saved text"); expect(unchanged.revision).toBe(1);
+    expect((await request(`${base()}/tasks/${task.id}`, "PATCH", edit(), editor.id)).status).toBe(200);
+    // Matching/omitted expectations never substitute for actual authorization.
+    expect((await request(`${base()}/tasks`, "GET", undefined, outsider.id, outsider.cookie)).status).toBe(404);
+    expect((await request(`${base()}/tasks`, "GET", undefined, owner.id, "")).status).toBe(401);
   });
   it("saves every fixed status while parent/child completion stays independent", async () => {
     let revision = 1;

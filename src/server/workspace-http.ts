@@ -3,6 +3,7 @@ import { z } from "zod";
 import { serverConfig } from "./config";
 import { verifiedSession } from "./auth";
 import { Unauthenticated, WorkspaceDenied } from "./workspaces";
+import { SessionChanged } from "./session-precondition";
 
 export function workspaceResponse(data: unknown, status = 200) {
   return Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
@@ -10,6 +11,7 @@ export function workspaceResponse(data: unknown, status = 200) {
 export async function workspaceRequest(operation: () => Promise<Response>) {
   try { return await operation(); }
   catch (error) {
+    if (error instanceof SessionChanged) return workspaceResponse({ error: "Account changed. Verify your session before continuing.", code: "SESSION_CHANGED" }, 412);
     if (error instanceof Unauthenticated) return workspaceResponse({ error: "Sign in required" }, 401);
     if (error instanceof WorkspaceDenied) return workspaceResponse({ error: error.message }, error.status);
     if (error instanceof z.ZodError) return workspaceResponse({ error: "Check the required fields and remove unsupported fields." }, 400);

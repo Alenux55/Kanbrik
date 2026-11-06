@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { personalWorkspace, Unauthenticated } from "@/server/workspaces";
 import { verifiedSession } from "@/server/auth";
 import { PlanningDrafts } from "@/components/planning-drafts";
+import { PlannerSessionBoundary } from "@/components/planner-session";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +22,7 @@ export default async function PlannerLayout({ children }: Readonly<{ children: R
     throw new Error("Workspace setup is temporarily unavailable. Refresh to retry.");
   }
   return (
-    <PlanningDrafts key={session.user.id}>
+    <PlannerSessionBoundary key={session.user.id} userId={session.user.id}><PlanningDrafts>
         <a href="#main-content" className="skip-link">Skip to content</a>
         <div className="min-h-dvh lg:grid lg:grid-cols-[16rem_minmax(0,1fr)]">
           <aside className="border-b border-neutral-200 bg-neutral-100 p-5 lg:border-r lg:border-b-0 lg:p-6">
@@ -43,6 +44,6 @@ export default async function PlannerLayout({ children }: Readonly<{ children: R
             <main id="main-content" tabIndex={-1} className="mx-auto max-w-5xl px-6 py-10 outline-none lg:px-10 lg:py-16">{children}</main>
           </div>
         </div>
-    </PlanningDrafts>
+    </PlanningDrafts></PlannerSessionBoundary>
   );
 }
