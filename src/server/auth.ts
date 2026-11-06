@@ -27,7 +27,7 @@ let instance: ReturnType<typeof createAuth> | undefined;
 export function authentication() { return instance ??= createAuth(); }
 
 export async function verifiedSession(headers: Headers) {
-  const session = await authentication().api.getSession({ headers, query: { disableCookieCache: true } });
+  const session = await authentication().api.getSession({ headers, query: { disableCookieCache: true, disableRefresh: true } });
   if (session) assertExpectedAccount(headers, session.user.id);
   return session;
 }

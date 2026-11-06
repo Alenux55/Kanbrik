@@ -60,6 +60,31 @@ afterAll(async () => {
   await mail?.close();
 });
 
+describe("read-only planner identity probe", () => {
+  it("never forwards cookie headers or renews a due session, and exposes only minimal identity", async () => {
+    const user = await account();
+    const expiry = new Date(Date.now() + 3600000);
+    await db.session.updateMany({ where: { userId: user.id }, data: { expiresAt: expiry } });
+    const probe = (cookie = user.cookie, expected?: string) => fetch(`${origin}/api/planner-session`, { headers: { cookie, ...(expected ? { [expectedAccountHeader]: expected } : {}) } });
+    const response = await probe();
+    expect(response.status).toBe(200); expect(response.headers.getSetCookie()).toEqual([]);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(await response.json()).toEqual({ userId: user.id });
+    expect((await db.session.findFirstOrThrow({ where: { userId: user.id } })).expiresAt.getTime()).toBe(expiry.getTime());
+    const failure = await probe(user.cookie, "obsolete-account");
+    expect(failure.status).toBe(503); expect(failure.headers.getSetCookie()).toEqual([]);
+    for (const cookie of ["", "better-auth.session_token=invalid"]) {
+      const missing = await probe(cookie);
+      expect(missing.status).toBe(200); expect(missing.headers.getSetCookie()).toEqual([]);
+      expect(await missing.json()).toEqual({ userId: null });
+    }
+    await db.session.updateMany({ where: { userId: user.id }, data: { expiresAt: new Date(0) } });
+    const expired = await probe();
+    expect(expired.status).toBe(200); expect(expired.headers.getSetCookie()).toEqual([]);
+    expect(await expired.json()).toEqual({ userId: null });
+  });
+});
+
 describe("canonical projects/tasks through real HTTP and PostgreSQL", () => {
   let owner: Awaited<ReturnType<typeof account>>;
   let editor: Awaited<ReturnType<typeof account>>;

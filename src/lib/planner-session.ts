@@ -1,5 +1,4 @@
 "use client";
-import { authClient } from "./auth-client";
 import { expectedAccountHeader } from "./session-contract";
 
 type Snapshot = { phase: "checking" | "ready" | "error" | "changing"; path: string };
@@ -58,11 +57,13 @@ export class PlannerSession {
     const request = { version, promise: Promise.resolve(null) as Promise<SessionLease | null> };
     request.promise = (async () => {
       try {
-        const result = await authClient.getSession({ query: { disableCookieCache: true }, fetchOptions: { cache: "no-store", signal: AbortSignal.timeout(10_000) } });
+        const response = await fetch("/api/planner-session", { cache: "no-store", signal: AbortSignal.timeout(10_000) });
+        if (!response.ok) throw new SessionUnavailable();
+        const result: unknown = await response.json();
         if (this.leaving) return null;
         if (version !== this.version) return this.verify(false);
-        if (result.error || result.data === undefined) throw new SessionUnavailable();
-        const userId = result.data?.user.id ?? null;
+        if (!result || typeof result !== "object" || !("userId" in result) || (result.userId !== null && typeof result.userId !== "string")) throw new SessionUnavailable();
+        const userId = result.userId;
         if (userId !== this.userId) { this.invalidate(userId); return null; }
         this.phase("ready"); return this.capture();
       } catch {

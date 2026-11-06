@@ -1,16 +1,62 @@
 import type { Browser, Page, Route } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import { test, expect } from "./base";
+import { testDB } from "../database";
 
 test.setTimeout(90_000);
 const origin = "http://127.0.0.1:3100";
-const sessionPath = "**/api/auth/get-session*";
+const sessionPath = "**/api/planner-session";
 const taskPath = "**/api/workspaces/*/tasks/*";
 type Account = { email: string; password: string; id: string };
 function gate() {
   let release!: () => void;
   const promise = new Promise<void>(resolve => { release = resolve; });
   return { promise, release };
+}
+
+for (const state of ["renewal", "expired"] as const) {
+  test(`delayed ${state} verification cannot replace or erase a newer sign-in cookie without notification hints`, async ({ browser, context, page, testAccounts, testWorkspaces }) => {
+    await context.addInitScript(() => {
+      window.addEventListener = new Proxy(window.addEventListener, { apply(target, receiver, args) {
+        if (args[0] === "storage") return;
+        return Reflect.apply(target, receiver, args);
+      } });
+    });
+    const { a, b, workspaceId, taskId } = await setup(browser, page, testAccounts, testWorkspaces);
+    const form = await openTask(page, workspaceId);
+    await form.getByLabel("Description").fill("Obsolete draft must never save");
+    const control = await context.newPage(); await control.goto("/sign-in");
+    await page.bringToFront(); await expect(form.getByLabel("Description")).toBeVisible();
+    await testDB.session.updateMany({ where: { userId: a.id }, data: { expiresAt: new Date(Date.now() + (state === "renewal" ? 3600000 : -1000)) } });
+    const waiting = gate(); const held = gate(); const settled = gate();
+    let first = true; let cookieHeader = false;
+    // Match both the old library probe (for before-fix reproduction) and the
+    // application probe. Preserve all upstream headers on release.
+    await page.route(/\/api\/(?:auth\/get-session(?:\?.*)?|planner-session)$/, async route => {
+      if (!first) return route.continue();
+      first = false;
+      const response = await route.fetch();
+      cookieHeader = response.headers()["set-cookie"] !== undefined;
+      waiting.release(); await held.promise;
+      await fulfillIfActive(route, response); settled.release();
+    });
+    try {
+      await form.getByRole("button", { name: "Save changes", exact: true }).click(); await waiting.promise;
+      await signIn(control, b);
+      expect((await (await context.request.get("/api/auth/get-session")).json()).user.id).toBe(b.id);
+      held.release(); await settled.promise;
+      expect((await (await context.request.get("/api/auth/get-session")).json())?.user.id).toBe(b.id);
+      await page.bringToFront();
+      if (state === "renewal") await expect(page.getByText(`Signed in as ${b.email}`, { exact: true })).toBeVisible();
+      // A stale null identity may conservatively gate at sign-in; it must not
+      // remove B's actual cookie or leave A's edit form alive.
+      await expect(page.getByLabel("Description", { exact: true })).toHaveCount(0);
+      expect((await (await context.request.get("/api/auth/get-session")).json())?.user.id).toBe(b.id);
+      const saved = await (await context.request.get(`/api/workspaces/${workspaceId}/tasks/${taskId}`)).json();
+      expect(saved.description).toBe("Saved shared text"); expect(saved.revision).toBe(1);
+      expect(cookieHeader).toBe(false);
+    } finally { held.release(); }
+  });
 }
 async function signIn(page: Page, account: Account) {
   await page.goto("/sign-in");
@@ -94,7 +140,7 @@ test("same-cookie tabs refresh account context, prevent draft resurrection, and 
   expect((await context.request.patch(`/api/workspaces/${workspaceId}/tasks/${taskId}`, { headers: { origin }, data: { title: current.title, description: current.description, status: current.status, revision: current.revision } })).status()).toBe(200);
   await aAgain.getByRole("button", { name: "Save changes", exact: true }).click();
   await expect(aAgain.getByRole("region", { name: "Saved version" })).toBeVisible();
-  const sameUserCheck = page.waitForResponse(response => response.url().includes("/api/auth/get-session"));
+  const sameUserCheck = page.waitForResponse(response => response.url().includes("/api/planner-session"));
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));
   await sameUserCheck;
   await expect(aAgain.getByLabel("Description")).toHaveValue("Draft invalidated by remote logout");
