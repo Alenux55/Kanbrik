@@ -1,12 +1,12 @@
-# Coordinator handoff — 2026-11-05
+# Coordinator handoff — 2026-11-06
 
 ## Current state
 
-Tasks 001–006 are implemented. The app has Better Auth accounts/sessions, private personal workspaces, shared owner/editor management, server-error retry, password confirmation, SMTP recovery, named senders, safe email diagnostics, workspace-owned project/task planning, and verified cross-tab session/draft isolation. Projects supports standalone/project tasks, one-level subtasks, five fixed statuses, revision conflicts, and in-session drafts. Board/calendar/checklist/inbox persistence remains unimplemented. No production deployment was performed.
+Tasks 001–006 are implemented through `0c13917`. The app has Better Auth accounts/sessions, personal/shared workspaces, recovery/email diagnostics, project/task planning, and cross-tab session/draft guards. Independent review found a remaining delayed session-cookie race; full isolation is not closed. Projects supports one-level subtasks, fixed statuses, revision conflicts, and in-session drafts. Board/calendar/checklist/inbox persistence remains unimplemented. No production deployment was performed.
 
 Read `AGENTS.md`, `docs/product.md`, `docs/architecture.md`, `docs/stack.md`, and the task completion records before assigning dependent work. Task records contain the detailed verification evidence and contracts; this file summarizes the transfer to the coordinating agent.
 
-The current committed planning implementation is [005: workspace-owned projects and tasks](tasks/005-projects-tasks.md), `0929f9a`. Its independently reproduced cross-tab account-switch gap is addressed by the staged/uncommitted [006 corrective implementation](tasks/006-cross-tab-session-isolation.md), based on preparation commit `c8fabab`; implementation verification is complete. Review task 006 before assigning Kanban work; board/calendar implementation remains separate.
+The current corrective implementation is [task 006](tasks/006-cross-tab-session-isolation.md), committed as `0c13917` after planning commit `0929f9a` and preparation `c8fabab`. Independent review requires [007: read-only session verification](tasks/007-read-only-session-verification.md) next. [008: Kanban board](tasks/008-kanban-board.md) is separately specified because its task/status/workspace contracts are unaffected by the probe fix, but runtime implementation/integration waits for task 007's independent review. Neither follow-up is implemented.
 
 ## Latest operational resolution
 
@@ -41,12 +41,20 @@ A separate two-tab test found a P2 gap at `0929f9a`: A's unsaved shared-task dra
 
 The `c8fabab` task 006 preparation was documentation-only; its carried application results were from that earlier coordinator review. The subsequent task 006 application/test implementation and its new verification are recorded separately above and in the task's completion handoff.
 
+### Task 006 review at `0c13917`
+
+Independent review passed `npm run check`, `npm run db:validate`, `npm run build -- --webpack`, **54/54** unit/database/HTTP/SMTP checks, and **6/6 focused cross-tab browser cases** (1.3 minutes). It did not independently repeat the implementer's 30-case full suite or recheck default-build, provider/deployment, hardware, or dependency-audit behavior. The working tree was left unchanged.
+
+A separate renewal test found an open P2 race: with notification hints unavailable, A's verification response contains renewal `Set-Cookie`; after B signs in, releasing that response restores A's cookie and A's obsolete draft saves (revision 2). JavaScript version/epoch guards cannot undo browser cookie-header effects. Task 007 specifies a cookie-immutable verification path plus delayed renewal/expiry regressions. This is distinct from the original stale-layout bug. No production data/provider was involved. Earlier descriptions of task 006 as staged/uncommitted are corrected to `0c13917`.
+
+The current task 007/008 preparation is documentation-only. Application results above are carried from the preceding review, not rerun for these document edits. New verification is Markdown/link/diff checking.
+
 ## Important contracts
 
 - Task 005 adds Project/Task canonical records via additive `202611050002_projects_tasks`, leaving the original migration untouched. Composite references and SQL triggers enforce consistent workspace/project/parent context, one-level hierarchy, and immutable assignments. Only Done means completed; parent/child statuses are independent. No content delete/archive/move endpoint exists.
 - Content operations share the membership workspace lock and recheck access after waiting. GET/POST collections and GET/PATCH details live under `/api/workspaces/[id]/projects` and `/tasks`. Strict bodies, trusted Origin, no-store responses, monotonic revision compare/increment and safe 409 current-state responses apply. Shared owner/editor content rights are equal; membership management stays owner-only.
 - Projects chooses one explicit workspace for that view. Refresh planning fetches shared changes; no live push. Drafts and pending-save locks span navigation in memory only. Task 006 puts the whole shell behind a live server-verified session boundary with versioned checks, account/epoch-scoped requests/callbacks, neutral checking/retry screens, and non-secret auth invalidation pulses. Confirmed identity changes clear state and replace the document, refreshing header/workspace options and preventing draft resurrection; same-account checks preserve drafts and conflicts. Notifications are hints, with independent focus/navigation/action checks and no polling. Suspended tabs cannot retract information already viewed/downloaded.
-- Protected UI requests include `X-Kanbrik-Account` solely as a rejection precondition; a mismatch with the verified cookie session returns safe 412. This closes cookie changes between verification and dispatch and covers sign-out too. Matching/omitted expectations never grant access. Old-context responses and disposed coordinators cannot alter or navigate the new context; cancellation never promises rollback of an already-authorized transaction. Network-check errors gate editing and retain the original draft for retry, not infer logout.
+- Protected UI requests include `X-Kanbrik-Account` solely as a rejection precondition; a mismatch with the verified cookie session returns safe 412, including sign-out. Matching/omitted expectations never grant access. However, an old verifier that restores A's cookie also makes A's expectation match again: the header does not close task 007's cookie race. Old-context JavaScript callbacks are guarded and network errors gate editing, but verification responses are not yet cookie-immutable. Cancellation never promises rollback of a committed transaction or reversal of cookie effects.
 - Identity comes from verified database-backed Better Auth sessions. Personal workspaces require owner identity plus owner membership; shared workspaces require current membership. Filters never grant access.
 - Shared mutations serialize on a workspace row lock and recheck authority. One owner plus editors only; no owner removal/leave/transfer, role changes, personal sharing/conversion or workspace deletion endpoints.
 - Recovery uses Better Auth one-hour/single-use tokens and explicit Prisma adapter transactions for token consumption, credential changes and session revocation. Reset tokens are emailed in a URL fragment, removed from visible history after hydration and sent only in a POST body. Reopening the original link is required after losing the in-memory token on reload.
@@ -55,7 +63,7 @@ The `c8fabab` task 006 preparation was documentation-only; its carried applicati
 
 ## Reviewed history / change inventory
 
-Original transfer baseline: `6a1e5b0`. Task 005 started from reviewed `ca6fbc7` and is committed as `0929f9a`. The coordinator independently reviewed that implementation and handed off its account-switch finding in `c8fabab`. Task 006's subsequent implementation is staged/uncommitted work pending the owner's commit and independent review.
+Original transfer baseline: `6a1e5b0`. Task 005 is committed as `0929f9a`; the first account-switch handoff is `c8fabab`; task 006 is committed as `0c13917` and has now received coordinator review. Current application baseline for follow-ups 007/008 is `0c13917`. Use Git history to identify subsequent implementation commits rather than carrying forward a stale staged/uncommitted description.
 
 | Commit | Change |
 | --- | --- |
@@ -69,11 +77,12 @@ Original transfer baseline: `6a1e5b0`. Task 005 started from reviewed `ca6fbc7` 
 | `ca6fbc7` | Coordinator transfer and user-reported SMTP resolution |
 | `0929f9a` | Workspace-owned projects/tasks, migration, revision conflicts, and in-session drafts |
 | `c8fabab` | Corrective cross-tab isolation assignment and coordinator review history |
+| `0c13917` | Planner session/draft guards and expected-account preconditions; reviewed with remaining delayed-cookie finding |
 
-Task 005 and task 006 preparation are committed. Current task 006 changes add session/UI/request guards, server identity preconditions, explicit same-cookie browser and HTTP coverage, and updated contracts/handoffs. Stage only this assignment's files for the owner. Do not automatically commit, push, or deploy; no credentials, generated files, local database, or test artifacts belong in the staged diff.
+The application changes above are committed. This handoff prepares task 007's correction and task 008's feature specification, with review/documentation updates only. Stage only these documentation changes for the owner. Do not automatically commit, push, or deploy; credentials, generated files, local databases, and test artifacts do not belong in the staged diff.
 
 ## Next coordinator action
 
-Independently review task 006's session/mutation/lifecycle boundary and its before/after same-cookie, failed-check, conflict-retention and in-flight evidence. A bounded Kanban assignment follows separately after this corrective review. No board/calendar work, production deployment, destructive lifecycle operation, assignment move, or new identity/membership policy is included in task 006.
+Assign task 007 first, require the delayed renewal/expiry browser regressions with original response headers, then independently review it. Task 008 is ready as a separate Kanban write-up; start its runtime implementation/integration after task 007 is reviewed, using the corrected shared session/request contract. Do not combine the two implementation scopes or start Calendar automatically. Provider/deployment, destructive lifecycle operations, assignment moves, and identity/membership policy remain outside these assignments.
 
 Durable user preference for continuing work: **stage changed files and provide a commit message whenever changes are made; leave committing/pushing to the owner unless explicitly instructed otherwise.** Preserve unrelated checkout changes. Re-read current instructions at handoff; do not assume this chat's live context or local secrets are available to another agent.

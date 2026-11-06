@@ -22,7 +22,9 @@ The first version includes personal and shared workspaces, with workspace filter
 - [Shared workspaces and retry recovery](docs/tasks/003-shared-workspaces-retry.md): task 003 implementation, permission contract, and completion evidence.
 - [Password confirmation and recovery](docs/tasks/004-password-recovery.md): confirmation fields and configurable SMTP reset emails.
 - [Projects and tasks](docs/tasks/005-projects-tasks.md): workspace-owned planning, canonical tasks/subtasks, fixed statuses, and shared-edit conflict handling.
-- [Cross-tab account isolation](docs/tasks/006-cross-tab-session-isolation.md): verified planner identity and invalidation of old-account drafts after another tab changes the shared session.
+- [Cross-tab account isolation](docs/tasks/006-cross-tab-session-isolation.md): implemented guards and test evidence, with the remaining delayed-cookie finding.
+- [Next fix: read-only verification](docs/tasks/007-read-only-session-verification.md): prevent delayed probes from changing the shared login cookie.
+- [Next feature: Kanban board](docs/tasks/008-kanban-board.md): multi-workspace task cards and status moves; implementation follows review of the session fix.
 - [Agent instructions](AGENTS.md): working agreements for coding agents.
 
 ## Local setup

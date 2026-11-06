@@ -1,6 +1,6 @@
 # 006: Cross-tab session and planning-draft isolation
 
-Status: Implemented and verified. Focused corrective handoff from the review of `0929f9a`; ready for independent coordinator review.
+Status: Implemented as `0c13917` and independently reviewed; delayed verification cookie effects remain open in corrective task 007. Earlier implementation test evidence is preserved below.
 
 Suggested model: GPT-6.1 Sol, High effort. Reuse the implementation chat and reread current repository instructions. This task does not include Kanban implementation.
 
@@ -104,5 +104,9 @@ Final complete browser result: **30/30 passed in one full `npm run test:e2e` run
 - Event/action synchronization cannot retract previously downloaded data or run while a browser suspends JavaScript. Notifications may be unavailable; resume/navigation/action verification and server preconditions still apply. Verification-network errors retain the original scoped draft behind a neutral retry screen, not an editable unknown-account form. Aborted responses do not reverse committed work.
 - No production/provider mail, Ubuntu/Docker runtime, hardware Android, dependency audit, backup/restore, or deployment check was performed. Existing guarded PostgreSQL and memory-only loopback SMTP fixtures were retained, with no rate-limit bypass or blanket retry changes.
 - Proposed next work only after review: separately scoped Kanban over canonical tasks with authorized workspace selection and non-drag controls. It was not started.
+
+### Independent review follow-up
+
+Coordinator review at `0c13917` passed lint/types, schema validation, Webpack build, **54/54** unit/database/HTTP/SMTP checks, and **6/6 focused cross-tab browser cases**. It did not independently rerun the implementation's full 30-case suite. A separate test with A's valid session due for renewal, unavailable auth notification hints, and a held verification response found that its `Set-Cookie` restored A after B signed in; A's obsolete draft then saved at revision 2. Version/epoch checks only protect JavaScript data/callbacks and cannot reverse applied cookie headers. [Task 007](007-read-only-session-verification.md) must make planner verification cookie-immutable and cover both delayed renewal and deletion/expiry paths. The implementation is already committed as `0c13917`; earlier staged/uncommitted descriptions are historical.
 
 Stage only this assignment's changed files and provide a commit message. Leave committing/pushing/deployment to the owner unless explicitly instructed otherwise.
