@@ -41,6 +41,40 @@ To test sharing, create at least two development accounts, using separate browse
 
 If a server request fails temporarily, **Try again** now requests fresh server content in the same session. A continuing failure leaves the error and retry available; recovery does not duplicate the personal workspace.
 
+### Restart the Ubuntu test server
+
+These instructions are for the manually started development/test app on port **3005**, with a separate disposable development database. In the server terminal running Kanbrik, press **Ctrl+C** first.
+
+After code changes have been committed and pushed to GitHub, run on Ubuntu:
+
+```bash
+cd ~/github/Kanbrik
+git pull --ff-only
+nvm install
+nvm use
+npm ci
+docker compose up -d --wait db
+npm run db:migrate
+npm run dev -- --webpack --port 3005
+```
+
+Run the commands in order and stop if one fails. Keep `BETTER_AUTH_URL=http://127.0.0.1:3005` in the server's existing `.env` for the SSH-tunnel setup. Git pulls preserve that ignored file; edit it rather than copying the example over your saved credentials. Database startup and migrations use the disposable database already configured for this checkout; no database reset is needed.
+
+If you only changed `.env`, stop the app with **Ctrl+C** and restart it without reinstalling dependencies:
+
+```bash
+cd ~/github/Kanbrik
+npm run dev -- --webpack --port 3005
+```
+
+Keep the app terminal open. On your own computer, keep the existing SSH tunnel open, or reconnect it (replace `USER@SERVER_IP` with your server login; add `-i /path/to/key` if needed):
+
+```bash
+ssh -N -L 127.0.0.1:3005:127.0.0.1:3005 USER@SERVER_IP
+```
+
+Refresh [http://127.0.0.1:3005](http://127.0.0.1:3005) on your own computer. This is the manual test server; automated browser checks start their own servers on different ports. These steps are a development workflow, not a production service/deployment setup.
+
 Configuration is server-only: `BETTER_AUTH_URL` is the exact trusted app origin, `BETTER_AUTH_SECRET` is a generated random secret of at least 32 characters, and `DATABASE_URL` is the development database URL. Generate a secret with `node -e "console.log(require('node:crypto').randomBytes(48).toString('hex'))"` and put it only in the ignored environment file. Restart the server after configuration changes.
 
 URL-encode special characters in database URL passwords. The portable setup generates hexadecimal credentials, which need no escaping.
@@ -63,6 +97,16 @@ SMTP_FROM="Kanbrik Notifications <no-reply@your-domain.example>"
 Replace every placeholder. `SMTP_FROM` accepts one plain email address or `Display Name <email>`; use an address your provider permits you to send from. Use port 587 for STARTTLS or 465 for implicit TLS; TLS certificate checks remain enabled. No SMTP credentials go in browser code or Git. `SMTP_ALLOW_INSECURE_LOCAL` defaults to false and is allowed only for an explicitly configured loopback mail server in local/test mode; real providers require TLS. Without the enable flag and complete valid settings, the forgot-password screen explains that email recovery is unavailable and the server rejects email requests.
 
 If recovery still says it is not configured, run `npm run email:check` from the repository on the same machine/user as the app. It uses Next's development environment-file loading and the application's actual validation, reports loaded filenames and failing setting names only, and identifies inherited shell variables that override `.env`. It never prints credentials or tests SMTP connectivity. A valid result confirms configuration syntax, not delivery. Escape literal dollar signs in `.env` passwords as `\$`, since Next expands `$VARIABLE` references even inside quoted values. Restart the app after fixing settings.
+
+If `.env` is listed as loaded but all SMTP fields and `PASSWORD_RESET_ENABLED` fail, inspect the saved file at `~/github/Kanbrik/.env` with `nano .env`. Check that the SMTP block was saved there, names use exact uppercase spelling, each setting appears only once, and quotes are balanced (including earlier database/auth settings). A later empty/default duplicate can replace your populated value, and an unclosed quote can disrupt parsing. Ordinary punctuation inside a correctly quoted password is supported.
+
+On Ubuntu, this read-only command prints setting names/line numbers with all values hidden, making duplicate or incorrectly cased SMTP keys easier to spot:
+
+```bash
+awk '/^[[:space:]]*(PASSWORD_RESET_ENABLED|SMTP_[A-Za-z_]+)[[:space:]]*=/ { sub(/=.*/, "=[hidden]"); print NR ": " $0 }' .env
+```
+
+Share only this redacted output and `npm run email:check` results when troubleshooting; examine the actual values/quotes privately. Correct the saved file, rerun the diagnostic, then restart the app with the commands above.
 
 Reset requests show the same generic confirmation for existing and unknown addresses. Delivery failures show a retryable generic error. Better Auth generates one-hour, single-use tokens and changes the password/revokes existing sessions atomically. Users confirm the new password, then sign in again; workspaces and memberships are preserved. No password is sent by email.
 
