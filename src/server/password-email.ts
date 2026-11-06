@@ -1,10 +1,11 @@
 import "server-only";
 import nodemailer from "nodemailer";
 import { z } from "zod";
+import { mailSenderSchema } from "./mail-sender";
 
 const smtpSchema = z.object({
   host: z.string().min(1), port: z.coerce.number().int().min(1).max(65535),
-  user: z.string().min(1), password: z.string().min(1), from: z.email(),
+  user: z.string().min(1), password: z.string().min(1), from: mailSenderSchema,
 });
 
 export function passwordEmailConfig() {

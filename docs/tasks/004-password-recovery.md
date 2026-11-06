@@ -61,3 +61,9 @@ Browser evidence on desktop and Pixel 7 touch emulation: mismatched sign-up conf
 - Default Turbopack build was not rechecked for this follow-up; historical intermittent results remain documented in task 003. The Webpack build is verified. Docker/Compose runtime, Linux, real Android hardware and production deployment remain unverified; Compose email forwarding is scaffolding only.
 - Public registration and email-address verification policies remain unchanged. Recovery email is not sign-up verification. No social login, invitation delivery, production account administration, planner CRUD, workspace policy or deployment changes were made.
 - Next planner assignment remains a separately scoped workspace-owned projects/tasks task. SMTP credentials and provider setup belong in the owner's ignored environment, not a repository commit.
+
+### Follow-up: named SMTP sender (2026-11-05)
+
+Requested support for `SMTP_FROM="Kanbrik Notifications <address@example.com>"`. Added `src/server/mail-sender.ts` to normalize a single plain/formatted mailbox into Nodemailer's structured name/address form, retaining plain-address compatibility and rejecting invalid/multiple mailboxes or embedded control characters. Updated environment/README/architecture guidance. No new dependencies or provider configuration.
+
+Verified `npm run check`, `npm run build -- --webpack`, and `npm run test`: **36 passed**, including 11 sender-format validation cases and actual SMTP assertions for the display-name From header and the plain-address envelope sender. No UI change; browser flows were not rerun for this server-only follow-up. Real-provider delivery remains unverified.

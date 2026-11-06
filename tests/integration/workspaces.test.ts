@@ -38,7 +38,7 @@ async function bootstrap(cookie: string) {
 beforeAll(async () => {
   mail = await startMailCapture();
   server = spawn(process.execPath, ["node_modules/next/dist/bin/next", "start", "--hostname", "127.0.0.1", "--port", "3110"], {
-    env: { ...process.env, DATABASE_URL: url, BETTER_AUTH_URL: origin, KANBRIK_ENV: "test", ENABLE_LOCAL_REGISTRATION: "true", SMTP_PORT: String(mail.port) }, stdio: "ignore", windowsHide: true,
+    env: { ...process.env, DATABASE_URL: url, BETTER_AUTH_URL: origin, KANBRIK_ENV: "test", ENABLE_LOCAL_REGISTRATION: "true", SMTP_PORT: String(mail.port), SMTP_FROM: "Kanbrik Notifications <no-reply@example.invalid>" }, stdio: "ignore", windowsHide: true,
   });
   let ready = false;
   for (let attempt = 0; attempt < 80; attempt++) {
@@ -64,6 +64,8 @@ describe("SMTP password recovery with real PostgreSQL sessions", () => {
     expect(response.status).toBe(200);
     const message = mail.messages.filter(message => message.to.includes(user.email)).at(-1);
     expect(!!message).toBe(true);
+    expect(message!.from).toBe("Kanbrik Notifications <no-reply@example.invalid>");
+    expect(message!.envelopeFrom).toBe("no-reply@example.invalid");
     const link = new URL(message!.text.match(/http[^\s]+/)![0]);
     expect(link.origin).toBe(origin); expect(link.pathname).toBe("/reset-password");
     expect(link.search.length).toBe(0);

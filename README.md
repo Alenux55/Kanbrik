@@ -57,10 +57,10 @@ SMTP_HOST=smtp.your-provider.example
 SMTP_PORT=587
 SMTP_USER=your-smtp-username
 SMTP_PASSWORD="your-smtp-password-or-provider-app-password"
-SMTP_FROM=no-reply@your-domain.example
+SMTP_FROM="Kanbrik Notifications <no-reply@your-domain.example>"
 ```
 
-Replace every placeholder. `SMTP_FROM` must be an email address your provider permits you to send from. Use port 587 for STARTTLS or 465 for implicit TLS; TLS certificate checks remain enabled. No SMTP credentials go in browser code or Git. `SMTP_ALLOW_INSECURE_LOCAL` defaults to false and is allowed only for an explicitly configured loopback mail server in local/test mode; real providers require TLS. Without the enable flag and complete valid settings, the forgot-password screen explains that email recovery is unavailable and the server rejects email requests.
+Replace every placeholder. `SMTP_FROM` accepts one plain email address or `Display Name <email>`; use an address your provider permits you to send from. Use port 587 for STARTTLS or 465 for implicit TLS; TLS certificate checks remain enabled. No SMTP credentials go in browser code or Git. `SMTP_ALLOW_INSECURE_LOCAL` defaults to false and is allowed only for an explicitly configured loopback mail server in local/test mode; real providers require TLS. Without the enable flag and complete valid settings, the forgot-password screen explains that email recovery is unavailable and the server rejects email requests.
 
 Reset requests show the same generic confirmation for existing and unknown addresses. Delivery failures show a retryable generic error. Better Auth generates one-hour, single-use tokens and changes the password/revokes existing sessions atomically. Users confirm the new password, then sign in again; workspaces and memberships are preserved. No password is sent by email.
 

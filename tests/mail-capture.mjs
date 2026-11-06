@@ -17,7 +17,8 @@ export async function startMailCapture({ smtpPort = 0, httpPort = 0, secret = ra
         const headers = raw.slice(0, split);
         const body = raw.slice(split + 4);
         const text = /Content-Transfer-Encoding: base64/i.test(headers) ? Buffer.from(body.replace(/\s/g, ''), 'base64').toString('utf8') : body;
-        messages.push({ to: session.envelope.rcptTo.map(recipient => recipient.address), text });
+        const from = headers.match(/^From:([^\r\n]*(?:\r\n[ \t][^\r\n]*)*)/im)?.[1].replace(/\r\n[ \t]+/g, ' ').trim() ?? '';
+        messages.push({ from, envelopeFrom: session.envelope.mailFrom?.address, to: session.envelope.rcptTo.map(recipient => recipient.address), text });
         callback();
       });
     },

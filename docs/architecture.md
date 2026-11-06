@@ -29,6 +29,8 @@ The domain sections below remain a planning contract, not implemented behavior. 
 
 ### Password confirmation and recovery (task 004)
 
+- `SMTP_FROM` accepts a plain email address or `Display Name <email>` (including a quoted display name). It is validated as one mailbox and passed to Nodemailer as a structured name/address object for safe header formatting. Invalid addresses, multiple mailboxes and embedded control characters are rejected.
+
 - Explicitly requested follow-up to the identity slice: sign-up confirms the password locally before making an auth request; the extra confirmation is not a new stored credential or API authentication mechanism. Sign-in links to public `/forgot-password`; `/reset-password` accepts an emailed token and confirms the new password. Pending/error states retain recoverable input, and successful reset requires a fresh sign-in.
 - Better Auth 1.7.18 owns reset token generation, one-hour expiry, atomic single use, password hashing, and session revocation. Its Prisma adapter now enables transactions explicitly so token consumption, credential update and database session revocation commit together. Reset preserves canonical users, workspaces and memberships. The existing Verification table supports this without a migration.
 - Nodemailer sends plain-text recovery links via server-only SMTP configuration. Email requests are disabled until `PASSWORD_RESET_ENABLED=true` and required host/port/user/password/sender fields validate. Normal SMTP requires STARTTLS or implicit TLS with certificate validation; a plaintext exception is restricted to explicitly enabled loopback local/test mail capture. No mail credentials or URLs/tokens are logged, returned as diagnostic API data, or added to client bundles.
