@@ -10,6 +10,8 @@ The first version includes personal and shared workspaces, with workspace filter
 
 ## Start here
 
+- [Coordinator handoff](docs/handoff.md): current implementation state, verification evidence, operational resolution, and next assignment boundaries.
+
 - [Product scope](docs/product.md): requirements, proposed defaults, and open questions.
 - [Architecture](docs/architecture.md): data relationships and behavior that implementations must preserve.
 - [Recommended stack](docs/stack.md): application, database, authentication, and self-hosting recommendations.

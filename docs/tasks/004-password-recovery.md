@@ -1,6 +1,6 @@
 # 004: Password confirmation and email recovery
 
-Status: Implemented and verified (2026-11-05). Owner-provided SMTP configuration and real-provider delivery remain separate setup steps.
+Status: Implemented and verified (2026-11-05). The owner now reports server recovery working after correcting the server's environment file; provider delivery remains user-reported rather than independently tested by this agent.
 
 ## Outcome and scope
 
@@ -77,3 +77,7 @@ Verified lint/types and Webpack build. Full database/SMTP/safety suite: **43 pas
 ### Documentation follow-up: Ubuntu test-server restart (2026-11-05)
 
 Added an explicit README workflow for updating/restarting the manual port-3005 test app, a shorter restart after environment-only edits, SSH tunnel reconnection and preservation of the existing `.env`/database. Added safe diagnosis for a loaded `.env` whose SMTP keys all fail validation: saved-file location, duplicates, exact key case and balanced quotes, plus an Ubuntu command that prints names/line numbers with values redacted. Reviewed commands and `git diff --check`; an isolated temporary `.env` probe confirmed the existing diagnostic loads a named sender and a quoted synthetic password containing `!#%&=` correctly, without printing values or contacting SMTP. Documentation-only edits; no full application suite or remote server commands run. The actual remote configuration issue remains unresolved until the owner checks the saved file/output.
+
+### User-confirmed resolution and coordinator transfer (2026-11-05)
+
+The owner confirmed they had edited the local computer's `.env`, while the Ubuntu server's independent ignored `.env` still lacked the SMTP block. After correcting the server file, they report recovery is working. The missing-configuration incident is resolved by user report; it was not a password-punctuation or SMTP-validation defect. No credentials or real reset links were collected, and the agent did not independently inspect provider delivery. See `docs/handoff.md` for the current coordinator summary, exact verification limits, restart context, commit inventory and next proposed bounded task. This transfer updates documentation only; no new application test run or deployment is claimed.
