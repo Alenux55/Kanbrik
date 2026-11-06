@@ -6,6 +6,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { assertTestDatabase } from "../../scripts/test-target.mjs";
 import { failFixtureMembership } from "../database";
 import { startMailCapture } from "../mail-capture.mjs";
+import { taskStatusIds, taskCompleted } from "../../src/lib/task-statuses";
 
 const url = assertTestDatabase(process.env.TEST_DATABASE_URL);
 const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: url }), log: [] });
@@ -56,6 +57,198 @@ afterAll(async () => {
   await db.$disconnect();
   server?.kill();
   await mail?.close();
+});
+
+describe("canonical projects/tasks through real HTTP and PostgreSQL", () => {
+  let owner: Awaited<ReturnType<typeof account>>;
+  let editor: Awaited<ReturnType<typeof account>>;
+  let outsider: Awaited<ReturnType<typeof account>>;
+  let workspaceId: string;
+  let personalId: string;
+  let otherId: string;
+  let project: { id: string; revision: number };
+  let otherProject: { id: string };
+  let parent: { id: string; revision: number };
+  let child: { id: string };
+  const base = () => `/api/workspaces/${workspaceId}`;
+  const get = (path: string, cookie = owner.cookie) => fetch(`${origin}${path}`, { headers: { cookie } });
+  const patch = (path: string, body: object, cookie = owner.cookie) => fetch(`${origin}${path}`, { method: "PATCH", headers: { cookie, origin, "content-type": "application/json" }, body: JSON.stringify(body) });
+  const edit = (revision = 1) => ({ title: "Edited task", description: "Planning", status: "in_progress", revision });
+  async function create(path: string, body: object, cookie = owner.cookie) {
+    const response = await post(path, body, cookie);
+    expect(response.status).toBe(201);
+    return response.json();
+  }
+  beforeAll(async () => {
+    owner = await account(); editor = await account(); outsider = await account();
+    personalId = (await bootstrap(owner.cookie)).id;
+    otherId = (await bootstrap(outsider.cookie)).id;
+    const shared = await post("/api/workspaces", { name: "Content fixture" }, owner.cookie);
+    expect(shared.status).toBe(201);
+    workspaceId = (await shared.json()).id; sharedIds.push(workspaceId);
+    expect((await post(`${base()}/members`, { email: editor.email }, owner.cookie)).status).toBe(200);
+    project = await create(`${base()}/projects`, { title: "  Plan  ", description: "<b>Plain text</b>" });
+    otherProject = await create(`/api/workspaces/${otherId}/projects`, { title: "Private plan" }, outsider.cookie);
+    parent = await create(`${base()}/tasks`, { title: "Parent", projectId: project.id });
+    child = await create(`${base()}/tasks`, { title: "Child", parentId: parent.id }, editor.cookie);
+  });
+  it("persists minimal workspace-scoped records for personal owners and shared editors across sessions", async () => {
+    const privateProject = await create(`/api/workspaces/${personalId}/projects`, { title: "My plan" });
+    const privateTask = await create(`/api/workspaces/${personalId}/tasks`, { title: "Personal standalone" });
+    expect(privateTask.projectId).toBeNull();
+    const created = await create(`${base()}/projects`, { title: "Editor's plan" }, editor.cookie);
+    expect((await patch(`${base()}/projects/${created.id}`, { title: "Editor update", description: "Shared", revision: 1 }, editor.cookie)).status).toBe(200);
+    const login = await post("/api/auth/sign-in/email", { email: owner.email, password: owner.password });
+    expect(login.status).toBe(200);
+    const cookie = login.headers.getSetCookie().map(value => value.split(";")[0]).join("; ");
+    const detail = await get(`${base()}/projects/${project.id}`, cookie);
+    expect(detail.headers.get("cache-control")).toBe("no-store");
+    const record = await detail.json();
+    expect(record.title).toBe("Plan"); expect(record.description).toBe("<b>Plain text</b>");
+    expect(Object.keys(record).sort()).toEqual(["createdAt", "description", "id", "revision", "title", "updatedAt", "workspaceId"]);
+    expect((await (await get(`/api/workspaces/${personalId}/projects/${privateProject.id}`, cookie)).json()).id).toBe(privateProject.id);
+    expect((await (await get(`${base()}/tasks/${child.id}`, editor.cookie)).json()).projectId).toBe(project.id);
+    const rows = await (await get(`${base()}/tasks`)).json();
+    expect(rows.map((row: { id: string }) => row.id)).toEqual([parent.id, child.id]);
+  });
+  it("saves every fixed status while parent/child completion stays independent", async () => {
+    let revision = 1;
+    for (const status of taskStatusIds) {
+      const response = await patch(`${base()}/tasks/${child.id}`, { ...edit(revision++), status }, editor.cookie);
+      expect(response.status).toBe(200); expect((await response.json()).status).toBe(status);
+      expect(taskCompleted(status)).toBe(status === "done");
+    }
+    expect((await (await get(`${base()}/tasks/${parent.id}`)).json()).status).toBe("todo");
+    expect((await patch(`${base()}/tasks/${parent.id}`, { ...edit(), status: "done" })).status).toBe(200);
+    expect((await patch(`${base()}/tasks/${child.id}`, { ...edit(revision), status: "blocked" })).status).toBe(200);
+    expect((await (await get(`${base()}/tasks/${parent.id}`)).json()).status).toBe("done");
+  });
+  it("isolates lists/details/creates/updates from anonymous and unrelated accounts", async () => {
+    for (const kind of ["projects", "tasks"]) {
+      const id = kind === "projects" ? project.id : parent.id;
+      for (const [cookie, status] of [["", 401], [outsider.cookie, 404]] as const) {
+        expect((await get(`${base()}/${kind}`, cookie)).status).toBe(status);
+        expect((await get(`${base()}/${kind}/${id}`, cookie)).status).toBe(status);
+        expect((await post(`${base()}/${kind}`, { title: "Intrusion" }, cookie)).status).toBe(status);
+        const body = kind === "tasks" ? edit() : { title: "Intrusion", description: "", revision: 1 };
+        const response = await patch(`${base()}/${kind}/${id}`, body, cookie);
+        expect(response.status).toBe(status); expect(JSON.stringify(await response.json())).not.toContain("Plan");
+      }
+      expect((await get(`/api/workspaces/${personalId}/${kind}`, editor.cookie)).status).toBe(404);
+      expect((await get(`${base()}/${kind}/${randomUUID()}`)).status).toBe(404);
+    }
+    expect((await get(`${base()}/projects/${otherProject.id}`)).status).toBe(404);
+    expect((await post(`${base()}/members`, { email: outsider.email }, editor.cookie)).status).toBe(403);
+  });
+  it("rejects invalid inputs, unsupported fields/statuses, immutable context changes and hostile origins", async () => {
+    const before = await db.task.count({ where: { workspaceId } });
+    for (const body of [{ title: " " }, { title: "x".repeat(201) }, { title: "x", description: "x".repeat(20001) }, { title: "x", creatorId: owner.id }, { title: "x", workspaceId: otherId }, { title: "x", status: "scheduled" }]) {
+      expect((await post(`${base()}/tasks`, body, owner.cookie)).status).toBe(400);
+    }
+    for (const values of [{ projectId: project.id }, { workspaceId: otherId }, { parentId: parent.id }, { revision: 0 }, { status: "archived" }, { revision: 1.5 }]) {
+      expect((await patch(`${base()}/tasks/${parent.id}`, { ...edit(), ...values })).status).toBe(400);
+    }
+    for (const body of [{ title: " " }, { title: "x", creatorId: owner.id }, { title: "x", description: "x".repeat(20001) }]) {
+      expect((await post(`${base()}/projects`, body, owner.cookie)).status).toBe(400);
+    }
+    expect((await patch(`${base()}/projects/${project.id}`, { title: "x", description: "", revision: 1, workspaceId: otherId })).status).toBe(400);
+    const hostile = await fetch(`${origin}${base()}/tasks`, { method: "POST", headers: { cookie: owner.cookie, origin: "https://hostile.invalid", "content-type": "application/json" }, body: JSON.stringify({ title: "x" }) });
+    expect(hostile.status).toBe(403);
+    expect(await db.task.count({ where: { workspaceId } })).toBe(before);
+  });
+  it("rejects deeper, mismatched and foreign parent/project references without partial creates", async () => {
+    const before = await db.task.count({ where: { workspaceId } });
+    for (const [body, status] of [
+      [{ parentId: child.id }, 400], [{ parentId: parent.id, projectId: null }, 400],
+      [{ parentId: parent.id, projectId: otherProject.id }, 400], [{ projectId: otherProject.id }, 404], [{ parentId: randomUUID() }, 404],
+    ] as const) expect((await post(`${base()}/tasks`, { title: "Invalid child", ...body }, owner.cookie)).status).toBe(status);
+    const standalone = await create(`${base()}/tasks`, { title: "Standalone" });
+    const subtask = await create(`${base()}/tasks`, { title: "Standalone child", parentId: standalone.id });
+    expect(subtask.projectId).toBeNull(); expect(subtask.parentId).toBe(standalone.id);
+    expect(await db.task.count({ where: { workspaceId } })).toBe(before + 2);
+  });
+  it("enforces workspace consistency, NULL-safe parent project equality and hierarchy in the database", async () => {
+    const sameWorkspaceProject = await db.project.create({ data: { workspaceId, title: "Other context" } });
+    const foreignParent = await db.task.create({ data: { workspaceId: otherId, title: "Foreign parent" } });
+    for (const context of [
+      { projectId: otherProject.id }, { parentId: foreignParent.id }, { parentId: parent.id },
+      { projectId: sameWorkspaceProject.id, parentId: parent.id }, { projectId: project.id, parentId: child.id },
+    ]) await expect(db.task.create({ data: { workspaceId, title: "Invalid direct record", ...context } })).rejects.toThrow();
+    const id = randomUUID();
+    await expect(db.task.create({ data: { id, workspaceId, title: "Self", parentId: id } })).rejects.toThrow();
+    await expect(db.task.update({ where: { id: parent.id }, data: { parentId: child.id } })).rejects.toThrow();
+    await expect(db.project.update({ where: { id: project.id }, data: { workspaceId: otherId } })).rejects.toThrow();
+    await expect(db.task.create({ data: { workspaceId, title: " " } })).rejects.toThrow();
+    await expect(db.task.create({ data: { workspaceId, title: "x", revision: 0 } })).rejects.toThrow();
+    await expect(db.$executeRaw`UPDATE "Task" SET status = 'scheduled' WHERE id = ${parent.id}`).rejects.toThrow();
+  });
+  it("commits exactly one same-revision task edit and returns a safe current record to the loser", async () => {
+    const task = await create(`${base()}/tasks`, { title: "Race" });
+    const responses = await Promise.all([patch(`${base()}/tasks/${task.id}`, { ...edit(), title: "Owner wins?" }), patch(`${base()}/tasks/${task.id}`, { ...edit(), title: "Editor wins?" }, editor.cookie)]);
+    expect(responses.map(response => response.status).sort()).toEqual([200, 409]);
+    const winner = await responses.find(response => response.ok)!.json();
+    const loser = await responses.find(response => response.status === 409)!.json();
+    expect(loser.current).toEqual(winner); expect(winner.revision).toBe(2);
+    expect((await patch(`${base()}/tasks/${task.id}`, edit(), outsider.cookie)).status).toBe(404);
+    expect((await db.task.findUniqueOrThrow({ where: { id: task.id } })).revision).toBe(2);
+  });
+  it("compares project revisions atomically and rejects stale retry without overwriting", async () => {
+    const input = { title: "New plan", description: "Saved", revision: 1 };
+    const responses = await Promise.all([patch(`${base()}/projects/${project.id}`, input), patch(`${base()}/projects/${project.id}`, input, editor.cookie)]);
+    expect(responses.map(response => response.status).sort()).toEqual([200, 409]);
+    expect((await patch(`${base()}/projects/${project.id}`, { ...input, title: "Old retry" })).status).toBe(409);
+    expect((await db.project.findUniqueOrThrow({ where: { id: project.id } })).title).toBe("New plan");
+  });
+  it("rolls back a failed update without changing saved text or revision", async () => {
+    const name = `content_fail_${randomUUID().replaceAll("-", "")}`;
+    const task = await create(`${base()}/tasks`, { title: "Before failure" });
+    await db.$executeRawUnsafe(`CREATE FUNCTION ${name}() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.id = '${task.id}' THEN RAISE EXCEPTION 'Fixture update failure'; END IF; RETURN NEW; END $$`);
+    await db.$executeRawUnsafe(`CREATE TRIGGER ${name} BEFORE UPDATE ON "Task" FOR EACH ROW EXECUTE FUNCTION ${name}()`);
+    try {
+      expect((await patch(`${base()}/tasks/${task.id}`, edit())).status).toBe(503);
+      const unchanged = await db.task.findUniqueOrThrow({ where: { id: task.id } });
+      expect(unchanged.title).toBe("Before failure"); expect(unchanged.revision).toBe(1);
+    } finally {
+      await db.$executeRawUnsafe(`DROP TRIGGER IF EXISTS ${name} ON "Task"`);
+      await db.$executeRawUnsafe(`DROP FUNCTION IF EXISTS ${name}()`);
+    }
+    expect((await patch(`${base()}/tasks/${task.id}`, edit())).status).toBe(200);
+  });
+  it("denies an editor update that waited behind the membership-removal transaction", async () => {
+    const task = await create(`${base()}/tasks`, { title: "Revocation race" });
+    let release!: () => void; let locked!: (pid: number) => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const ready = new Promise<number>(resolve => { locked = resolve; });
+    const removal = db.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM "Workspace" WHERE id = ${workspaceId} FOR UPDATE`;
+      await tx.membership.deleteMany({ where: { workspaceId, userId: editor.id } });
+      const [{ pid }] = await tx.$queryRaw<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`;
+      locked(pid); await gate;
+    }, { timeout: 15000 });
+    const pid = await ready;
+    const saving = patch(`${base()}/tasks/${task.id}`, edit(), editor.cookie);
+    try {
+      let waiting = false;
+      for (let attempt = 0; attempt < 60; attempt++) {
+        const rows = await db.$queryRaw<{ waiting: boolean }[]>`SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE ${pid} = ANY(pg_blocking_pids(pid))) AS waiting`;
+        if (rows[0].waiting) { waiting = true; break; }
+        await new Promise(resolve => setTimeout(resolve, 25));
+      }
+      expect(waiting).toBe(true);
+    } finally { release(); await removal; }
+    expect((await saving).status).toBe(404);
+    expect((await db.task.findUniqueOrThrow({ where: { id: task.id } })).revision).toBe(1);
+    expect((await get(`${base()}/projects`, editor.cookie)).status).toBe(404);
+    expect((await get(`${base()}/tasks/${task.id}`, editor.cookie)).status).toBe(404);
+    expect((await post(`${base()}/tasks`, { title: "No longer authorized" }, editor.cookie)).status).toBe(404);
+    expect((await get("/api/workspaces", editor.cookie)).status).toBe(200);
+    // Exercise the public remove operation against content too.
+    expect((await post(`${base()}/members`, { email: editor.email }, owner.cookie)).status).toBe(200);
+    const membership = await db.membership.findUniqueOrThrow({ where: { workspaceId_userId: { workspaceId, userId: editor.id } } });
+    const removed = await fetch(`${origin}${base()}/members/${membership.id}`, { method: "DELETE", headers: { cookie: owner.cookie, origin, "content-type": "application/json" }, body: "{}" });
+    expect(removed.status).toBe(200);
+    expect((await patch(`${base()}/tasks/${task.id}`, edit(), editor.cookie)).status).toBe(404);
+  });
 });
 
 describe("SMTP password recovery with real PostgreSQL sessions", () => {

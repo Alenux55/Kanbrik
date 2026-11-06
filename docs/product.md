@@ -54,6 +54,12 @@ These are recommendations, not additional user-confirmed requirements.
 - Saves require a connection. Show pending/saved/failed/conflicting states with recovery controls. Durable offline queues are deferred.
 - Removing membership stops future server reads/writes; it cannot remove information already downloaded or seen.
 
+## Implemented planning defaults (task 005)
+
+Task 005 uses the proposed workspace ownership boundary and canonical task model. These bounded implementation defaults are not additional user-confirmed requirements: plain-text project/task descriptions; titles of 1–200 trimmed characters; descriptions up to 20,000 characters; default task status `todo`; standalone tasks; one subtask level; independent parent/child completion; and immutable workspace/project/parent assignments after creation. Shared owners and editors have equal content-editing rights. Create/read/update are available; moving, deleting, archiving, due dates, and assignment remain deferred.
+
+Projects selects one explicit workspace locally to that view, independent of future board/calendar selection. Manual refresh fetches shared changes. Conflicts require comparing a saved version with the retained draft and explicitly choosing which to keep before another save. Draft retention lasts only within the signed-in planner session; document reload/close or sign-out discards it. There is no offline queue.
+
 ## Decisions still open
 
 - Final acceptance of the recommended stack; verification of Docker and existing reverse-proxy configuration.

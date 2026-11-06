@@ -97,6 +97,20 @@ async function sharedMutation<T>(headers: Headers, workspaceId: string, ownerOnl
   });
 }
 
+// Content uses the very same workspace row lock as membership changes. Recheck
+// both membership and personal-owner identity after waiting for that lock.
+export async function workspaceContent<T>(headers: Headers, workspaceId: string,
+  operation: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+  const userId = await actor(headers);
+  return database().$transaction(async tx => {
+    const scope = { id: workspaceId, ...accessible(userId) };
+    if (!await tx.workspace.findFirst({ where: scope, select: { id: true } })) throw new WorkspaceDenied(404, "Workspace not found");
+    await tx.$queryRaw`SELECT id FROM "Workspace" WHERE id = ${workspaceId} FOR UPDATE`;
+    if (!await tx.workspace.findFirst({ where: scope, select: { id: true } })) throw new WorkspaceDenied(404, "Workspace not found");
+    return operation(tx);
+  });
+}
+
 export async function addEditor(headers: Headers, workspaceId: string, email: string) {
   return sharedMutation(headers, workspaceId, true, async tx => {
     const user = await tx.user.findUnique({ where: { email }, select: { id: true } });

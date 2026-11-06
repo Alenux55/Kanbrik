@@ -1,8 +1,10 @@
 "use client";
 import { useRef, useState } from "react";
 import { authClient } from "@/lib/auth-client";
+import { usePlanningDrafts } from "./planning-drafts";
 
 export function SignOut() {
+  const { prepareSignOut } = usePlanningDrafts();
   const busy = useRef(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
@@ -12,6 +14,7 @@ export function SignOut() {
     try {
       const result = await authClient.signOut();
       if (result.error) throw new Error();
+      prepareSignOut();
       window.location.replace("/sign-in"); return;
     } catch { setError("Sign-out failed. Please retry."); }
     busy.current = false; setPending(false);

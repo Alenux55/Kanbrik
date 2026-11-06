@@ -1,6 +1,6 @@
 # Delivery roadmap
 
-Tasks 001–004 implement the foundation shell, local tooling, development/test identity, personal/shared workspace access, retry recovery, and password confirmation/SMTP recovery; see their handoffs for verification and limitations. Planner content and board/calendar filtering remain planned. This sequence is a proposal and may change with product decisions.
+Tasks 001–005 implement the foundation shell, local tooling, development/test identity, personal/shared workspace access, retry recovery, password confirmation/SMTP recovery, and workspace-owned project/task planning; see their handoffs for verification and limitations. Kanban, calendar, and their workspace filters remain planned. Phase 2 is only partially complete until the board is separately assigned and implemented. This sequence is a proposal and may change with product decisions.
 
 | Phase | Outcome | Evidence required for completion |
 | --- | --- | --- |
@@ -24,5 +24,6 @@ Tasks 001–004 implement the foundation shell, local tooling, development/test 
 
 - [001: application foundation](tasks/001-foundation.md): implemented; see completion evidence and runtime limitations.
 - [002: accounts and automatic personal-workspace creation](tasks/002-accounts-personal-workspace.md): identity and personal-workspace implementation; see its completion evidence and limitations. Shared-workspace membership follows separately.
-- [003: shared workspaces and retry recovery](tasks/003-shared-workspaces-retry.md): implemented retry recovery, shared creation and owner/editor management for existing accounts; see verification evidence and development-policy limitations. Workspace-owned projects/tasks are proposed next.
+- [003: shared workspaces and retry recovery](tasks/003-shared-workspaces-retry.md): implemented retry recovery, shared creation and owner/editor management for existing accounts; see verification evidence and development-policy limitations.
 - [004: password confirmation and recovery](tasks/004-password-recovery.md): requested identity follow-up with SMTP email configuration; see its verification and provider-delivery limitations.
+- [005: workspace-owned projects and tasks](tasks/005-projects-tasks.md): implemented and verified explicit-workspace project planning, tasks/subtasks, fixed statuses, and stale-save protection; see exact browser-run evidence and limitations. Kanban and calendar views follow separately.
