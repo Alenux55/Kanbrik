@@ -8,7 +8,7 @@ Node.js 24 LTS (local 24.19.0), npm 12.0.2, Next.js 16.4.5, React/React DOM 19.3
 
 Versions were checked using npm registry version, engine, and peer metadata as well as official documentation. Next.js requires Node >=20.9 and accepts React 19. Prisma 7.10.1 accepts Node 24; the selected Node engine is conservatively >=24.11 and <25. TypeScript 5.9.3 is a stable supported baseline; adopting TypeScript 7 is unnecessary for this task. Vitest 5 supports Node 24. Playwright 1.65.0's test package referenced an unavailable `playwright-core@1.65.0` during installation, so the complete stable 1.64.0 dependency chain was selected.
 
-The Prisma `latest` tag resolved to **8.0.0-rc.30**, so it was explicitly rejected in favor of stable **7.10.1**. Better Auth 1.7.18 declares Next 16, React 19, and Prisma 7 compatibility; its official adapter guide uses Prisma 7/PostgreSQL. These identity dependencies were subsequently installed in task 002 as recorded below. FullCalendar remains deferred; dnd-kit is installed with task 008 as recorded below. Their integration has not been verified by the shell build.
+The Prisma `latest` tag resolved to **8.0.0-rc.30**, so it was explicitly rejected in favor of stable **7.10.1**. Better Auth 1.7.18 declares Next 16, React 19, and Prisma 7 compatibility; its official adapter guide uses Prisma 7/PostgreSQL. These identity dependencies were subsequently installed in task 002 as recorded below. FullCalendar is installed with task 009 and dnd-kit with task 008 as recorded below. Their feature tests establish integration beyond the original shell build.
 
 Compose selects PostgreSQL **17.11** (a supported stable minor listed by PostgreSQL) with Debian Bookworm images and Node **24.19.0**. Image pulls and runtime compatibility are unverified because Docker is absent; no claim of database or container integration is made.
 
@@ -66,3 +66,9 @@ FullCalendar Standard plugins are MIT-licensed; Premium resource/timeline featur
 - [Vitest](https://vitest.dev/guide/) and [Playwright](https://playwright.dev/docs/intro).
 
 These sources establish capabilities. This combination is an architectural recommendation, not a vendor claim that it is uniquely best for Kanbrik.
+
+## Task 009 Calendar selection (2026-11-06)
+
+Pinned matching FullCalendar Standard `@fullcalendar/{core,react,timegrid,interaction,luxon3}` **6.1.22**, Luxon **3.7.2**, and `@types/luxon` **3.7.6**. Registry stable/peer metadata was checked before installation: React integration 6.1.22 accepts React/React DOM 19 and core ~6.1.22; this matches the pinned React 19.3.1/Next 16.4.5 app. The registry's newer React package 7.1.4 uses a different integration while the luxon3 package remains 6.1.22, so this task selects one coherent v6 family rather than mixing majors. No peer overrides or unrelated upgrades. Standard packages are MIT; Premium plugins are absent.
+
+The installed v6 types/source verify React imports, `timeGridWeek/timeGridDay`, `eventDrop/eventResize`, named-zone luxon3 integration, revert and 15-minute snapping. [Named zones](https://fullcalendar.io/docs/timeZone), [drag callbacks](https://fullcalendar.io/docs/eventDrop), [external dragging](https://fullcalendar.io/docs/external-dragging), [license](https://fullcalendar.io/license) and [Luxon DateTime API](https://moment.github.io/luxon/api-docs/index.html) were checked. Existing-block assignment deliberately uses the existing dnd-kit MouseSensor instead of an external drop that creates an event. Luxon uses Intl IANA rules, round-trip validation and `getPossibleOffsets`; no custom DST arithmetic. Keep Node/browser zone data current. Runtime integration is verified by the task's builds and browser journeys, not inferred from package peers alone.

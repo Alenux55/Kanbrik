@@ -2,9 +2,11 @@
 import { createContext, useContext, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import type { TaskStatus } from "@/lib/task-statuses";
 import { usePlannerSession } from "./planner-session";
+import type { CalendarDraft } from "@/lib/calendar-draft";
 
 export type PlanningDraft = { title: string; description: string; status: TaskStatus; revision: number; dirty: boolean };
 type DraftStore = {
+  calendarDrafts: Record<string, CalendarDraft>; setCalendarDrafts: Dispatch<SetStateAction<Record<string, CalendarDraft>>>;
   drafts: Record<string, PlanningDraft>; setDrafts: Dispatch<SetStateAction<Record<string, PlanningDraft>>>;
   workspaceId: string; setWorkspaceId: (id: string) => void; prepareSignOut: () => void;
   savingKeys: string[]; saveEpoch: number; beginSave: (key: string) => boolean; finishSave: (key: string, saved: boolean) => void;
@@ -17,12 +19,13 @@ export function PlanningDrafts({ children }: { children: React.ReactNode }) {
   const session = usePlannerSession();
   const [lease] = useState(session.capture);
   const [drafts, setDrafts] = useState<Record<string, PlanningDraft>>({});
+  const [calendarDrafts, setCalendarDrafts] = useState<Record<string, CalendarDraft>>({});
   const [workspaceId, setWorkspaceId] = useState("");
   const inFlight = useRef(new Set<string>());
   const [savingKeys, setSavingKeys] = useState<string[]>([]);
   const [saveEpoch, setSaveEpoch] = useState(0);
   const documentExitAllowed = useRef(false);
-  const dirty = Object.values(drafts).some(draft => draft.dirty);
+  const dirty = [...Object.values(drafts), ...Object.values(calendarDrafts)].some(draft => draft.dirty);
   useEffect(() => {
     if (!dirty) return;
     const warn = (event: BeforeUnloadEvent) => { if (!documentExitAllowed.current && !session.isLeaving()) { event.preventDefault(); event.returnValue = ""; } };
@@ -30,10 +33,10 @@ export function PlanningDrafts({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty, session]);
   useEffect(() => session.onInvalidate(() => {
-    documentExitAllowed.current = true; inFlight.current.clear(); setDrafts({}); setWorkspaceId(""); setSavingKeys([]); setSaveEpoch(0);
+    documentExitAllowed.current = true; inFlight.current.clear(); setDrafts({}); setCalendarDrafts({}); setWorkspaceId(""); setSavingKeys([]); setSaveEpoch(0);
   }), [session]);
   const updateDrafts: DraftStore["setDrafts"] = value => { if (session.isCurrent(lease)) setDrafts(value); };
-  function prepareSignOut() { documentExitAllowed.current = true; setDrafts({}); }
+  function prepareSignOut() { documentExitAllowed.current = true; setDrafts({}); setCalendarDrafts({}); }
   function beginSave(key: string) {
     if (!session.isCurrent(lease)) return false;
     if (inFlight.current.has(key)) return false;
@@ -46,7 +49,7 @@ export function PlanningDrafts({ children }: { children: React.ReactNode }) {
     // still fetch that committed record; drafts never move to the new context.
     if (saved) setSaveEpoch(current => current + 1);
   }
-  return <Context.Provider value={{ drafts, setDrafts: updateDrafts, workspaceId, setWorkspaceId, prepareSignOut, savingKeys, saveEpoch, beginSave, finishSave }}>{children}</Context.Provider>;
+  return <Context.Provider value={{ calendarDrafts, setCalendarDrafts: value => { if (session.isCurrent(lease)) setCalendarDrafts(value); }, drafts, setDrafts: updateDrafts, workspaceId, setWorkspaceId, prepareSignOut, savingKeys, saveEpoch, beginSave, finishSave }}>{children}</Context.Provider>;
 }
 export function usePlanningDrafts() {
   const value = useContext(Context);

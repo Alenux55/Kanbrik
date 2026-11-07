@@ -10,7 +10,7 @@ export const test = base.extend<{ testAccounts: string[]; testWorkspaces: string
   testWorkspaces: [async ({}, runFixture) => {
     const ids: string[] = [];
     try { await runFixture(ids); }
-    finally { await db.workspace.deleteMany({ where: { id: { in: ids } } }); }
+    finally { await db.timeBlock.deleteMany({ where: { workspaceId: { in: ids } } }); await db.workspace.deleteMany({ where: { id: { in: ids } } }); }
   }, { auto: true }],
   testAccounts: [async ({ testWorkspaces }, runFixture) => {
     const emails: string[] = [];
@@ -18,6 +18,7 @@ export const test = base.extend<{ testAccounts: string[]; testWorkspaces: string
     finally {
       // Delete shared fixtures before users, whose membership cascades do not
       // delete a shared workspace. Every ID/email belongs to this test only.
+      await db.timeBlock.deleteMany({ where: { workspace: { OR: [{ id: { in: testWorkspaces } }, { personalOwner: { email: { in: emails } } }] } } });
       await db.workspace.deleteMany({ where: { id: { in: testWorkspaces } } });
       await db.user.deleteMany({ where: { email: { in: emails } } });
     }

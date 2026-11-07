@@ -52,6 +52,7 @@ beforeAll(async () => {
 });
 afterAll(async () => {
   await db.verification.deleteMany({ where: { value: { in: userIds } } });
+  await db.timeBlock.deleteMany({ where: { workspace: { OR: [{ id: { in: sharedIds } }, { personalOwnerId: { in: userIds } }] } } });
   await db.workspace.deleteMany({ where: { id: { in: sharedIds } } });
   // Delete only this run's users; cascades remove their own workspaces/sessions.
   await db.user.deleteMany({ where: { id: { in: userIds } } });
@@ -610,5 +611,157 @@ describe("real PostgreSQL and HTTP authentication boundary", () => {
     const cookie = login.headers.getSetCookie().map(value => value.split(";")[0]).join("; ");
     expect((await bootstrap(cookie)).id).toBe(workspace.id);
     expect(await db.workspace.count({ where: { personalOwnerId: user.id } })).toBe(1);
+  });
+});
+
+describe("calendar time blocks through authorized HTTP and PostgreSQL", () => {
+  let a: Awaited<ReturnType<typeof account>>, b: Awaited<ReturnType<typeof account>>, outsider: Awaited<ReturnType<typeof account>>;
+  let workspaceId: string, personalId: string, projectId: string, taskId: string, childId: string, foreignTask: string, foreignProject: string;
+  let block: { id: string; revision: number };
+  const schedule = { startAt: "2026-06-01T12:00:00-07:00", endAt: "2026-06-01T15:00:00-07:00", timeZone: "America/Los_Angeles" };
+  const empty = { projectId: null, taskId: null };
+  const body = (assignment: object = empty, times = schedule) => ({ requestKey: randomUUID(), label: "Time block", schedule: times, assignment });
+  const path = () => `/api/workspaces/${workspaceId}/time-blocks`;
+  const range = "?start=2026-06-01T00%3A00Z&end=2026-06-03T00%3A00Z";
+  const request = (path: string, method = "GET", data?: object, cookie = a.cookie, expected?: string) => fetch(origin + path, { method, headers: { cookie, origin, "content-type": "application/json", ...(expected ? { [expectedAccountHeader]: expected } : {}) }, body: data ? JSON.stringify(data) : undefined });
+  beforeAll(async () => {
+    a = await account(); b = await account(); outsider = await account();
+    personalId = (await bootstrap(a.cookie)).id;
+    workspaceId = (await (await post("/api/workspaces", { name: "Calendar fixture" }, a.cookie)).json()).id;
+    sharedIds.push(workspaceId);
+    await post(`/api/workspaces/${workspaceId}/members`, { email: b.email }, a.cookie);
+    projectId = (await (await post(`/api/workspaces/${workspaceId}/projects`, { title: "Calendar project" }, a.cookie)).json()).id;
+    taskId = (await (await post(`/api/workspaces/${workspaceId}/tasks`, { title: "Calendar parent", projectId, status: "done" }, a.cookie)).json()).id;
+    childId = (await (await post(`/api/workspaces/${workspaceId}/tasks`, { title: "Calendar child", parentId: taskId }, a.cookie)).json()).id;
+    foreignTask = (await (await post(`/api/workspaces/${personalId}/tasks`, { title: "Foreign task" }, a.cookie)).json()).id;
+    foreignProject = (await (await post(`/api/workspaces/${personalId}/projects`, { title: "Foreign project" }, a.cookie)).json()).id;
+  });
+  it("persists separate account-owned preferences, including explicit empty and new sign-in", async () => {
+    const first = await request("/api/calendar/preferences"); expect(first.status).toBe(200); expect(first.headers.get("cache-control")).toBe("no-store");
+    expect(await first.json()).toMatchObject({ workspaceIds: [personalId], timeZone: null });
+    await request("/api/board/preferences", "PUT", { workspaceIds: [workspaceId] });
+    expect((await request("/api/calendar/preferences", "PUT", { workspaceIds: [workspaceId, workspaceId, personalId], timeZone: "Asia/Tokyo" })).status).toBe(200);
+    expect(await (await request("/api/calendar/preferences")).json()).toMatchObject({ workspaceIds: [workspaceId, personalId], timeZone: "Asia/Tokyo" });
+    expect((await (await request("/api/board/preferences")).json()).workspaceIds).toEqual([workspaceId]);
+    expect((await request("/api/calendar/preferences", "PUT", { workspaceIds: [], timeZone: "UTC" })).status).toBe(200);
+    const login = await post("/api/auth/sign-in/email", { email: a.email, password: a.password }); expect(login.status).toBe(200);
+    const cookie = login.headers.getSetCookie().map(value => value.split(";")[0]).join("; ");
+    expect(await (await request("/api/calendar/preferences", "GET", undefined, cookie)).json()).toMatchObject({ workspaceIds: [], timeZone: "UTC" });
+    expect((await request("/api/calendar/preferences", "PUT", { workspaceIds: [personalId], timeZone: "UTC" }, b.cookie)).status).toBe(404);
+    for (const extra of [{ userId: b.id }, { timeZone: "Invalid/zone" }]) expect((await request("/api/calendar/preferences", "PUT", { workspaceIds: [], timeZone: "UTC", ...extra })).status).toBe(400);
+    expect((await (await request("/api/calendar/preferences", "GET", undefined, outsider.cookie)).json()).timeZone).toBeNull();
+  });
+  it("creates once for concurrent retries and never reuses a changed or deleted intent", async () => {
+    const intent = body();
+    const responses = await Promise.all([request(path(), "POST", intent), request(path(), "POST", intent)]);
+    expect(responses.map(r => r.status)).toEqual([201, 201]);
+    const [one, two] = await Promise.all(responses.map(r => r.json())); expect(one.id).toBe(two.id); block = one;
+    expect(await db.timeBlock.count({ where: { workspaceId } })).toBe(1);
+    expect((await request(path(), "POST", { ...intent, label: "Different" })).status).toBe(400);
+    const temporaryIntent = body(); const temporary = await (await request(path(), "POST", temporaryIntent)).json();
+    expect(await (await request(`${path()}/${temporary.id}`, "DELETE", { revision: 1 })).json()).toEqual({ deleted: true, id: temporary.id });
+    expect((await request(path(), "POST", temporaryIntent)).status).toBe(404);
+    expect(await db.timeBlock.count({ where: { workspaceId } })).toBe(1);
+  });
+  it("assigns projects/tasks/subtasks, replaces and clears without changing canonical work", async () => {
+    const beforeProjects = await db.project.findMany({ where: { workspaceId } }); const beforeTasks = await db.task.findMany({ where: { workspaceId } });
+    for (const assignment of [{ projectId, taskId: null }, { projectId: null, taskId }, { projectId: null, taskId: childId }, empty]) {
+      const response = await request(`${path()}/${block.id}`, "PATCH", { revision: block.revision, changes: { assignment } }, b.cookie);
+      expect(response.status).toBe(200); block = await response.json(); expect(block).toMatchObject({ ...assignment, startAt: "2026-06-01T19:00:00.000Z", endAt: "2026-06-01T22:00:00.000Z" });
+    }
+    expect(await db.project.findMany({ where: { workspaceId } })).toEqual(beforeProjects); expect(await db.task.findMany({ where: { workspaceId } })).toEqual(beforeTasks);
+    const assigned = await (await request(path(), "POST", body({ projectId: null, taskId: childId }))).json();
+    const repeated = await request(path(), "POST", body({ projectId: null, taskId: childId })); expect(repeated.status).toBe(201);
+    expect(await db.timeBlock.count({ where: { workspaceId, taskId: childId } })).toBe(2);
+    await db.task.update({ where: { id: childId }, data: { title: "Current canonical child" } });
+    const events = await (await request(path() + range)).json(); expect(events.find((e: { id: string }) => e.id === assigned.id).task.title).toBe("Current canonical child");
+  });
+  it("rejects strict input, forged ownership, invalid zone/offsets and foreign references", async () => {
+    for (const invalid of [
+      { ...body(), workspaceId: personalId }, { ...body(), userId: b.id }, { ...body(), label: " " },
+      { ...body(), assignment: { projectId, taskId } }, { ...body(), schedule: { ...schedule, startAt: "2026-06-01T12:00Z" } },
+      { ...body(), schedule: { ...schedule, startAt: schedule.endAt } }, { ...body(), schedule: { ...schedule, timeZone: "wrong/zone" } },
+      { ...body(), schedule: { startAt: "2026-03-08T02:30-08:00", endAt: "2026-03-08T04:00-07:00", timeZone: "America/Los_Angeles" } },
+    ]) expect((await request(path(), "POST", invalid)).status).toBe(400);
+    for (const changes of [{}, { workspaceId: personalId }, { assignment: { taskId: childId } }, { schedule: { startAt: schedule.startAt } }]) expect((await request(`${path()}/${block.id}`, "PATCH", { revision: block.revision, changes })).status).toBe(400);
+    expect((await request(path(), "POST", body({ projectId: null, taskId: foreignTask }))).status).toBe(404);
+    expect((await request(path(), "POST", body({ projectId: foreignProject, taskId: null }))).status).toBe(404);
+    expect((await request(`${path()}/${block.id}`, "PATCH", { revision: block.revision, changes: { assignment: { projectId: null, taskId: foreignTask } } })).status).toBe(404);
+    for (const suffix of ["", "?start=2026-01-01T00:00Z&end=2026-05-01T00:00Z", "?start=2026-01-01T00:00&end=2026-01-02T00:00Z"]) expect((await request(path() + suffix)).status).toBe(400);
+  });
+  it("denies anonymous, outsider, foreign-route and mismatched accounts on every operation", async () => {
+    for (const [cookie, expected] of [["", 401], [outsider.cookie, 404]] as const) {
+      expect((await request(path() + range, "GET", undefined, cookie)).status).toBe(expected);
+      expect((await request(path(), "POST", body(), cookie)).status).toBe(expected);
+      expect((await request(`${path()}/${block.id}`, "PATCH", { revision: block.revision, changes: { label: "No" } }, cookie)).status).toBe(expected);
+      expect((await request(`${path()}/${block.id}`, "DELETE", { revision: block.revision }, cookie)).status).toBe(expected);
+    }
+    expect((await request(path() + range, "GET", undefined, b.cookie, a.id)).status).toBe(412);
+    expect((await request(path(), "POST", body(), b.cookie, a.id)).status).toBe(412);
+    expect((await request(`${path()}/${block.id}`, "PATCH", { revision: block.revision, changes: { label: "No" } }, b.cookie, a.id)).status).toBe(412);
+    expect((await request(`${path()}/${block.id}`, "DELETE", { revision: block.revision }, b.cookie, a.id)).status).toBe(412);
+    expect((await request(`/api/workspaces/${personalId}/time-blocks${range}`, "GET", undefined, b.cookie)).status).toBe(404);
+    expect((await request(`/api/workspaces/${personalId}/time-blocks`, "POST", body(), b.cookie)).status).toBe(404);
+    for (const invalid of [{ revision: 0 }, { revision: block.revision, workspaceId: personalId }]) expect((await request(`${path()}/${block.id}`, "DELETE", invalid)).status).toBe(400);
+    expect((await request(`/api/workspaces/${personalId}/time-blocks/${block.id}`, "PATCH", { revision: block.revision, changes: { label: "No" } })).status).toBe(404);
+    expect((await fetch(origin + `${path()}/${block.id}`, { method: "DELETE", headers: { cookie: a.cookie, origin: "https://hostile.invalid", "content-type": "application/json" }, body: JSON.stringify({ revision: block.revision }) })).status).toBe(403);
+  });
+  it("serializes competing label/schedule/assignment edits and rejects stale deletion", async () => {
+    const changes = [{ label: "Concurrent label" }, { assignment: { projectId, taskId: null } }, { schedule: { ...schedule, endAt: "2026-06-02T15:00:00-07:00" } }];
+    const responses = await Promise.all(changes.map(change => request(`${path()}/${block.id}`, "PATCH", { revision: block.revision, changes: change })));
+    expect(responses.map(r => r.status).sort()).toEqual([200, 409, 409]);
+    const current = await db.timeBlock.findUniqueOrThrow({ where: { id: block.id } }); expect(current.revision).toBe(block.revision + 1);
+    const stale = await request(`${path()}/${block.id}`, "DELETE", { revision: block.revision }); expect(stale.status).toBe(409); expect((await stale.json()).current.id).toBe(block.id);
+    block = current;
+    const race = await Promise.all([request(`${path()}/${block.id}`, "DELETE", { revision: block.revision }), request(`${path()}/${block.id}`, "PATCH", { revision: block.revision, changes: { label: "Race" } })]);
+    expect(race.filter(r => r.status === 200)).toHaveLength(1); expect([404, 409]).toContain(race.find(r => r.status !== 200)!.status);
+    const still = await db.timeBlock.findUnique({ where: { id: block.id } });
+    if (still) { expect((await request(`${path()}/${block.id}`, "DELETE", { revision: still.revision })).status).toBe(200); }
+    expect(await db.task.count({ where: { workspaceId } })).toBe(2); expect(await db.project.count({ where: { workspaceId } })).toBe(1);
+  });
+  it("queries half-open overlaps including spanning blocks and DST crossings", async () => {
+    const make = async (startAt: string, endAt: string, timeZone = "UTC") => (await (await request(path(), "POST", body(empty, { startAt, endAt, timeZone }))).json()).id;
+    const endsAtStart = await make("2026-03-07T00:00Z", "2026-03-08T08:00Z");
+    const startsAtEnd = await make("2026-03-09T07:00Z", "2026-03-10T08:00Z");
+    const spanning = await make("2026-03-07T12:00-08:00", "2026-03-10T15:00-07:00", "America/Los_Angeles");
+    const crossing = await make("2026-03-08T01:30-08:00", "2026-03-08T03:30-07:00", "America/Los_Angeles");
+    for (const startAt of ["2026-11-01T01:30-07:00", "2026-11-01T01:30-08:00"]) expect((await request(path(), "POST", body(empty, { startAt, endAt: "2026-11-01T03:00-08:00", timeZone: "America/Los_Angeles" }))).status).toBe(201);
+    const events = await (await request(path() + "?" + new URLSearchParams({ start: "2026-03-08T00:00-08:00", end: "2026-03-09T00:00-07:00" }))).json();
+    expect(events.map((e: { id: string }) => e.id).sort()).toEqual([spanning, crossing].sort());
+    expect(events.map((e: { id: string }) => e.id)).not.toContain(endsAtStart); expect(events.map((e: { id: string }) => e.id)).not.toContain(startsAtEnd);
+    const cross = events.find((e: { id: string }) => e.id === crossing); expect(Date.parse(cross.endAt) - Date.parse(cross.startAt)).toBe(3600000);
+  });
+  it("enforces database relationships, interval, revision, zone and immutable ownership", async () => {
+    const data = { workspaceId, label: "SQL fixture", startAt: new Date(schedule.startAt), endAt: new Date(schedule.endAt), timeZone: schedule.timeZone };
+    for (const bad of [{ taskId: foreignTask }, { projectId: foreignProject }, { projectId, taskId }, { endAt: data.startAt }, { revision: 0 }, { label: " " }, { timeZone: "No/Zone" }]) await expect(db.timeBlock.create({ data: { ...data, ...bad } })).rejects.toThrow();
+    const owned = await db.timeBlock.create({ data: { ...data, projectId } });
+    await expect(db.timeBlock.update({ where: { id: owned.id }, data: { workspaceId: personalId, projectId: null } })).rejects.toThrow();
+    await expect(db.project.delete({ where: { id: projectId } })).rejects.toThrow();
+    await expect(db.task.delete({ where: { id: childId } })).rejects.toThrow();
+    const [types] = await db.$queryRaw<{ valid: boolean }[]>`SELECT COUNT(*) = 2 AS valid FROM information_schema.columns WHERE table_name = 'TimeBlock' AND column_name IN ('startAt','endAt') AND data_type = 'timestamp with time zone' AND datetime_precision = 3`;
+    expect(types.valid).toBe(true);
+  });
+  it("denies a mutation confirmed queued behind membership removal and prunes preferences", async () => {
+    await request("/api/calendar/preferences", "PUT", { workspaceIds: [workspaceId], timeZone: "UTC" }, b.cookie);
+    const target = await (await request(path(), "POST", body())).json();
+    let release!: () => void, ready!: (pid: number) => void;
+    const gate = new Promise<void>(resolve => { release = resolve; }); const locked = new Promise<number>(resolve => { ready = resolve; });
+    const removal = db.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM "Workspace" WHERE id = ${workspaceId} FOR UPDATE`;
+      await tx.membership.deleteMany({ where: { workspaceId, userId: b.id } });
+      const [row] = await tx.$queryRaw<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`; ready(row.pid); await gate;
+    }, { timeout: 15000 });
+    const pid = await locked;
+    const queued = request(`${path()}/${target.id}`, "PATCH", { revision: 1, changes: { label: "Denied" } }, b.cookie);
+    try {
+      let blocked = false;
+      for (let i = 0; i < 80; i++) {
+        const [row] = await db.$queryRaw<{ blocked: boolean }[]>`SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE ${pid} = ANY(pg_blocking_pids(pid))) AS blocked`;
+        if (row.blocked) { blocked = true; break; } await new Promise(resolve => setTimeout(resolve, 25));
+      }
+      expect(blocked).toBe(true);
+    } finally { release(); await removal; }
+    expect((await queued).status).toBe(404); expect((await db.timeBlock.findUniqueOrThrow({ where: { id: target.id } })).revision).toBe(1);
+    const prefs = await (await request("/api/calendar/preferences", "GET", undefined, b.cookie)).json(); expect(prefs.workspaceIds).toEqual([]); expect(prefs.workspaces.some((w: { id: string }) => w.id === workspaceId)).toBe(false);
   });
 });

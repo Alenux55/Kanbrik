@@ -35,7 +35,7 @@ These are recommendations, not additional user-confirmed requirements.
 - Give each user a private personal workspace and allow multiple shared workspace memberships. Start with owner/editor roles.
 - Workspace membership is the only sharing boundary initially. Project-level exceptions and private items within shared workspaces are deferred.
 - Every record belongs to one workspace. A task may have no project but still has a workspace.
-- Board/calendar share a user-selected workspace set, persisted per user. Keep active filters visible and show workspace name/color on entries.
+- Persist user-selected workspace sets per view. Board already has its own selection; task 009 adds a separate Calendar selection. Keep active filters visible and show workspace names on entries.
 - Shared workspace blocks are visible to members; personal workspace blocks are private. Privately scheduling shared tasks across workspaces needs a separate design decision.
 - Creating work with multiple workspaces selected requires an explicit destination or clearly displayed default. Filters must not silently assign ownership.
 - Use one canonical task across project, board, list, and calendar views.
@@ -62,7 +62,11 @@ Projects selects one explicit workspace locally to that view, independent of fut
 
 ## Implemented board defaults (task 008)
 
-Board displays canonical tasks/subtasks individually under the five shared statuses, with workspace/project/parent context and independent completion. Selection is account-owned/server-saved and local to Board: first visit selects only personal, explicitly cleared selection persists empty, and same-user tabs use last-committed selection. These are bounded implementation defaults, not new sharing policy. Workspaces are still authorized for every task operation regardless of preferences. Ordering is creation-time/ID; same-column drops do not reorder. Desktop mouse dragging and explicit keyboard/touch selectors update status only. Android uses status tabs. Manual refresh, incomplete-load warnings, explicit conflict review, and retained Projects draft revisions are part of the contract; live push and Calendar remain deferred.
+Board displays canonical tasks/subtasks individually under the five shared statuses, with workspace/project/parent context and independent completion. Selection is account-owned/server-saved and local to Board: first visit selects only personal, explicitly cleared selection persists empty, and same-user tabs use last-committed selection. These are bounded implementation defaults, not new sharing policy. Workspaces are still authorized for every task operation regardless of preferences. Ordering is creation-time/ID; same-column drops do not reorder. Desktop mouse dragging and explicit keyboard/touch selectors update status only. Android uses status tabs. Manual refresh, incomplete-load warnings, explicit conflict review, and retained Projects draft revisions are part of the contract; live push remains deferred; Calendar has its independent contract below.
+
+## Implemented Calendar defaults (task 009)
+
+[009: Calendar time blocks](tasks/009-calendar-time-blocks.md) implements workspace-owned, one-off timed blocks: empty or linked to one project/task in the same workspace, with independent Calendar filters and an account-saved display time zone. Shared workspace members can read/edit shared blocks; personal blocks stay private. Overlaps are allowed initially, pointer snapping is 15 minutes, and explicit controls accept other minute values. UTC instants, visible IANA zones, explicit DST ambiguity handling and revision checks define scheduling. Block removal leaves canonical work intact. Private scheduling of shared work, recurrence and availability booking remain deferred. These bounded implementation defaults remain subject to evaluation; they are not additional user-confirmed requirements. Saves/assignment/removal are revision protected, create retries reconcile the original intent, drafts are account-scoped in memory, and refresh is manual.
 
 ## Decisions still open
 
@@ -70,7 +74,7 @@ Board displays canonical tasks/subtasks individually under the five shared statu
 - Sign-up/invitation process, login method, and whether viewer-only access is needed.
 - Whether personal scheduling of shared tasks is needed initially and its exact visibility rules.
 - Recurring chores/checklists and whether checklist items are independently schedulable tasks.
-- Block overlap policy, snapping, and project/task deletion/archive behavior.
+- Longer-term overlap/availability and snapping policy (task 009 implements overlaps allowed and 15-minute pointer snapping initially); project/task deletion/archive behavior remains undecided.
 - SilverBullet's role and whether linked notes are sufficient.
 - External calendars, notifications, and actual time tracking are uncommitted follow-ups.
 

@@ -20,6 +20,7 @@ model User {
   personalWorkspace Workspace? @relation("PersonalOwner")
   memberships Membership[]
   boardPreference BoardPreference?
+  calendarPreference CalendarPreference?
   @@map("user")
 }
 
@@ -86,6 +87,8 @@ model Workspace {
   memberships     Membership[]
   projects        Project[]
   tasks           Task[]
+  timeBlocks      TimeBlock[]
+  calendarIntents CalendarCreateIntent[]
   createdAt       DateTime @default(now())
 }
 
@@ -124,6 +127,7 @@ model Project {
   updatedAt   DateTime @updatedAt
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   tasks       Task[]
+  timeBlocks  TimeBlock[]
   @@unique([id, workspaceId])
   @@index([workspaceId, createdAt, id])
 }
@@ -143,8 +147,45 @@ model Task {
   project     Project? @relation(fields: [projectId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
   parent      Task? @relation("Subtasks", fields: [parentId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
   children    Task[] @relation("Subtasks")
+  timeBlocks  TimeBlock[]
   @@unique([id, workspaceId])
   @@index([workspaceId, createdAt, id])
   @@index([projectId, workspaceId])
   @@index([parentId, workspaceId])
+}
+
+model CalendarPreference {
+  userId String @id
+  workspaceIds String[]
+  timeZone String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model TimeBlock {
+  id String @id @default(cuid())
+  workspaceId String
+  label String @default("Time block")
+  startAt DateTime @db.Timestamptz(3)
+  endAt DateTime @db.Timestamptz(3)
+  timeZone String
+  projectId String?
+  taskId String?
+  revision Int @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project Project? @relation(fields: [projectId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  task Task? @relation(fields: [taskId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  @@index([workspaceId, startAt, endAt])
+  @@index([projectId, workspaceId])
+  @@index([taskId, workspaceId])
+}
+
+model CalendarCreateIntent {
+  workspaceId String
+  requestKey String
+  payload String
+  blockId String
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  @@id([workspaceId, requestKey])
 }

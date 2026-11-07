@@ -1,6 +1,6 @@
 # Delivery roadmap
 
-Tasks 001–008 implement the foundation, development/test identity/recovery, personal/shared access, project/task planning, corrected cross-tab verification, and the Kanban board with saved authorized workspace selection. Phase 2's board implementation is verified and ready for review; Calendar and its selection remain planned. See handoffs for exact evidence and limits. This sequence is a proposal and may change with product decisions.
+Tasks 001–008 implement the foundation, development/test identity/recovery, personal/shared access, project/task planning, corrected cross-tab verification, and the Kanban board with saved authorized workspace selection. Phase 2's board passed independent review at `500b136`. Task 009 implements Calendar and its separate selection; independent review is pending. See handoffs for exact evidence and limits. This sequence is a proposal and may change with product decisions.
 
 | Phase | Outcome | Evidence required for completion |
 | --- | --- | --- |
@@ -28,5 +28,6 @@ Tasks 001–008 implement the foundation, development/test identity/recovery, pe
 - [004: password confirmation and recovery](tasks/004-password-recovery.md): requested identity follow-up with SMTP email configuration; see its verification and provider-delivery limitations.
 - [005: workspace-owned projects and tasks](tasks/005-projects-tasks.md): implemented and verified explicit-workspace project planning, tasks/subtasks, fixed statuses, and stale-save protection; see exact browser-run evidence and limitations. Kanban and calendar views follow separately.
 - [006: cross-tab session and planning-draft isolation](tasks/006-cross-tab-session-isolation.md): implemented as `0c13917` and independently reviewed; delayed cookie effects require task 007.
-- [007: read-only session verification](tasks/007-read-only-session-verification.md): implemented and verified (55 automated checks, 34 browser cases); coordinator review precedes task 008. Planner probes cannot restore/delete browser auth cookies or renew valid sessions.
-- [008: Kanban board](tasks/008-kanban-board.md): implemented over canonical tasks with saved board selection and status-only revision-protected moves, following owner-confirmed 007 approval. Verified 59 automated checks and 40 browser cases; see its completion handoff for evidence/limitations.
+- [007: read-only session verification](tasks/007-read-only-session-verification.md): implemented and verified (55 automated checks, 34 browser cases), with owner-confirmed approval before task 008. Planner probes cannot restore/delete browser auth cookies or renew valid sessions.
+- [008: Kanban board](tasks/008-kanban-board.md): implemented as `500b136` and independently reviewed without actionable findings. Implementation passed 59 backend checks and 40 full browser cases; coordinator separately passed 59 backend checks and six focused board cases. See its completion handoff for distinctions and limits.
+- [009: Calendar time blocks](tasks/009-calendar-time-blocks.md): implemented after board review; see its completion record for actual checks and limitations. Empty/assigned workspace-owned blocks, time-zone-aware scheduling, separate saved workspace filters, explicit desktop/Android controls and desktop assignment/move/resize gestures. Independent review remains pending; no deployment is authorized.

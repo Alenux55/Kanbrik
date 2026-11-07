@@ -2,11 +2,11 @@
 
 ## Current state
 
-Tasks 001–007 are committed through `47993fa`; task 008 is implemented and verified as staged/uncommitted work, ready for board review. The app has Better Auth accounts/sessions, personal/shared workspaces, recovery/email diagnostics, project/task planning, and cross-tab session/draft guards. Task 007 now corrects the independently reproduced delayed session-cookie race; its implementation evidence is below; the owner confirmed review approval before task 008 began. Projects supports one-level subtasks, fixed statuses, revision conflicts, and in-session drafts. The Kanban board now shows canonical tasks across saved workspace selections. Calendar/checklist/inbox persistence remains unimplemented. No production deployment was performed.
+Tasks 001–008 are committed through `500b136`; 008 passed independent coordinator review. Task [009: Calendar time blocks](tasks/009-calendar-time-blocks.md) now adds Calendar runtime, additive storage/API contracts, retained account-scoped drafts and scheduling checks. Its completion record below distinguishes actual verification from remaining limits. Task 009 is uncommitted pending owner action and independent review. Checklist/inbox persistence remains unimplemented. No production deployment was performed.
 
 Read `AGENTS.md`, `docs/product.md`, `docs/architecture.md`, `docs/stack.md`, and the task completion records before assigning dependent work. Task records contain the detailed verification evidence and contracts; this file summarizes the transfer to the coordinating agent.
 
-The current corrective implementation is [task 006](tasks/006-cross-tab-session-isolation.md), committed as `0c13917` after planning commit `0929f9a` and preparation `c8fabab`. [007: read-only session verification](tasks/007-read-only-session-verification.md) is committed as `47993fa` and owner-confirmed approved. [008: Kanban board](tasks/008-kanban-board.md) is separately specified because its task/status/workspace contracts are unaffected by the probe fix, and now consumes its approved shared session contract. The owner explicitly confirmed 007 approval and authorized task 008; independent review command details were not supplied and are not invented here.
+The session corrections are [task 006](tasks/006-cross-tab-session-isolation.md) at `0c13917` and [007: read-only session verification](tasks/007-read-only-session-verification.md) at `47993fa`. Owner-confirmed 007 approval preceded [008: Kanban board](tasks/008-kanban-board.md) at `500b136`. Task 009 consumes those reviewed shared contracts; do not reopen identity or membership policy as part of scheduling.
 
 ## Latest operational resolution
 
@@ -18,11 +18,19 @@ The Ubuntu app is manually run on loopback port **3005**, accessed through an SS
 
 ## Verification carried forward
 
-- Task 008 implementation: both builds, lint/types, schema/client generation, guarded test migration, and **59/59** database/HTTP checks passed. Development fixtures (including canonical Project/Task) retained identical row digests through the additive preference migration; a fresh isolated cluster applied all three migrations with no schema drift and was stopped. Final full browser suite passed **40/40** (8.1 minutes), including six new desktop/Android board cases and all 34 existing regressions. Screenshots were inspected on both viewport profiles. Production audit reports 0 vulnerabilities; original 8 moderate dev-only findings remain. The board's independent review is not yet performed.
+- Task 008 implementation: both builds, lint/types, schema/client generation, guarded test migration, and **59/59** database/HTTP checks passed. Development fixtures (including canonical Project/Task) retained identical row digests through the additive preference migration; a fresh isolated cluster applied all three migrations with no schema drift and was stopped. Final full browser suite passed **40/40** (8.1 minutes), including six new desktop/Android board cases and all 34 existing regressions. Screenshots were inspected on both viewport profiles. Production audit reports 0 vulnerabilities; original 8 moderate dev-only findings remain. These are implementation results; independent review evidence follows below.
+
+## Task 009 implementation and verification
+
+Calendar has workspace-owned one-off blocks, exclusive same-workspace project/task references, revision-safe changes/removal, separate saved view preferences, UTC instants with IANA editing/display zones, explicit DST choices, and idempotent create intents. Desktop uses a matching FullCalendar Standard 6.1.22 family with the existing dnd-kit palette for assignment onto an existing empty block; Android uses explicit agenda/forms. The existing verified account/epoch boundary owns Calendar drafts and pending locks. Failed, uncertain, conflicting, partial and revoked states remain explicit. Retained drafts can reconcile an already removed block after navigation. Canonical work is never copied, completed or deleted by scheduling.
+
+Task 009's client generation, schema validation, additive guarded migrations, final lint/types/default build and **74/74** backend checks passed. Existing development rows retained identical digests; a fresh guarded cluster applied all four migrations with no schema drift and was stopped. Runtime dependency audit is **0**; the same **8 moderate** development-only linter-chain findings remain. Final `npm run test:e2e` passed **52/52 in one full run (10.8 minutes)** on the final default Turbopack build, including all 40 existing cases and 12 Calendar cases; see the task record for earlier interrupted/focused runs. Screenshots use desktop and Pixel 7 emulation, not physical hardware. No provider or production server changes.
+
+Independent review of 009 remains pending. The owner commits/pushes after review. Apply the new additive migration during the README's test-server restart sequence; do not reset the database.
 
 ## Task 008 integration contract
 
-Board reuses canonical tasks and the corrected session abstraction, with server-saved user-owned BoardPreference selections. It defaults only to personal, persists cleared selection, validates/deduplicates IDs, filters inaccessible IDs at read, and never grants access from filters. Strict status-only PATCH uses existing workspace locks, rechecks and expected revision/account; text/context/parent-child independence are preserved. Multi-scope failures label counts incomplete and remove that scope's editable cards. Selection generations, context guards and shared in-flight locks prevent obsolete responses from restoring deselected/old-account cards or releasing a new account's lock. Projects drafts retain original revisions. Desktop has five columns and MouseSensor drag handles; narrow screens use status tabs and explicit selectors. Review task 008's full completion evidence before any calendar assignment.
+Board reuses canonical tasks and the corrected session abstraction, with server-saved user-owned BoardPreference selections. It defaults only to personal, persists cleared selection, validates/deduplicates IDs, filters inaccessible IDs at read, and never grants access from filters. Strict status-only PATCH uses existing workspace locks, rechecks and expected revision/account; text/context/parent-child independence are preserved. Multi-scope failures label counts incomplete and remove that scope's editable cards. Selection generations, context guards and shared in-flight locks prevent obsolete responses from restoring deselected/old-account cards or releasing a new account's lock. Projects drafts retain original revisions. Desktop has five columns and MouseSensor drag handles; narrow screens use status tabs and explicit selectors. Task 009 must preserve these reviewed behaviors.
 
 ## Historical verification
 
@@ -58,6 +66,12 @@ At baseline `0c13917`, a separate renewal test found a P2 race: with notificatio
 
 Commit `e4224a9` prepared tasks 007/008 as documentation only. Its coordinator results are historical. Task 007 subsequently added source and permanent regressions and was committed as `47993fa`; the owner confirmed its approval before 008.
 
+### Task 008 review at `500b136`
+
+Independent review on 2026-11-06 found no actionable code defects. Passed `npm run check`, `npm run db:validate`, `npm run db:test:migrate` (no pending migrations), `npm run build -- --webpack`, **59/59 backend tests**, and **6/6 focused board browser cases** in 1.4 minutes across desktop and Pixel 7 touch emulation. Reviewed status-only/preference authorization, pointer/control moves, conflicts, retained Projects drafts, incomplete loads, delayed-probe/account switching and actual membership removal; inspected both layout screenshots. The review left the working tree unchanged.
+
+The coordinator did not independently repeat the full 40-case suite, default build, migration fixture/fresh-cluster proof, audit, hardware Android or provider/deployment checks. At task-009 preparation HEAD was still `500b136` with a clean tree; the review evidence above was carried forward, not rerun for documentation changes. The board is suitable as the next feature's baseline.
+
 ## Important contracts
 
 - Task 005 adds Project/Task canonical records via additive `202611050002_projects_tasks`, leaving the original migration untouched. Composite references and SQL triggers enforce consistent workspace/project/parent context, one-level hierarchy, and immutable assignments. Only Done means completed; parent/child statuses are independent. No content delete/archive/move endpoint exists.
@@ -72,7 +86,7 @@ Commit `e4224a9` prepared tasks 007/008 as documentation only. Its coordinator r
 
 ## Reviewed history / change inventory
 
-Original transfer baseline: `6a1e5b0`. Task 005 is committed as `0929f9a`; the first account-switch handoff is `c8fabab`; task 006 is committed as `0c13917` and has now received coordinator review. Task 008 application baseline is approved commit `47993fa`. Use Git history to identify subsequent implementation commits rather than carrying forward a stale staged/uncommitted description.
+Original transfer baseline: `6a1e5b0`. Task 005 is committed as `0929f9a`; the first account-switch handoff is `c8fabab`; task 006 is committed as `0c13917` and has received coordinator review. Task 008 built on approved `47993fa` and is committed/reviewed as `500b136`. Use Git history to identify subsequent implementation commits rather than carrying forward a stale staged/uncommitted description.
 
 | Commit | Change |
 | --- | --- |
@@ -88,11 +102,14 @@ Original transfer baseline: `6a1e5b0`. Task 005 is committed as `0929f9a`; the f
 | `c8fabab` | Corrective cross-tab isolation assignment and coordinator review history |
 | `0c13917` | Planner session/draft guards and expected-account preconditions; reviewed with remaining delayed-cookie finding |
 | `47993fa` | Cookie-immutable planner identity probe; owner confirmed approval before 008 |
+| `500b136` | Kanban board, saved workspace selection and status-only moves; independently reviewed |
 
-Tasks 001–007 and preparation `e4224a9` are committed. Current task 008 application, additive migration, dependency lock, tests and documentation are staged/uncommitted work for the owner. Do not automatically commit, push, or deploy; credentials, generated files, local databases, and test artifacts do not belong in the staged diff.
+Tasks 001–008 and preparation `e4224a9` are committed. Task 009 includes runtime/migration changes plus the coordinator's already-staged 009 preparation and 008 review corrections, preserved for the owner to commit. Do not automatically commit, push, or deploy; credentials, generated files, local databases, and test artifacts do not belong in the staged diff.
 
 ## Next coordinator action
 
-Independently review the integrated task 008 board, its migration/status-only/preference contracts, and full regression evidence. Task 007 approval was explicitly confirmed by the owner; it is not a pending prerequisite now. A separately specified Calendar/time-block task follows only after board review. Do not combine the two implementation scopes or start Calendar automatically. Provider/deployment, destructive lifecycle operations, assignment moves, and identity/membership policy remain outside these assignments.
+Task 008 review is complete. Task 009 is implemented; its next step is **independent review**, not a later roadmap feature. Read the task completion record and inspect the staged Calendar diff, including permissions, DST conversion, intent retries, revision-safe deletion, shared draft/provider isolation and FullCalendar lifecycle handling. No independent review was performed by this implementing agent.
 
-Durable user preference for continuing work: **stage changed files and provide a commit message whenever changes are made; leave committing/pushing to the owner unless explicitly instructed otherwise.** Preserve unrelated checkout changes. Re-read current instructions at handoff; do not assume this chat's live context or local secrets are available to another agent.
+Suggested review prompt: "Read AGENTS.md, docs/product.md, docs/architecture.md, docs/stack.md, docs/agent-workflow.md and docs/tasks/009-calendar-time-blocks.md. Independently review task 009 against baseline 500b136 and its acceptance criteria. Check the actual staged diff and rerun meaningful verification, distinguishing focused checks from the full integrated suite. Record actionable findings and review evidence. Do not implement later phases or deploy."
+
+Provider/deployment, work deletion/archive/moves and identity/membership policy remain outside task 009; block removal is its expressly scoped lifecycle operation. The adopted Calendar defaults are bounded implementation choices, not new user-confirmed product requirements.

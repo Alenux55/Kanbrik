@@ -1,6 +1,6 @@
 # 008: Kanban board over canonical tasks
 
-Status: Implemented and verified. Owner confirmed task 007 approval before runtime work began; baseline `47993fa`. Independent board review is the next handoff.
+Status: Implemented as `500b136` and independently reviewed on 2026-11-06 with no actionable findings. Owner confirmed task 007 approval before runtime work began; implementation baseline `47993fa`. Next feature handoff: [009: Calendar time blocks](009-calendar-time-blocks.md).
 
 Suggested model: GPT-6.1 Sol, High effort for board/data/concurrency integration. This document does not configure a model or start work.
 
@@ -103,3 +103,9 @@ The implementation evidence follows. The proposed following feature is a separat
 No real Android hardware, Ubuntu/Docker runtime, production deployment, real-provider mail, backups/restore, or separate review agent was used. All fixtures are owned disposable accounts/workspaces and guarded PostgreSQL; existing email tests stay loopback/memory-only. Touch uses explicit controls; mobile precision dragging is deliberately not offered. Counts are uncapped but incomplete on failed selected scopes. Calendar, deletion/archive/moves, manual ordering, custom status and offline editing remain unimplemented. Review the integrated board before assigning a separately specified calendar/time-block slice; it was not started.
 
 Stage only this task's changed files and provide a commit message. Leave commits, pushes, external accounts/server configuration, and deployment to the owner.
+
+## Independent coordinator review — 2026-11-06
+
+Reviewed committed `500b136` with no actionable code findings. Independently passed `npm run check`, `npm run db:validate`, `npm run db:test:migrate` (no pending migrations), `npm run build -- --webpack`, **59/59** backend tests and **6/6 focused board browser cases** (1.4 minutes) across desktop and Pixel 7 touch emulation. These cover pointer/control moves, conflicts, retained Projects drafts, incomplete loads, delayed-probe/account-switch isolation and actual membership removal. Inspected both layout screenshots; the review left the working tree unchanged.
+
+The coordinator did not repeat the implementer's full 40-case browser suite, default build, fresh-cluster/data-preservation proof, dependency audit, hardware Android or deployment/provider checks. On the subsequent task-009 preparation, HEAD and the clean tree were still `500b136`; these are the earlier review's actual results, not a new test run. The board is suitable as the calendar implementation baseline. Task [009](009-calendar-time-blocks.md) specifies the next feature; it is not implemented by this documentation change.
