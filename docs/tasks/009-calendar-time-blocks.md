@@ -1,6 +1,6 @@
 # 009: Calendar time blocks and work assignment
 
-Status: Implemented and verified after task 008's independent review at `500b136`. Ready for independent review of 009; that review remains pending.
+Status: Implemented as `82d60e4`; the coordinator’s P2 deleted-block gesture finding is corrected and verified on 2026-11-08. Ready for coordinator re-review; acceptance remains pending.
 
 Suggested implementer: use the same model/effort recommendation as task 008 in [agent-workflow.md](../agent-workflow.md): High effort for scheduling, data relationships, permissions and concurrency. This file does not configure an agent or start implementation.
 
@@ -137,11 +137,36 @@ Development failures were corrected rather than counted as passes: the first bac
 
 ### Limits and review handoff
 
-- Independent review has not been performed. Review the actual staged diff and reproduce meaningful checks before assigning another feature.
+- This original implementation record predates independent review. The coordinator review of `82d60e4` and corrective follow-up are appended below; acceptance still requires re-review.
 - Browser verification uses Chromium desktop and Pixel 7 **emulation**, including dispatched touch input; no physical Android device, Firefox or Safari was tested. Screenshots are local ignored artifacts, not committed assets.
 - Intl zone rules depend on current Node/browser data. Server mismatch is rejected, not silently reinterpreted; Node/browser updates may be needed after political zone changes. Calendar storage uses instants and remains independent of host local time.
 - Drafts/locks are current-account memory only. Full reload/sign-out can discard them; an aborted client response does not roll back an already committed server transaction. Intent records have no expiry/retention job in this slice.
 - Manual refresh only; no live push, offline editing, recurrence/all-day events, reminders, availability reservations, work deletion/archive/moves, later roadmap phases or production deployment. Docker, real SMTP delivery and the owner's Ubuntu instance were not changed or verified by this task.
 - Owner commits/pushes. Stage task-owned files and retain existing coordinator documentation; never include ignored environment files, generated clients, local PostgreSQL data or browser artifacts.
 
-Final handoff: all task-owned changes are staged, including preserved coordinator preparation. `git diff --cached --check` passes. No commit, push or production deployment was performed. Suggested commit: `feat: add workspace calendar time blocks`.
+Original pre-commit handoff: all task-owned changes are staged, including preserved coordinator preparation. `git diff --cached --check` passes. No commit, push or production deployment was performed. Suggested commit: `feat: add workspace calendar time blocks`.
+
+## Coordinator finding and corrective follow-up — 2026-11-06
+
+The coordinator independently reviewed committed `82d60e4` and found one **P2**: a gesture PATCH 404 was treated as revocation of the entire workspace. When a collaborator had deleted only the target block, Calendar removed the workspace and every draft in it despite the workspace endpoint still returning 200. Independent review passed lint/types, schema validation, migration status, Webpack build, 74 backend checks and 12 focused Calendar browser cases; it did not repeat the full 52-case suite. Those existing cases did not cover this deletion race.
+
+The correction stays within task 009: a record-level gesture 404 now rechecks the workspace through the existing verified request boundary. Confirmed revocation still clears the affected workspace/drafts. Access 200 removes only the missing saved event and retains its proposed input, workspace selection and unrelated drafts. Failed access checks remain visibly unconfirmed and retain drafts. Recheck completions verify the current mounted scope/account; the shared revocation callback also ignores obsolete form callbacks after navigation. No schema, server authorization, dependency or deployment changes.
+
+Permanent browser regressions create an owner/editor pair and use the owner's real DELETE while the editor's page has a stale block plus an unrelated dirty draft. Desktop exercises actual palette assignment; Android exercises explicit assignment. They also check a failed access recheck, genuine owner-driven revocation, and a held obsolete access result after a range change. All fixtures are owned and disposable; failure/held responses are browser-test interception only.
+
+A pre-fix desktop run of `npm run test:e2e -- calendar.spec.ts --grep 'distinguishes collaborator-deleted' --project desktop` failed as expected, showing “Workspace access ended” and loss of the unrelated draft while the real workspace endpoint returned 200.
+
+### Correction verification resumed — 2026-11-08
+
+- The computer shutdown interrupted verification. The existing portable PostgreSQL cluster completed normal recovery on restart; the initial `pg_ctl` wait expired while recovery was still syncing, then `pg_isready` confirmed it accepted connections. No database reset or data-file removal. `npm run db:test:migrate` passed with four migrations and no pending changes.
+- `npm run check`: lint and strict types passed on the final correction/test sources.
+- `npm run build`: default Turbopack production build passed after restart. This is the build used for final verification; an earlier repair-stage Webpack pass is not a final Webpack rerun.
+- `npm run test`: **74/74** backend/unit/HTTP/database checks passed across five files after restart.
+- `npm run test:e2e -- calendar.spec.ts --grep 'distinguishes collaborator-deleted|obsolete workspace-access recheck|isolates pending saves'`: **6/6 focused cases passed (1.5 minutes)** across desktop and Pixel 7 emulation. The new navigation regression waits for the obsolete operation's own pending lock to release before checking the retained current draft.
+- Final `npm run test:e2e`: **56/56 passed in one full run (11.6 minutes)** on the rebuilt default Turbopack build, with no retries/skips. This includes all 52 prior cases plus four new desktop/Android regression cases. The deleted-block race, failed access recheck, genuine revocation, obsolete callback/lock release and stabilized session-failure sequence passed in the integrated run. The deliberate setup-error output in the existing retry tests was expected and followed by successful recovery.
+
+An earlier 56-case attempt was stopped after 21 reported cases (20 passes, one existing Calendar session-fixture timeout). Its simulated identity failure could hide Save before Playwright clicked it during a background post-save read. The fixture now finishes a clean refresh, explicitly triggers verification through focus, then asserts editing pauses and its draft survives retry. No authentication behavior was weakened. The shutdown then interrupted the remaining verification; neither interrupted run is counted as a full pass.
+
+The correction changes only Calendar client handling, browser regressions and related documentation. It requires no new migration or dependency. Coordinator re-review remains pending. Physical Android, production/Ubuntu, provider email and new dependency-audit checks were not performed for this correction.
+
+Final correction handoff: all six task-owned files are staged and `git diff --cached --check` passes. Coordinator re-review remains pending. No commit, push or deployment was performed. Suggested commit: `fix: preserve calendar drafts after block deletion`.

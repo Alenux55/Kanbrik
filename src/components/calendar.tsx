@@ -89,7 +89,10 @@ function CalendarScope({ workspaces, zone, day, view, range, editing, setEditing
   const alive = useRef(true); const version = useRef(0); const canceledGesture = useRef(false);
   useEffect(() => { const cancel = (event: KeyboardEvent) => { if (event.key === "Escape") canceledGesture.current = true; }; document.addEventListener("keydown", cancel); return () => document.removeEventListener("keydown", cancel); }, []);
   const sensors = useSensors(useSensor(MouseSensor, { activationConstraint: { distance: 8 } }));
-  function lost(id: string) { setCalendarDrafts(current => Object.fromEntries(Object.entries(current).filter(([key]) => !key.startsWith(`${id}/`)))); revoked(id); }
+  function lost(id: string) {
+    if (!alive.current || !session.isCurrent(lease)) return;
+    setCalendarDrafts(current => Object.fromEntries(Object.entries(current).filter(([key]) => !key.startsWith(`${id}/`)))); revoked(id);
+  }
   useEffect(() => {
     alive.current = true; const seq = ++version.current;
     Promise.all(workspaces.map(async workspace => {
@@ -134,7 +137,18 @@ function CalendarScope({ workspaces, zone, day, view, range, editing, setEditing
       if (!session.isCurrent(lease)) return;
       if (response.ok) setCalendarDrafts(current => { const next = { ...current }; delete next[`${block.workspaceId}/blocks/${block.id}`]; return next; });
       if (!alive.current) return;
-      if (response.status === 404) { lost(block.workspaceId); return; }
+      if (response.status === 404) {
+        // Record-level 404 also covers a collaborator deleting this block.
+        // Only a separate denied workspace read confirms access was revoked.
+        const access = await session.fetch(`/api/workspaces/${block.workspaceId}`);
+        if (!alive.current || !session.isCurrent(lease)) return;
+        if (access.status === 404) { lost(block.workspaceId); return; }
+        if (!access.ok) { setError("Save unconfirmed; workspace access could not be checked. Retry the original intent."); return; }
+        setScopes(current => current?.map(scope => ({ ...scope, blocks: scope.blocks.filter(item => item.id !== block.id) })) ?? null);
+        setEditing(null);
+        setError("Time block is no longer available. Proposed change retained; other workspace content is unchanged.");
+        return;
+      }
       if (!response.ok) { setError(response.status === 409 ? `Conflict. Saved revision ${result.current?.revision}; proposed change retained. Review saved block before retrying.` : "Save not confirmed. Proposed change retained; review and retry explicitly."); retainGesture(block, changes, result.current); return; }
       saved(result); setError(""); setNotice("Saved calendar change.");
     } catch { if (alive.current && session.isCurrent(lease)) setError("Save not confirmed. Proposed change retained in the editing form."); }

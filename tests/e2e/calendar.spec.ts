@@ -25,6 +25,111 @@ async function drag(page: Page, source: { x: number; y: number }, target: { x: n
   await page.mouse.move(source.x, source.y); await page.mouse.down(); await page.mouse.move(source.x + 12, source.y, { steps: 3 }); await page.mouse.move(target.x, target.y, { steps: 24 }); await page.mouse.up();
 }
 
+async function staleAssignment(page: Page, block: BlockRecord, projectId: string, isMobile: boolean) {
+  if (isMobile) {
+    await page.getByRole("button", { name: `Edit block: ${block.label}`, exact: true }).tap();
+    const form = page.getByRole("form", { name: `Edit time block ${block.label}`, exact: true });
+    await form.getByLabel("Assigned work", { exact: true }).selectOption(`project:${projectId}`);
+    await form.getByRole("button", { name: "Save block", exact: true }).tap();
+  } else {
+    const grid = page.locator(".fc"); await grid.scrollIntoViewIfNeeded();
+    const source = (await page.getByRole("button", { name: "Drag project: Race project", exact: true }).boundingBox())!;
+    const target = (await grid.locator(`[data-block-id="${block.id}"]`).boundingBox())!;
+    await drag(page, { x: source.x + 20, y: source.y + 20 }, { x: target.x + target.width / 2, y: target.y + 20 });
+  }
+}
+
+async function refreshCalendar(page: Page) {
+  await page.getByRole("button", { name: "Refresh calendar", exact: true }).focus();
+  await page.keyboard.press("Space", { delay: 75 });
+}
+
+test("calendar distinguishes collaborator-deleted blocks from revoked access without losing unrelated drafts", async ({ browser, page, isMobile, testAccounts, testWorkspaces }) => {
+  const actor = (await (await page.request.get("/api/auth/get-session")).json()).user;
+  const peer = await browser.newContext({ baseURL: origin });
+  const email = `${randomUUID()}@example.invalid`; testAccounts.push(email);
+  try {
+    expect((await peer.request.post("/api/auth/sign-up/email", { headers: { origin }, data: { email, password: randomUUID() + randomUUID(), name: "Calendar race owner" } })).status()).toBe(200);
+    const workspace = await (await peer.request.post("/api/workspaces", { headers: { origin }, data: { name: "Calendar deletion race" } })).json(); testWorkspaces.push(workspace.id);
+    expect((await peer.request.post(`/api/workspaces/${workspace.id}/members`, { headers: { origin }, data: { email: actor.email } })).status()).toBe(200);
+    const project = await post(page, `/api/workspaces/${workspace.id}/projects`, { title: "Race project" });
+    const target = await provisionBlock(page, workspace.id, "Deleted target");
+    const other = await provisionBlock(page, workspace.id, "Other saved block");
+    await open(page); await page.getByRole("checkbox", { name: "Calendar deletion race (shared)", exact: true }).check();
+    await page.getByRole("button", { name: "Apply calendar preferences", exact: true }).click();
+    await page.getByRole("button", { name: "Edit block: Other saved block", exact: true }).click();
+    await page.getByRole("form", { name: "Edit time block Other saved block", exact: true }).getByLabel("Block label", { exact: true }).fill("Unrelated retained input");
+    const remove = async (block: BlockRecord) => expect((await peer.request.delete(`/api/workspaces/${workspace.id}/time-blocks/${block.id}`, { headers: { origin }, data: { revision: block.revision } })).status()).toBe(200);
+    const kept = async () => {
+      await expect(page.getByRole("checkbox", { name: "Calendar deletion race (shared)", exact: true })).toBeChecked();
+      await page.getByRole("button", { name: "Review draft: Unrelated retained input", exact: true }).click();
+      await expect(page.getByRole("form", { name: "Edit time block Other saved block", exact: true }).getByLabel("Block label", { exact: true })).toHaveValue("Unrelated retained input");
+    };
+    // The peer deletes on the real server without refreshing this page's stale
+    // target. Desktop must exercise the palette handler that caused the bug.
+    await remove(target); expect((await page.request.get(`/api/workspaces/${workspace.id}`)).status()).toBe(200);
+    await staleAssignment(page, target, project.id, isMobile);
+    await expect(page.getByText(isMobile ? "Time block not found" : "Time block is no longer available. Proposed change retained; other workspace content is unchanged.", { exact: true })).toBeVisible();
+    await kept();
+    const saved = await events(page, workspace.id); expect(saved).toHaveLength(1); expect(saved[0]).toMatchObject({ id: other.id, label: "Other saved block", revision: 1 });
+
+    // A failed access recheck is uncertainty, not proof of revocation.
+    const uncertain = await provisionBlock(page, workspace.id, "Uncertain target"); await refreshCalendar(page);
+    await expect(page.getByRole("button", { name: "Edit block: Uncertain target", exact: true })).toBeVisible(); await remove(uncertain);
+    const accessPath = `**/api/workspaces/${workspace.id}`;
+    await page.route(accessPath, route => route.fulfill({ status: 503, json: { error: "Fixture access check unavailable" } }));
+    await staleAssignment(page, uncertain, project.id, isMobile);
+    await expect(page.getByText("Save unconfirmed; workspace access could not be checked. Retry the original intent.", { exact: true })).toBeVisible();
+    await kept(); await page.unroute(accessPath);
+
+    // Genuine revocation must still clear the affected workspace and drafts.
+    const revoked = await provisionBlock(page, workspace.id, "Revoked target"); await refreshCalendar(page);
+    await expect(page.getByRole("button", { name: "Edit block: Revoked target", exact: true })).toBeVisible();
+    const roster = await (await peer.request.get(`/api/workspaces/${workspace.id}`)).json();
+    const membership = roster.members.find((member: { email: string }) => member.email === actor.email);
+    expect((await peer.request.delete(`/api/workspaces/${workspace.id}/members/${membership.id}`, { headers: { origin }, data: {} })).status()).toBe(200);
+    await staleAssignment(page, revoked, project.id, isMobile);
+    await expect(page.getByText("Workspace access ended. Its calendar content and drafts were removed.", { exact: true })).toBeVisible();
+    await expect(page.getByRole("checkbox", { name: "Calendar deletion race (shared)", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Review draft: Unrelated retained input", exact: true })).toHaveCount(0);
+    expect((await page.request.get(`/api/workspaces/${workspace.id}`)).status()).toBe(404);
+  } finally { await peer.close(); }
+});
+
+test("calendar ignores an obsolete workspace-access recheck after a missing-block save", async ({ page, isMobile }) => {
+  const personal = (await (await page.request.get("/api/workspaces")).json()).find((workspace: { kind: string }) => workspace.kind === "personal");
+  const project = await post(page, `/api/workspaces/${personal.id}/projects`, { title: "Race project" });
+  const target = await provisionBlock(page, personal.id, "Old target");
+  await provisionBlock(page, personal.id, "Current saved block");
+  await open(page);
+  await page.getByRole("button", { name: "Edit block: Current saved block", exact: true }).click();
+  await page.getByRole("form", { name: "Edit time block Current saved block", exact: true }).getByLabel("Block label", { exact: true }).fill("Current context draft");
+  expect((await page.request.delete(`/api/workspaces/${personal.id}/time-blocks/${target.id}`, { headers: { origin }, data: { revision: 1 } })).status()).toBe(200);
+  expect((await page.request.get(`/api/workspaces/${personal.id}`)).status()).toBe(200);
+  let release!: () => void, ready!: () => void, settled!: () => void;
+  const held = new Promise<void>(resolve => { release = resolve; });
+  const waiting = new Promise<void>(resolve => { ready = resolve; });
+  const done = new Promise<void>(resolve => { settled = resolve; });
+  await page.route(`**/api/workspaces/${personal.id}`, async route => {
+    ready(); await held;
+    await route.fulfill({ status: 404, json: { error: "Fixture obsolete access result" } }).catch(() => {}); settled();
+  });
+  try {
+    await staleAssignment(page, target, project.id, isMobile); await waiting;
+    await page.getByLabel("Date", { exact: true }).fill("2030-07-01");
+    await expect(page.getByText("Total blocks in range: 0.", { exact: false })).toBeVisible();
+    release(); await done;
+    // Wait for the old operation to release its own lock, rather than merely
+    // checking the new DOM before the held response's callback has run.
+    await page.getByRole("button", { name: "Review draft: Old target", exact: true }).click();
+    await expect(page.getByRole("form", { name: "Edit time block Old target", exact: true }).getByRole("button", { name: "Save block", exact: true })).toBeEnabled();
+    await expect(page.getByRole("checkbox", { name: "Personal workspace (personal)", exact: true })).toBeChecked();
+    await page.getByRole("button", { name: "Review draft: Current context draft", exact: true }).click();
+    await expect(page.getByRole("form", { name: "Edit time block Current saved block", exact: true }).getByLabel("Block label", { exact: true })).toHaveValue("Current context draft");
+    await expect(page.getByText("Workspace access ended. Its calendar content and drafts were removed.", { exact: true })).toHaveCount(0);
+  } finally { release(); }
+});
+
 test("calendar combines workspaces and creates, assigns, edits, unassigns and removes canonical blocks", async ({ page, isMobile, testWorkspaces }, testInfo) => {
   const personal = (await (await page.request.get("/api/workspaces")).json()).find((w: { kind: string }) => w.kind === "personal");
   const shared = [];
@@ -234,9 +339,13 @@ test("calendar isolates pending saves across cookie account switches, failed che
     await edit.getByLabel("Block label", { exact: true }).fill("B pending block"); await edit.getByRole("button", { name: "Save block", exact: true }).click(); await readyB.promise;
     heldA.release(); await doneA.promise; await expect(edit.getByLabel("Block label", { exact: true })).toBeDisabled(); expect(oldWrites).toBe(0); expect(cookieHeader).toBe(false); expect((await (await context.request.get("/api/auth/get-session")).json()).user.id).toBe(b.id);
     heldB.release(); const savedEdit = page.getByRole("form", { name: "Edit time block B pending block", exact: true }); await expect(savedEdit.getByRole("status").filter({ hasText: "Saved." })).toBeVisible();
+    await refreshCalendar(page); // Finish a clean load before injecting failure.
+    await expect(savedEdit.getByLabel("Block label", { exact: true })).toBeVisible();
     await savedEdit.getByLabel("Block label", { exact: true }).fill("Draft retained after failed check");
     await page.route("**/api/planner-session", route => route.fulfill({ status: 503, json: { error: "Fixture identity failure" } }));
-    await savedEdit.getByRole("button", { name: "Save block", exact: true }).click(); await expect(page.getByRole("heading", { name: "Could not verify your session", exact: true })).toBeVisible();
+    // A save's background refetch can reach this stub before a button click.
+    // Focus is an explicit supported verification trigger and avoids that race.
+    await page.evaluate(() => window.dispatchEvent(new Event("focus"))); await expect(page.getByRole("heading", { name: "Could not verify your session", exact: true })).toBeVisible();
     await page.unroute("**/api/planner-session"); await page.getByRole("button", { name: "Retry session check", exact: true }).click();
     await expect(savedEdit.getByLabel("Block label", { exact: true })).toHaveValue("Draft retained after failed check");
     const roster = await (await owner.request.get(`/api/workspaces/${shared.id}`)).json(); const member = roster.members.find((m: { email: string }) => m.email === email);
