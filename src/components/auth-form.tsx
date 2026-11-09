@@ -34,10 +34,10 @@ export function AuthForm({ signUp, registrationEnabled }: { signUp: boolean; reg
     <label className="block">Email<input className={inputClass} name="email" type="email" autoComplete="email" required maxLength={254} disabled={pending} /></label>
     <label className="block">Password<input className={inputClass} name="password" type="password" autoComplete={signUp ? "new-password" : "current-password"} required minLength={signUp ? 12 : undefined} maxLength={128} disabled={pending} /></label>
     {signUp && <label className="block">Confirm your password<input ref={confirmation} className={inputClass} name="confirmPassword" type="password" autoComplete="new-password" required minLength={12} maxLength={128} disabled={pending} aria-invalid={mismatch || undefined} aria-describedby={mismatch ? "auth-error" : undefined} onChange={() => { if (mismatch) { setMismatch(false); setError(""); } }} /></label>}
-    {signUp && <p className="text-sm text-neutral-600">Use at least 12 characters. Registration is for local development and testing only.</p>}
+    {signUp && <p className="text-sm text-neutral-600">Use at least 12 characters. Create your own account; shared workspace access is granted separately.</p>}
     {error && <p id="auth-error" role="alert" className="text-red-800">{error}</p>}
     <button disabled={pending} className="min-h-12 rounded-lg bg-teal-900 px-5 py-3 text-white disabled:opacity-60">{pending ? "Please wait…" : signUp ? "Create account" : "Sign in"}</button>
     {!signUp && <p><Link href="/forgot-password" className="inline-flex min-h-12 items-center underline">Forgot your password?</Link></p>}
-    <p className="text-sm">{signUp ? <Link className="underline" href="/sign-in">Already have an account? Sign in</Link> : registrationEnabled ? <Link className="underline" href="/sign-up">Create a development account</Link> : "Registration is disabled."}</p>
+    <p className="text-sm">{signUp ? <Link className="underline" href="/sign-in">Already have an account? Sign in</Link> : registrationEnabled ? <Link className="underline" href="/sign-up">Create an account</Link> : "Registration is disabled."}</p>
   </form>;
 }

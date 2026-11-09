@@ -7,7 +7,7 @@ test("signup, session refresh, sign-out/back, invalid login, and sign-in", async
   testAccounts.push(email);
   await page.goto("/calendar");
   await expect(page).toHaveURL(/\/sign-in$/);
-  await page.getByRole("link", { name: "Create a development account" }).click();
+  await page.getByRole("link", { name: "Create an account", exact: true }).click();
   await page.getByLabel("Name", { exact: true }).fill("Browser auth user");
   await page.getByLabel("Email", { exact: true }).fill(email);
   await page.getByLabel("Password", { exact: true }).fill(password);

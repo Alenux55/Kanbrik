@@ -120,11 +120,46 @@ ssh -N -L 127.0.0.1:3005:127.0.0.1:3005 USER@SERVER_IP
 
 Refresh [http://127.0.0.1:3005](http://127.0.0.1:3005) on your own computer. This is the manual test server; automated browser checks start their own servers on different ports. These steps are a development workflow, not a production service/deployment setup.
 
+### Share the preview through your HTTPS reverse proxy
+
+For the owner's LAN/VPN server at **10.0.0.95**, point your chosen subdomain's DNS at the server as appropriate for that network. Configure your existing proxy to terminate HTTPS and forward to **http://10.0.0.95:3005**. Preserve the original Host and set the usual forwarded host/protocol headers. If the proxy runs directly on this Ubuntu host, it can instead forward to **http://127.0.0.1:3005** and the app can keep its default loopback binding. A proxy in another container/machine needs an upstream address it can actually reach.
+
+In **Nginx Proxy Manager**, the Proxy Host's destination scheme is **http**, Forward Hostname/IP is **10.0.0.95**, and Forward Port is **3005**. In its SSL tab, select/request the subdomain's certificate and enable **Force SSL**. The browser connects to the proxy over HTTPS; the proxy-to-app connection stays HTTP. This uses [NPM's SSL termination](https://nginxproxymanager.com/guide/); choosing HTTPS as the destination would require the upstream app itself to serve TLS.
+
+Stop the old app with Ctrl+C. Edit the **Ubuntu server's** existing `~/github/Kanbrik/.env`, preserving database/auth/SMTP credentials, and replace the example hostname:
+
+```dotenv
+BETTER_AUTH_URL=https://kanbrik.your-domain.example
+KANBRIK_ENV=preview
+ENABLE_PREVIEW_REGISTRATION=true
+ENABLE_LOCAL_REGISTRATION=false
+```
+
+`BETTER_AUTH_URL` is the exact **browser-facing HTTPS origin**, usually without port 3005; it is not the proxy's HTTP upstream address. Use this same HTTPS URL from your desktop and Android. Sign in afresh after changing origins. Recovery emails automatically use the new URL after restart. Database access remains on loopback.
+
+After committing/pushing and pulling the desired code, run on Ubuntu:
+
+```bash
+cd ~/github/Kanbrik
+nvm use
+npm ci
+docker compose up -d --wait db
+npm run db:migrate
+npm run build -- --webpack
+npm run start -- --hostname 10.0.0.95 --port 3005
+```
+
+The explicit hostname overrides the script's loopback default and binds to that server interface. For a proxy directly on the host using 127.0.0.1, use `npm run start -- --port 3005` instead. Stop if a command fails; keep the terminal open. This remains a manually run preview, not a persistent system service. No SSH tunnel is needed for users reaching the HTTPS subdomain. Only your proxy/intended network should reach the upstream port; the database port stays private. DNS, proxy, TLS and firewall changes are performed on your server, not by these repository changes.
+
+The separate preview flag permits signup only in preview mode with an HTTPS canonical URL. **Anyone who can reach that preview can create an account while enabled**; restrict proxy access to the intended LAN/VPN audience. Set `ENABLE_PREVIEW_REGISTRATION=false` and restart to close signup; existing accounts can still sign in. This does not implement invitations or verified emails. Each new account gets its own personal workspace. Use **Workspaces → Add existing account** with their email to grant access to a shared workspace; creating an account alone grants no access to your work. Shared members are editors, not read-only viewers.
+
+Use the HTTPS subdomain rather than browsing the HTTP upstream directly: browser-origin checks and secure session cookies use the configured HTTPS origin, and Calendar uses browser features available in secure contexts. Local/test loopback registration and production mode retain their existing policies. See [010: HTTPS preview access](docs/tasks/010-https-preview.md) for the change and verification record.
+
 Configuration is server-only: `BETTER_AUTH_URL` is the exact trusted app origin, `BETTER_AUTH_SECRET` is a generated random secret of at least 32 characters, and `DATABASE_URL` is the development database URL. Generate a secret with `node -e "console.log(require('node:crypto').randomBytes(48).toString('hex'))"` and put it only in the ignored environment file. Restart the server after configuration changes.
 
 URL-encode special characters in database URL passwords. The portable setup generates hexadecimal credentials, which need no escaping.
 
-Registration requires **all** of `KANBRIK_ENV=local` or `test`, `ENABLE_LOCAL_REGISTRATION=true`, and a loopback `BETTER_AUTH_URL`. Otherwise Better Auth rejects sign-up server-side. Unset `KANBRIK_ENV` defaults to `production`; `NODE_ENV` does not enable registration. Sign-up now requires a matching password confirmation in the UI; that confirmation stays in the browser and is not sent or stored separately. Email verification and public-registration policy remain deferred; this development baseline is not production-ready identity administration.
+Local registration requires **all** of `KANBRIK_ENV=local` or `test`, `ENABLE_LOCAL_REGISTRATION=true`, and a loopback `BETTER_AUTH_URL`. The separate HTTPS preview flow above requires `KANBRIK_ENV=preview`, `ENABLE_PREVIEW_REGISTRATION=true`, and an HTTPS `BETTER_AUTH_URL`. Otherwise Better Auth rejects signup server-side. Unset `KANBRIK_ENV` defaults to `production`, which keeps signup disabled even if either flag is true; `NODE_ENV` does not enable registration. Signup requires matching password confirmation in the UI; that confirmation stays in the browser and is not sent or stored separately. Email verification, invitations and general public-registration policy remain deferred.
 
 ### Password recovery email
 
@@ -225,3 +260,5 @@ The Dockerfile prepares a non-root standalone Next.js runtime. Compose keeps reg
 See the [task 001 handoff](docs/tasks/001-foundation.md#completion-handoff), [task 002 handoff](docs/tasks/002-accounts-personal-workspace.md#completion-handoff), and [task 003 handoff](docs/tasks/003-shared-workspaces-retry.md#completion-handoff) for actual verification evidence and limitations.
 
 Focused Calendar checks: `npm run test:e2e -- tests/e2e/calendar.spec.ts`. Run the full suite after integration; focused passes do not establish the existing regressions still pass.
+
+HTTPS preview browser checks additionally start two loopback app fixtures on **3104** (preview signup enabled) and **3106** (closed signup). A test-only route forwards a fictional browser-facing HTTPS origin to these HTTP upstreams; no real DNS, certificates or proxy are configured. Leave those ports free too. Run `npm run test:e2e -- preview.spec.ts` for the preview flow or `npm run test:e2e -- auth.spec.ts` for the existing account/origin/recovery-configuration regressions. These focused runs are distinct from a full integrated suite.

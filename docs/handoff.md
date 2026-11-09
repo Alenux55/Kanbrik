@@ -2,7 +2,7 @@
 
 ## Current state
 
-Tasks 001–009 are committed through `82d60e4`; 008 passed independent coordinator review. Task [009: Calendar time blocks](tasks/009-calendar-time-blocks.md) adds Calendar runtime, additive storage/API contracts, retained account-scoped drafts and scheduling checks. Coordinator review found one P2 deleted-block gesture issue; the corrective follow-up is uncommitted and needs re-review. Its task record distinguishes original implementation, independent review and correction evidence. Checklist/inbox persistence remains unimplemented. No production deployment was performed.
+Tasks 001–009 are committed through `da206b5`. Task 009's deleted-block correction passed independent coordinator re-review on 2026-11-08 with no remaining actionable findings. The owner then requested [010: HTTPS preview access](tasks/010-https-preview.md): LAN/VPN access through their Nginx Proxy Manager subdomain, with accounts for other users. Its code/configuration documentation is implemented and locally verified; actual DNS/proxy/Ubuntu configuration is owner-operated. Checklist/inbox persistence remains unimplemented. No production deployment was performed.
 
 Read `AGENTS.md`, `docs/product.md`, `docs/architecture.md`, `docs/stack.md`, and the task completion records before assigning dependent work. Task records contain the detailed verification evidence and contracts; this file summarizes the transfer to the coordinating agent.
 
@@ -27,6 +27,14 @@ Calendar has workspace-owned one-off blocks, exclusive same-workspace project/ta
 The original task 009 implementation's client generation, schema validation, additive guarded migrations, final lint/types/default build and **74/74** backend checks passed. Existing development rows retained identical digests; a fresh guarded cluster applied all four migrations with no schema drift and was stopped. Runtime dependency audit is **0**; the same **8 moderate** development-only linter-chain findings remain. Final `npm run test:e2e` passed **52/52 in one full run (10.8 minutes)** on the final default Turbopack build, including all 40 existing cases and 12 Calendar cases; see the task record for earlier interrupted/focused runs. Screenshots use desktop and Pixel 7 emulation, not physical hardware. No provider or production server changes.
 
 Coordinator review of `82d60e4` found one P2: a deleted gesture target incorrectly revoked the whole working workspace and discarded unrelated drafts. The follow-up checks workspace access separately and preserves unrelated drafts on a missing block or failed check; genuine revocation still clears the workspace, and obsolete recheck results are ignored. After the shutdown, correction verification resumed on 2026-11-08: lint/types, default build, migration status, 74 backend checks and six focused correction/session cases passed. The final full browser run passed **56/56 in one run (11.6 minutes)**, including all 52 prior cases and four new regressions. The correction and handoff are staged; coordinator re-review remains pending. The owner commits/pushes after review. Apply the new additive migration during the README's test-server restart sequence; do not reset the database.
+
+## Task 010: HTTPS preview access
+
+The user chose Nginx Proxy Manager HTTPS termination with an HTTP upstream at `10.0.0.95:3005`. Keep NPM's destination scheme HTTP and select a certificate/Force SSL for the browser-facing subdomain. The server's `BETTER_AUTH_URL` is that HTTPS origin, not the upstream IP URL. The exact hostname was not supplied; README uses a placeholder. The actual server `.env`, DNS, proxy, certificate and firewall have not been changed by the agent.
+
+`KANBRIK_ENV=preview` plus `ENABLE_PREVIEW_REGISTRATION=true` plus an HTTPS canonical URL explicitly enables account creation. Turning the flag off keeps existing sign-in. Local/test loopback registration and default production denial are preserved. Workspace membership, trusted Origin, secure cookies and canonical work boundaries are unchanged. Signup gives a private personal workspace; the owner grants shared editor access separately. Anyone reaching an enabled preview can register, so keep the intended LAN/VPN audience restriction at the proxy/network. See task 010 for actual verification and scope.
+
+Task 010 passed lint/types, Webpack build, **76/76 backend checks**, **8/8 focused auth browser cases** and **2/2 focused simulated-HTTPS-preview cases** across desktop/Android emulation. The final preview run passed after correcting harness teardown/selector failures; see its record. These are separate focused runs, not a full integrated 58-case pass, and do not verify actual TLS/proxy/Ubuntu configuration. No schema, dependency, real-provider or server changes. The owner commits/pushes the staged changes before applying the README settings on Ubuntu.
 
 ## Task 008 integration contract
 
@@ -104,13 +112,14 @@ Original transfer baseline: `6a1e5b0`. Task 005 is committed as `0929f9a`; the f
 | `47993fa` | Cookie-immutable planner identity probe; owner confirmed approval before 008 |
 | `500b136` | Kanban board, saved workspace selection and status-only moves; independently reviewed |
 | `82d60e4` | Calendar time blocks; coordinator found the deleted-block gesture P2, corrected in the current follow-up |
+| `da206b5` | Deleted-block correction; independently re-reviewed without actionable findings |
 
-Tasks 001–009 and preparation `e4224a9` are committed through `82d60e4`. The current deleted-block correction is staged for the owner to commit after review. Do not automatically commit, push, or deploy; credentials, generated files, local databases, and test artifacts do not belong in the staged diff.
+Tasks 001–009 and preparation `e4224a9` are committed through `da206b5`. Task 010's code, tests and documentation are the current owner-requested changes. Do not automatically commit, push, or deploy; credentials, generated files, local databases, and test artifacts do not belong in the staged diff.
 
 ## Next coordinator action
 
-Task 008 review is complete. Task 009 is implemented at `82d60e4`; its deleted-block correction needs **coordinator re-review**, not a later roadmap feature. Read the task completion record and inspect the staged Calendar diff, including permissions, DST conversion, intent retries, revision-safe deletion, shared draft/provider isolation and FullCalendar lifecycle handling. The coordinator independently found the P2 described above; this implementing agent does not claim to approve its own correction.
+Task 009 re-review is complete: lint/types, schema/migration status, Webpack build, 74 backend checks and six focused correction/session cases passed independently at `da206b5`. No remaining actionable findings; the full 56-case browser suite was not independently repeated. Task 010 now supports the requested HTTPS preview/account setup; review its diff and evidence, then the owner commits/pushes and applies the documented server settings. Subsequent product phases remain separately assigned.
 
-Suggested review prompt: "Read AGENTS.md, docs/product.md, docs/architecture.md, docs/stack.md, docs/agent-workflow.md and docs/tasks/009-calendar-time-blocks.md. Review the task 009 deleted-block correction against baseline 82d60e4 and the coordinator finding. Check the staged diff, retained-draft/revocation behavior and obsolete recheck guards. Rerun meaningful verification, distinguishing focused checks from the full integrated suite. Record actionable findings and review evidence. Do not implement later phases or deploy."
+Suggested review prompt: "Read AGENTS.md, docs/product.md, docs/architecture.md and docs/tasks/010-https-preview.md. Review the HTTPS preview registration policy, proxy-origin/cookie tests and server instructions against baseline da206b5. Check that local/test and production signup policies remain separate and workspace authorization is preserved. Distinguish simulated proxy checks from actual server configuration. Do not implement later phases or deploy."
 
 Provider/deployment, work deletion/archive/moves and identity/membership policy remain outside task 009; block removal is its expressly scoped lifecycle operation. The adopted Calendar defaults are bounded implementation choices, not new user-confirmed product requirements.

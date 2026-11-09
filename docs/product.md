@@ -68,6 +68,10 @@ Board displays canonical tasks/subtasks individually under the five shared statu
 
 [009: Calendar time blocks](tasks/009-calendar-time-blocks.md) implements workspace-owned, one-off timed blocks: empty or linked to one project/task in the same workspace, with independent Calendar filters and an account-saved display time zone. Shared workspace members can read/edit shared blocks; personal blocks stay private. Overlaps are allowed initially, pointer snapping is 15 minutes, and explicit controls accept other minute values. UTC instants, visible IANA zones, explicit DST ambiguity handling and revision checks define scheduling. Block removal leaves canonical work intact. Private scheduling of shared work, recurrence and availability booking remain deferred. These bounded implementation defaults remain subject to evaluation; they are not additional user-confirmed requirements. Saves/assignment/removal are revision protected, create retries reconcile the original intent, drafts are account-scoped in memory, and refresh is manual.
 
+## HTTPS preview access (task 010)
+
+The owner chose an HTTPS subdomain through their existing reverse proxy, with LAN/VPN access to server `10.0.0.95`, and requested accounts for other preview users. Task [010](tasks/010-https-preview.md) adds an explicit HTTPS preview signup mode/flag; it does not configure the actual server or proxy. Disabling the flag closes signup while retaining sign-in. Signup alone grants only a personal workspace; shared access still requires owner-granted membership. Read-only viewers, invitations and email verification remain unimplemented.
+
 ## Decisions still open
 
 - Final acceptance of the recommended stack; verification of Docker and existing reverse-proxy configuration.

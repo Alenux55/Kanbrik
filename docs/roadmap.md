@@ -1,6 +1,6 @@
 # Delivery roadmap
 
-Tasks 001–008 implement the foundation, development/test identity/recovery, personal/shared access, project/task planning, corrected cross-tab verification, and the Kanban board with saved authorized workspace selection. Phase 2's board passed independent review at `500b136`. Task 009 implements Calendar and its separate selection; independent review is pending. See handoffs for exact evidence and limits. This sequence is a proposal and may change with product decisions.
+Tasks 001–009 implement the foundation, accounts/recovery, personal/shared access, project/task planning, corrected cross-tab verification, Kanban and Calendar. The Calendar correction passed coordinator re-review at `da206b5`. Task 010 adds the owner's requested HTTPS preview signup/configuration support; actual server/proxy setup remains owner-operated. See handoffs for exact evidence and limits. This sequence is a proposal and may change with product decisions.
 
 | Phase | Outcome | Evidence required for completion |
 | --- | --- | --- |
@@ -30,4 +30,5 @@ Tasks 001–008 implement the foundation, development/test identity/recovery, pe
 - [006: cross-tab session and planning-draft isolation](tasks/006-cross-tab-session-isolation.md): implemented as `0c13917` and independently reviewed; delayed cookie effects require task 007.
 - [007: read-only session verification](tasks/007-read-only-session-verification.md): implemented and verified (55 automated checks, 34 browser cases), with owner-confirmed approval before task 008. Planner probes cannot restore/delete browser auth cookies or renew valid sessions.
 - [008: Kanban board](tasks/008-kanban-board.md): implemented as `500b136` and independently reviewed without actionable findings. Implementation passed 59 backend checks and 40 full browser cases; coordinator separately passed 59 backend checks and six focused board cases. See its completion handoff for distinctions and limits.
-- [009: Calendar time blocks](tasks/009-calendar-time-blocks.md): implemented after board review; see its completion record for actual checks and limitations. Empty/assigned workspace-owned blocks, time-zone-aware scheduling, separate saved workspace filters, explicit desktop/Android controls and desktop assignment/move/resize gestures. Independent review remains pending; no deployment is authorized.
+- [009: Calendar time blocks](tasks/009-calendar-time-blocks.md): implemented as `82d60e4`, corrected and independently re-reviewed at `da206b5`; no remaining actionable findings. See its completion and coordinator records for checks and limits.
+- [010: HTTPS preview access](tasks/010-https-preview.md): requested reverse-proxy configuration guidance and explicit HTTPS preview signup; preserves existing account/workspace boundaries. Actual DNS/proxy/server changes are not performed by this task.

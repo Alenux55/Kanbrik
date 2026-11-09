@@ -1,6 +1,6 @@
 # 009: Calendar time blocks and work assignment
 
-Status: Implemented as `82d60e4`; the coordinator’s P2 deleted-block gesture finding is corrected and verified on 2026-11-08. Ready for coordinator re-review; acceptance remains pending.
+Status: Implemented as `82d60e4`, corrected as `da206b5`, and independently re-reviewed on 2026-11-08 without remaining actionable findings. Suitable as the baseline for subsequent work.
 
 Suggested implementer: use the same model/effort recommendation as task 008 in [agent-workflow.md](../agent-workflow.md): High effort for scheduling, data relationships, permissions and concurrency. This file does not configure an agent or start implementation.
 
@@ -170,3 +170,7 @@ An earlier 56-case attempt was stopped after 21 reported cases (20 passes, one e
 The correction changes only Calendar client handling, browser regressions and related documentation. It requires no new migration or dependency. Coordinator re-review remains pending. Physical Android, production/Ubuntu, provider email and new dependency-audit checks were not performed for this correction.
 
 Final correction handoff: all six task-owned files are staged and `git diff --cached --check` passes. Coordinator re-review remains pending. No commit, push or deployment was performed. Suggested commit: `fix: preserve calendar drafts after block deletion`.
+
+## Coordinator re-review at `da206b5` — 2026-11-08
+
+The deleted-block P2 is resolved with no new actionable findings. Independently passed lint/types, schema validation, migration status, Webpack build, **74/74 backend checks** and **6/6 focused desktop/Android cases** in 1.5 minutes. Checked deleted versus revoked access, failed checks, unrelated-draft preservation, obsolete callbacks and account switching. The review left the working tree unchanged. It did not repeat the implementer's full 56-case suite or verify physical Android/proxy/Ubuntu deployment. The owner subsequently requested task 010's HTTPS preview/account setup.
