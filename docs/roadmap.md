@@ -2,6 +2,8 @@
 
 Tasks 001–009 implement the foundation, accounts/recovery, personal/shared access, project/task planning, corrected cross-tab verification, Kanban and Calendar. The Calendar correction passed coordinator re-review at `da206b5`. Task 010 adds the owner's requested HTTPS preview signup/configuration support; actual server/proxy setup remains owner-operated. See handoffs for exact evidence and limits. This sequence is a proposal and may change with product decisions.
 
+Current application baseline is `0a16f7d` (task 010 committed). The owner's next feedback is [011: Planner usability](tasks/011-planner-usability.md), including user-local time entry/display and each workspace's own canonical zone. UTC instants remain authoritative; server location is irrelevant. This is a staged redesign plan, not implemented behavior; prioritize the independent Calendar drag-overflow defect, then shared context/editors/settings before per-view rewrites.
+
 | Phase | Outcome | Evidence required for completion |
 | --- | --- | --- |
 | 0. Foundation | Verify stable stack compatibility; scaffold the app/checks for Ubuntu self-hosting | Verified startup/build/check commands; no secrets committed; documented decisions |
@@ -32,3 +34,4 @@ Tasks 001–009 implement the foundation, accounts/recovery, personal/shared acc
 - [008: Kanban board](tasks/008-kanban-board.md): implemented as `500b136` and independently reviewed without actionable findings. Implementation passed 59 backend checks and 40 full browser cases; coordinator separately passed 59 backend checks and six focused board cases. See its completion handoff for distinctions and limits.
 - [009: Calendar time blocks](tasks/009-calendar-time-blocks.md): implemented as `82d60e4`, corrected and independently re-reviewed at `da206b5`; no remaining actionable findings. See its completion and coordinator records for checks and limits.
 - [010: HTTPS preview access](tasks/010-https-preview.md): requested reverse-proxy configuration guidance and explicit HTTPS preview signup; preserves existing account/workspace boundaries. Actual DNS/proxy/server changes are not performed by this task.
+- [011: Planner usability](tasks/011-planner-usability.md): full desktop feedback plus user/workspace settings request, with proposed interaction/ownership/time-zone rules and separately reviewable slices. Documentation only; no redesign has been implemented.

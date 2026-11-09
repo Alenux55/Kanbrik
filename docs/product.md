@@ -72,6 +72,12 @@ Board displays canonical tasks/subtasks individually under the five shared statu
 
 The owner chose an HTTPS subdomain through their existing reverse proxy, with LAN/VPN access to server `10.0.0.95`, and requested accounts for other preview users. Task [010](tasks/010-https-preview.md) adds an explicit HTTPS preview signup mode/flag; it does not configure the actual server or proxy. Disabling the flag closes signup while retaining sign-in. Signup alone grants only a personal workspace; shared access still requires owner-granted membership. Read-only viewers, invitations and email verification remain unimplemented.
 
+## Requested usability changes (task 011, not implemented)
+
+Desktop feedback and the subsequent settings request are captured together in [011: Planner usability](tasks/011-planner-usability.md). Requested changes include a sidebar workspace default; overlay project/task/subtask/block editors with parent context and dirty-close confirmation; an expandable Projects hierarchy; compact whole-card-drag Board cards with project colors and a Filter panel; a fix for Calendar palette overflow; one-hour blocks from blank-slot work drops; and moving preferred time-zone editing into User settings. The owner clarified that each workspace has a canonical named zone, while users enter/edit/view schedules in their own zones. The server's location does not determine either.
+
+Recommended distinctions remain proposals: sidebar selection supplies creation defaults while saved record ownership stays fixed, and Board/Calendar visibility filters remain independent. The clarified time-zone model uses the user's zone for the combined calendar and ordinary time entry, with the workspace zone as the shared reference. Keep UTC instants and the workspace's named zone in storage; derive each local representation from that same instant. Settings changes do not move existing schedules or reinterpret dirty input. Whole-card desktop dragging retains tap-to-edit and explicit status/scheduling actions on Android. See task 011 for the full feedback, design tradeoffs and ordered implementation slices. None of these redesigns is claimed implemented here.
+
 ## Decisions still open
 
 - Final acceptance of the recommended stack; verification of Docker and existing reverse-proxy configuration.
@@ -81,6 +87,7 @@ The owner chose an HTTPS subdomain through their existing reverse proxy, with LA
 - Longer-term overlap/availability and snapping policy (task 009 implements overlaps allowed and 15-minute pointer snapping initially); project/task deletion/archive behavior remains undecided.
 - SilverBullet's role and whether linked notes are sufficient.
 - External calendars, notifications, and actual time tracking are uncommitted follow-ups.
+- Workspace-zone initialization/backfill and owner-edit permissions, plus any future ability to move existing records between workspaces; task 011 confirms user-local scheduling with a workspace-zone reference and recommends preserving immutable ownership for the UI redesign.
 
 ## First complete workflow
 

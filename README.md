@@ -26,6 +26,7 @@ The first version includes personal and shared workspaces, with workspace filter
 - [Cross-tab account isolation](docs/tasks/006-cross-tab-session-isolation.md): implemented guards; the later read-only verification fix closes its delayed-cookie finding.
 - [Read-only verification](docs/tasks/007-read-only-session-verification.md): implemented cookie-immutable planner probes.
 - [Calendar time blocks](docs/tasks/009-calendar-time-blocks.md): workspace filters, time zones, project/task assignment, desktop/Android controls and completion evidence.
+- [Planner usability feedback](docs/tasks/011-planner-usability.md): proposed sidebar defaults, shared editors, compact Projects/Board, Calendar drag fixes and user/workspace time-zone settings. Planning only; not implemented.
 - [Agent instructions](AGENTS.md): working agreements for coding agents.
 
 ## Local setup

@@ -125,6 +125,18 @@ Shared `calendar:<blockId>`/new-intent locks prevent duplicate actions across na
 - Existing Next hostname arguments can bind the manual app to `10.0.0.95` for a reachable proxy upstream, or keep loopback for a proxy directly on the host. The database remains private. DNS, TLS, network/firewall and actual Ubuntu proxy configuration are owner-operated, not claimed verified by local tests.
 - While enabled, anyone reaching the preview can register; the intended LAN/VPN restriction must be enforced at the network/proxy. Accounts retain private personal workspaces and existing shared editor/owner rules. The profile is not an invitation, email-verification or viewer-role system.
 
+## Planned usability/settings contracts (task 011)
+
+The [011 feedback and staged design](tasks/011-planner-usability.md) is a proposal, not the current runtime contract. Keep the implemented sections above as historical/current evidence until the respective slice is implemented.
+
+- Separate an account-owned default creation workspace from per-view visibility filters and from each record's immutable workspace ownership. Contextual parent/project/work references constrain creation; existing editors must not silently substitute the global default.
+- Reuse canonical entity editors and their original revision/intent/account-scoped draft state across views. Responsive modal presentation changes layout, not server authorization, save/conflict semantics or deletion/revocation distinctions.
+- User settings will own the saved zone for display and ordinary time entry, migrating the existing Calendar preference without losing its value. The owner clarified that each workspace has a canonical IANA zone representing its shared location; users create/edit/view from their own zone, independently of server location. Persist authoritative UTC instants and the workspace zone separately and derive both local representations. Do not store an ambiguous workspace-local timestamp alone. Changing preferences/zone metadata does not move instants; dirty forms retain their captured input zone. Current `TimeBlock.timeZone` means legacy editing context, so the input/API and metadata migration must be explicit. Workspace-zone backfill/owner permissions remain proposed details requiring a scoped contract before implementation.
+- Future blank-slot work drops create one idempotent one-hour block in the work's own workspace. Existing-block drops remain assignments preserving that block's identity/interval. Distinguish these operations in hit testing and tests; neither operation changes canonical task status.
+- Board filters remain authorized display preferences. Date-only ranges use the user display zone and explicit half-open instant bounds. Stable project color accents supplement names; whole-card desktop dragging retains explicit touch/keyboard editing.
+
+No schema, API or runtime behavior changes accompany this planning update. Establish and review any additive settings/preference/migration contracts before per-view implementation proceeds.
+
 ## Candidate entities
 
 | Entity | Responsibility |

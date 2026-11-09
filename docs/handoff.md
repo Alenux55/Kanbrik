@@ -2,7 +2,7 @@
 
 ## Current state
 
-Tasks 001–009 are committed through `da206b5`. Task 009's deleted-block correction passed independent coordinator re-review on 2026-11-08 with no remaining actionable findings. The owner then requested [010: HTTPS preview access](tasks/010-https-preview.md): LAN/VPN access through their Nginx Proxy Manager subdomain, with accounts for other users. Its code/configuration documentation is implemented and locally verified; actual DNS/proxy/Ubuntu configuration is owner-operated. Checklist/inbox persistence remains unimplemented. No production deployment was performed.
+Tasks 001–010 are committed through `0a16f7d`. Task 009's deleted-block correction passed independent coordinator re-review; task 010 adds explicit HTTPS preview signup and reverse-proxy instructions. The owner has loaded the latest version and provided desktop usability feedback, then added user/workspace time-zone settings to that list. [011: Planner usability](tasks/011-planner-usability.md) now records the full feedback, recommendations and ordered implementation slices. This preparation changes documentation only; no redesigned UI/settings or new server configuration has been implemented. Checklist/inbox persistence remains unimplemented.
 
 Read `AGENTS.md`, `docs/product.md`, `docs/architecture.md`, `docs/stack.md`, and the task completion records before assigning dependent work. Task records contain the detailed verification evidence and contracts; this file summarizes the transfer to the coordinating agent.
 
@@ -35,6 +35,14 @@ The user chose Nginx Proxy Manager HTTPS termination with an HTTP upstream at `1
 `KANBRIK_ENV=preview` plus `ENABLE_PREVIEW_REGISTRATION=true` plus an HTTPS canonical URL explicitly enables account creation. Turning the flag off keeps existing sign-in. Local/test loopback registration and default production denial are preserved. Workspace membership, trusted Origin, secure cookies and canonical work boundaries are unchanged. Signup gives a private personal workspace; the owner grants shared editor access separately. Anyone reaching an enabled preview can register, so keep the intended LAN/VPN audience restriction at the proxy/network. See task 010 for actual verification and scope.
 
 Task 010 passed lint/types, Webpack build, **76/76 backend checks**, **8/8 focused auth browser cases** and **2/2 focused simulated-HTTPS-preview cases** across desktop/Android emulation. The final preview run passed after correcting harness teardown/selector failures; see its record. These are separate focused runs, not a full integrated 58-case pass, and do not verify actual TLS/proxy/Ubuntu configuration. No schema, dependency, real-provider or server changes. The owner commits/pushes the staged changes before applying the README settings on Ubuntu.
+
+## Task 011: desktop feedback and settings follow-up
+
+The owner requests a sidebar default workspace, shared overlay editors for projects/tasks/subtasks/blocks, expandable project/task/subtask lists, compact whole-card desktop Board dragging with project colors, a Board Filter panel (workspace/project/created/edited dates), a Calendar drag-overflow fix, and one-hour block creation from blank-slot work drops. They then requested time-zone settings and clarified that each workspace has a canonical zone, while users enter/edit/view schedules in their own zones from anywhere. Their screenshots show current density/drag symptoms; they are desktop observations, not evidence that mobile requirements can be dropped.
+
+Task 011 records the full list and recommendations: preserve saved ownership despite sidebar defaults, keep multi-workspace filters separate, and retain tap/keyboard alternatives. The clarified time model supersedes the initial proposal to use a workspace zone as the creation form's default: users enter/view/edit in their own zone; the workspace zone supplies the shared reference. Keep UTC instants and workspace IANA metadata separately so both views represent the same moment, independently of server location. Existing block instants and dirty input never shift with settings. Evolve the legacy per-block editing-zone API explicitly. Workspace-setting permissions/backfill and record transfers are not newly confirmed requirements.
+
+Implement in separate reviewed slices: A isolates the urgent palette overflow defect; B establishes shared context/settings/editor contracts; C redesigns Projects; D redesigns Board; E redesigns Calendar interactions. The design record does not automatically assign all slices. No application tests were run for this documentation-only preparation; validate links/diff and stage the documentation for the owner. The reported drag defect still needs an independent browser reproduction.
 
 ## Task 008 integration contract
 
@@ -113,13 +121,14 @@ Original transfer baseline: `6a1e5b0`. Task 005 is committed as `0929f9a`; the f
 | `500b136` | Kanban board, saved workspace selection and status-only moves; independently reviewed |
 | `82d60e4` | Calendar time blocks; coordinator found the deleted-block gesture P2, corrected in the current follow-up |
 | `da206b5` | Deleted-block correction; independently re-reviewed without actionable findings |
+| `0a16f7d` | HTTPS preview registration support and proxy setup guidance |
 
-Tasks 001–009 and preparation `e4224a9` are committed through `da206b5`. Task 010's code, tests and documentation are the current owner-requested changes. Do not automatically commit, push, or deploy; credentials, generated files, local databases, and test artifacts do not belong in the staged diff.
+Tasks 001–010 and preparation `e4224a9` are committed through `0a16f7d`. Task 011's feedback/design documentation is the current owner-requested preparation. Do not automatically commit, push, or deploy; credentials, generated files, local databases, and test artifacts do not belong in the staged diff.
 
 ## Next coordinator action
 
-Task 009 re-review is complete: lint/types, schema/migration status, Webpack build, 74 backend checks and six focused correction/session cases passed independently at `da206b5`. No remaining actionable findings; the full 56-case browser suite was not independently repeated. Task 010 now supports the requested HTTPS preview/account setup; review its diff and evidence, then the owner commits/pushes and applies the documented server settings. Subsequent product phases remain separately assigned.
+Read task 011's complete feedback and proposed distinctions with the owner before broad UI work. The independent Calendar overflow fix can be assigned first without waiting for settings/schema decisions. Assign later slices individually after their shared contracts are agreed and integrated. Do not start capture/checklist work, data transfers or a full app rewrite as an implicit extension of this feedback.
 
-Suggested review prompt: "Read AGENTS.md, docs/product.md, docs/architecture.md and docs/tasks/010-https-preview.md. Review the HTTPS preview registration policy, proxy-origin/cookie tests and server instructions against baseline da206b5. Check that local/test and production signup policies remain separate and workspace authorization is preserved. Distinguish simulated proxy checks from actual server configuration. Do not implement later phases or deploy."
+Suggested first implementation prompt: "Read AGENTS.md, docs/architecture.md, docs/stack.md and docs/tasks/011-planner-usability.md. Implement only slice A: reproduce and fix the Calendar palette's expanding overflow while dragging, preserving existing assignment, save and touch behavior. Add meaningful pointer/scroll-boundary regressions and update the completion evidence. Do not implement the later redesign slices or change settings/ownership contracts. Stage task-owned changes and provide a commit message; leave commit/push/deployment to me."
 
 Provider/deployment, work deletion/archive/moves and identity/membership policy remain outside task 009; block removal is its expressly scoped lifecycle operation. The adopted Calendar defaults are bounded implementation choices, not new user-confirmed product requirements.
