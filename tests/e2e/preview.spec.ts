@@ -39,9 +39,11 @@ test("HTTPS preview accounts persist with secure cookies and can sign in after s
   await page.reload();
   await expect(page.getByText(`Signed in as ${email}`, { exact: true })).toBeVisible();
   await page.getByRole("navigation").getByRole("link", { name: "Calendar", exact: true }).click();
+  await page.getByRole("button", { name: "New block", exact: true }).click();
   const form = page.getByRole("form", { name: "Create time block", exact: true });
   await form.getByRole("button", { name: "Create block", exact: true }).click();
-  await expect(form.getByRole("status").filter({ hasText: "Saved." })).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.getByRole("status").filter({ hasText: "Saved time block." }).last()).toBeVisible();
 
   // The opt-in never changes the exact trusted Origin or workspace boundary.
   const rejectedEmail = `${randomUUID()}@example.invalid`; testAccounts.push(rejectedEmail);
@@ -66,6 +68,6 @@ test("HTTPS preview accounts persist with secure cookies and can sign in after s
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page).toHaveURL(`${origin}/projects`);
   expect(await page.evaluate(async () => (await (await fetch("/api/workspaces")).json()).find((w: { kind: string }) => w.kind === "personal").id)).toBe(personalId);
-  await expect(page.getByRole("combobox", { name: "Planning workspace", exact: true })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Creation workspace", exact: true })).toBeVisible();
   await page.waitForLoadState("networkidle");
 });

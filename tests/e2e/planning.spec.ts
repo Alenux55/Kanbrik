@@ -1,179 +1,230 @@
-import { devices } from "@playwright/test";
-import { randomUUID } from "node:crypto";
 import { test, expect } from "./fixtures";
-
-test.setTimeout(90_000);
-const origin = "http://127.0.0.1:3100";
-
-test("personal planning persists tasks/subtasks and preserves failed and navigation drafts", async ({ page, isMobile, testWorkspaces }, testInfo) => {
-  await page.getByLabel("Planning workspace").selectOption({ label: "Personal workspace (personal)" });
-  const createProject = page.getByRole("form", { name: "Create project", exact: true });
-  const title = `Project ${randomUUID()}`;
-  await createProject.getByLabel("Title", { exact: true }).fill(title);
-  await createProject.getByLabel("Description").fill("Plain text <b>planning</b>");
+import {
+  post,
+  personal,
+  retained,
+  saved,
+  origin,
+  cleanClose,
+} from "./planner-helpers";
+test.setTimeout(90000);
+test("hierarchy and canonical overlays create projects, tasks and subtasks with accessible dirty-close and pending guards", async ({
+  page,
+  isMobile,
+}, info) => {
+  const ws = await personal(page);
+  expect(await page.getByLabel("Creation workspace").inputValue()).toBe(ws.id);
+  await expect(
+    page.getByRole("form", { name: "Create project", exact: true }),
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: "New project", exact: true }).click();
+  const form = page.getByRole("form", { name: "Create project", exact: true });
+  await expect(page.getByRole("dialog")).toHaveAccessibleName("Create project");
+  await form.getByLabel("Title", { exact: true }).fill("Compact project");
+  await form.getByLabel("Description").fill("Plain <b>text</b>");
+  await expect(
+    form.getByRole("button", { name: "Create project", exact: true }),
+  ).toBeEnabled();
+  await page.screenshot({ path: info.outputPath("project-editor.png") });
+  await page.keyboard.press("Escape");
+  await expect(
+    page.getByRole("button", { name: "Keep editing", exact: true }),
+  ).toBeFocused();
+  await page.getByRole("button", { name: "Keep editing", exact: true }).click();
+  if (isMobile) {
+    await page.goBack();
+    await expect(
+      page.getByRole("button", { name: "Keep editing", exact: true }),
+    ).toBeVisible();
+    await page
+      .getByRole("button", { name: "Keep editing", exact: true })
+      .click();
+  } else {
+    await page.mouse.click(5, 5);
+    await page
+      .getByRole("button", { name: "Keep editing", exact: true })
+      .click();
+  }
   let release!: () => void;
-  const gate = new Promise<void>(resolve => { release = resolve; });
+  const gate = new Promise<void>((r) => (release = r));
   let attempts = 0;
-  await page.route("**/api/workspaces/*/projects", async route => {
+  await page.route("**/api/workspaces/*/projects", async (route) => {
     if (route.request().method() !== "POST") return route.continue();
-    attempts++; await gate;
-    await route.fulfill({ status: 503, json: { error: "Save not confirmed. Your draft is kept for retry." } });
+    attempts++;
+    await gate;
+    await route.fulfill({
+      status: 503,
+      json: { error: "Save not confirmed. Input kept." },
+    });
   });
-  await createProject.getByRole("button", { name: "Create project", exact: true }).click();
-  await expect(createProject.getByRole("button", { name: "Saving…" })).toBeDisabled();
-  expect(attempts).toBe(1); release();
-  await expect(createProject.getByRole("alert")).toContainText("not confirmed");
-  await expect(createProject.getByLabel("Title", { exact: true })).toHaveValue(title);
-  await expect(createProject.getByText("Unsaved draft")).toBeVisible();
+  await form
+    .getByRole("button", { name: "Create project", exact: true })
+    .click();
+  await expect(
+    form.getByRole("button", { name: "Saving…", exact: true }),
+  ).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: "Close editor" }),
+  ).toBeDisabled();
+  expect(attempts).toBe(1);
+  release();
+  await expect(form.getByRole("alert")).toContainText("not confirmed");
   await page.unroute("**/api/workspaces/*/projects");
-  await createProject.getByRole("button", { name: "Create project", exact: true }).click();
-  await expect(createProject.getByRole("status")).toHaveText("Saved.");
-  await page.getByRole("button", { name: `Open project: ${title}`, exact: true }).click();
-  const editProject = page.getByRole("form", { name: "Edit project", exact: true });
-  await expect(editProject.getByLabel("Description")).toHaveValue("Plain text <b>planning</b>");
-  await editProject.getByLabel("Description").fill("Revised planning");
-  await editProject.getByRole("button", { name: "Save changes", exact: true }).click();
-  await expect(editProject.getByRole("status")).toHaveText("Saved.");
-  const createTask = page.getByRole("form", { name: "Create task", exact: true });
-  await createTask.getByLabel("Title", { exact: true }).fill("Parent task");
-  await createTask.getByLabel("Status").selectOption("done");
-  if (isMobile) await createTask.getByRole("button", { name: "Create task", exact: true }).tap();
-  else await createTask.getByRole("button", { name: "Create task", exact: true }).click();
-  await expect(createTask.getByRole("status")).toHaveText("Saved.");
-  await page.getByRole("button", { name: "Edit task: Parent task", exact: true }).click();
-  const createChild = page.getByRole("form", { name: "Create subtask", exact: true });
-  await createChild.getByLabel("Title", { exact: true }).fill("Child task");
-  await createChild.getByLabel("Status").selectOption("blocked");
-  await createChild.getByRole("button", { name: "Create subtask", exact: true }).click();
-  await expect(createChild.getByRole("status")).toHaveText("Saved.");
-  await expect(page.getByRole("form", { name: "Edit task", exact: true }).getByLabel("Status")).toHaveValue("done");
-  await page.getByRole("button", { name: "Edit subtask: Child task", exact: true }).click();
-  const editChild = page.getByRole("form", { name: "Edit subtask", exact: true });
-  await expect(editChild.getByLabel("Status")).toHaveValue("blocked");
-  await expect(page.getByRole("form", { name: "Create subtask", exact: true })).toHaveCount(0);
-
-  await page.getByRole("button", { name: "Standalone tasks / all projects", exact: true }).click();
-  await createTask.getByLabel("Title", { exact: true }).fill("Standalone work");
-  await createTask.getByLabel("Status").selectOption("backlog");
-  let releaseSave!: () => void;
-  const saveGate = new Promise<void>(resolve => { releaseSave = resolve; });
-  let releaseReads!: () => void;
-  const readGate = new Promise<void>(resolve => { releaseReads = resolve; });
-  let holdReads = false;
-  let heldReads = 0;
-  let taskCreates = 0;
-  await page.route("**/api/workspaces/*/tasks", async route => {
-    if (route.request().method() === "GET" && holdReads) { heldReads++; await readGate; return route.continue(); }
-    if (route.request().method() !== "POST") return route.continue();
-    taskCreates++; await saveGate; await route.continue();
+  await form
+    .getByRole("button", { name: "Create project", exact: true })
+    .click();
+  await saved(page);
+  const expand = page.getByRole("button", {
+    name: "Expand project: Compact project",
+    exact: true,
   });
-  await createTask.getByRole("button", { name: "Create task", exact: true }).click();
-  await expect(createTask.getByRole("button", { name: "Saving…" })).toBeDisabled();
-  await page.getByRole("navigation").getByRole("link", { name: "Board", exact: true }).click();
-  await page.getByRole("navigation").getByRole("link", { name: "Projects", exact: true }).click();
-  await expect(createTask.getByRole("button", { name: "Saving…" })).toBeDisabled();
-  expect(taskCreates).toBe(1);
-  holdReads = true;
-  await page.getByRole("button", { name: "Refresh planning", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Refreshing…", exact: true })).toBeDisabled();
-  releaseSave();
-  await expect.poll(() => heldReads).toBeGreaterThanOrEqual(2);
-  releaseReads();
-  await expect(page.getByRole("button", { name: "Refresh planning", exact: true })).toBeEnabled();
-  await expect(page.getByRole("button", { name: "Edit task: Standalone work", exact: true })).toBeVisible();
-  await page.unroute("**/api/workspaces/*/tasks");
-  await page.getByRole("button", { name: "Edit task: Standalone work", exact: true }).click();
-  const editTask = page.getByRole("form", { name: "Edit task", exact: true });
-  await editTask.getByLabel("Status").selectOption("in_progress");
-  await editTask.getByRole("button", { name: "Save changes", exact: true }).click();
-  await expect(editTask.getByRole("status")).toHaveText("Saved.");
-  await createTask.getByLabel("Title", { exact: true }).fill("Keep this workspace's draft");
-  const personalId = await page.getByLabel("Planning workspace").inputValue();
-  const sharedResponse = await page.request.post("/api/workspaces", { headers: { origin }, data: { name: "Draft destination check" } });
-  expect(sharedResponse.status()).toBe(201);
-  const shared = await sharedResponse.json(); testWorkspaces.push(shared.id);
-  // Refresh the server workspace list without destroying the layout's draft store.
-  await page.getByRole("navigation").getByRole("link", { name: "Workspaces", exact: true }).click();
-  await page.getByRole("navigation").getByRole("link", { name: "Projects", exact: true }).click();
-  await expect(createTask.getByLabel("Title", { exact: true })).toHaveValue("Keep this workspace's draft");
-  await page.getByLabel("Planning workspace").selectOption(shared.id);
-  await expect(createTask.getByLabel("Title", { exact: true })).toHaveValue("");
-  await page.getByLabel("Planning workspace").selectOption(personalId);
-  await expect(createTask.getByLabel("Title", { exact: true })).toHaveValue("Keep this workspace's draft");
-  await page.getByRole("navigation").getByRole("link", { name: "Board", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Board", exact: true })).toBeVisible();
-  await page.getByRole("navigation").getByRole("link", { name: "Projects", exact: true }).click();
-  await expect(createTask.getByLabel("Title", { exact: true })).toHaveValue("Keep this workspace's draft");
-  await createTask.getByRole("button", { name: "Discard draft" }).click();
-  await expect(createTask.getByLabel("Title", { exact: true })).toHaveValue("");
-  await page.reload();
-  await page.getByLabel("Planning workspace").selectOption(personalId);
-  await expect(page.getByRole("button", { name: "Edit task: Standalone work", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: `Open project: ${title}`, exact: true }).click();
-  await expect(editProject.getByLabel("Description")).toHaveValue("Revised planning");
-  await expect(page.getByRole("button", { name: "Edit subtask: Child task", exact: true })).toBeVisible();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  await page.screenshot({ path: testInfo.outputPath("planning.png"), fullPage: true });
-  // Successful sign-out must discard protected drafts without a stale unload prompt.
-  await editProject.getByLabel("Description").fill("Protected draft before sign-out");
-  page.on("dialog", dialog => { throw new Error(`Unexpected ${dialog.type()} prompt during sign-out`); });
-  await page.getByRole("button", { name: "Sign out", exact: true }).click();
-  await expect(page).toHaveURL(/\/sign-in$/);
+  await expect(expand).toHaveAttribute("aria-expanded", "false");
+  await expand.click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Add task to Compact project", exact: true })
+    .click();
+  const task = page.getByRole("form", { name: "Create task", exact: true });
+  await task.getByLabel("Title", { exact: true }).fill("Parent");
+  await task.getByLabel("Status", { exact: true }).selectOption("done");
+  await task.getByRole("button", { name: "Create task", exact: true }).click();
+  await saved(page);
+  await page
+    .getByRole("button", { name: "Expand task: Parent", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Add subtask to Parent", exact: true })
+    .click();
+  const child = page.getByRole("form", { name: "Create subtask", exact: true });
+  await expect(child).toContainText("Parent: Parent");
+  await child.getByLabel("Title", { exact: true }).fill("Child");
+  await child.getByLabel("Status").selectOption("blocked");
+  await child
+    .getByRole("button", { name: "Create subtask", exact: true })
+    .click();
+  await saved(page);
+  await page.getByRole("button", { name: "Child", exact: true }).click();
+  await expect(
+    page
+      .getByRole("form", { name: "Edit subtask", exact: true })
+      .getByLabel("Status"),
+  ).toHaveValue("blocked");
+  await cleanClose(page);
+  const records = await (
+    await page.request.get(`/api/workspaces/${ws.id}/tasks`)
+  ).json();
+  expect(
+    records.find((t: { title: string }) => t.title === "Parent").status,
+  ).toBe("done");
+  expect(
+    records.find((t: { title: string }) => t.title === "Child").parentId,
+  ).toBe(records.find((t: { title: string }) => t.title === "Parent").id);
+  await page
+    .getByRole("button", { name: "Refresh planning", exact: true })
+    .click();
+  await expect(expand).toHaveAttribute("aria-expanded", "true");
+  await expect(
+    page.getByRole("button", { name: "Child", exact: true }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: info.outputPath("projects.png"),
+    fullPage: true,
+  });
 });
-
-test("shared editing detects stale drafts across contexts and clears revoked content", async ({ page, browser, isMobile, testAccounts, testWorkspaces }) => {
-  const response = await page.request.post("/api/workspaces", { headers: { origin }, data: { name: "Shared planning" } });
-  expect(response.status()).toBe(201);
-  const workspace = await response.json(); testWorkspaces.push(workspace.id);
-  const email = `${randomUUID()}@example.invalid`; testAccounts.push(email);
-  const context = await browser.newContext({ ...(isMobile ? devices["Pixel 7"] : devices["Desktop Chrome"]), baseURL: origin });
-  try {
-    const signup = await context.request.post("/api/auth/sign-up/email", { headers: { origin }, data: { name: "Planning editor", email, password: randomUUID() + randomUUID() } });
-    expect(signup.status()).toBe(200);
-    expect((await page.request.post(`/api/workspaces/${workspace.id}/members`, { headers: { origin }, data: { email } })).status()).toBe(200);
-    await page.reload();
-    await page.getByLabel("Planning workspace").selectOption(workspace.id);
-    const creation = page.getByRole("form", { name: "Create task", exact: true });
-    await creation.getByLabel("Title", { exact: true }).fill("Shared task");
-    await creation.getByRole("button", { name: "Create task", exact: true }).click();
-    await expect(creation.getByRole("status")).toHaveText("Saved.");
-    await page.getByRole("button", { name: "Edit task: Shared task", exact: true }).click();
-    const ownerForm = page.getByRole("form", { name: "Edit task", exact: true });
-    const editorPage = await context.newPage();
-    await editorPage.goto("/projects");
-    await editorPage.getByLabel("Planning workspace").selectOption(workspace.id);
-    await editorPage.getByRole("button", { name: "Edit task: Shared task", exact: true }).click();
-    const editorForm = editorPage.getByRole("form", { name: "Edit task", exact: true });
-    await editorForm.getByLabel("Description").fill("Editor's unsaved changes");
-    await ownerForm.getByLabel("Description").fill("Owner's newer saved version");
-    await ownerForm.getByRole("button", { name: "Save changes", exact: true }).click();
-    await expect(ownerForm.getByRole("status")).toHaveText("Saved.");
-    await editorForm.getByRole("button", { name: "Save changes", exact: true }).click();
-    await expect(editorForm.getByRole("alert")).toContainText("newer version");
-    await expect(editorForm.getByLabel("Description")).toHaveValue("Editor's unsaved changes");
-    await expect(editorForm.getByRole("region", { name: "Saved version" })).toContainText("Owner's newer saved version");
-    await expect(editorForm.getByRole("button", { name: "Save changes", exact: true })).toBeDisabled();
-    await editorForm.getByRole("button", { name: "Review complete: keep my draft", exact: true }).click();
-    await editorForm.getByRole("button", { name: "Save changes", exact: true }).click();
-    await expect(editorForm.getByRole("status")).toHaveText("Saved.");
-    await ownerForm.getByLabel("Description").fill("Another old draft");
-    await ownerForm.getByRole("button", { name: "Save changes", exact: true }).click();
-    await expect(ownerForm.getByRole("alert")).toContainText("newer version");
-    await ownerForm.getByRole("button", { name: "Load saved version", exact: true }).click();
-    await expect(ownerForm.getByLabel("Description")).toHaveValue("Editor's unsaved changes");
-    await expect(ownerForm.getByText("Unsaved draft")).toHaveCount(0);
-    await editorForm.getByLabel("Description").fill("Revoked draft");
-    const detail = await (await page.request.get(`/api/workspaces/${workspace.id}`)).json();
-    const membership = detail.members.find((member: { email: string }) => member.email === email);
-    expect((await page.request.delete(`/api/workspaces/${workspace.id}/members/${membership.id}`, { headers: { origin }, data: {} })).status()).toBe(200);
-    if (isMobile) await editorForm.getByRole("button", { name: "Save changes", exact: true }).tap();
-    else await editorForm.getByRole("button", { name: "Save changes", exact: true }).click();
-    await expect(editorPage.getByRole("heading", { name: "Workspace unavailable", exact: true })).toBeVisible();
-    await expect(editorPage.getByRole("form", { name: "Edit task", exact: true })).toHaveCount(0);
-    await expect(editorPage.getByText("Shared task", { exact: true })).toHaveCount(0);
-    expect((await context.request.get(`/api/workspaces/${workspace.id}/tasks`)).status()).toBe(404);
-    await editorPage.getByLabel("Planning workspace").selectOption({ label: "Personal workspace (personal)" });
-    await expect(editorPage.getByRole("form", { name: "Create task", exact: true }).getByLabel("Title", { exact: true })).toHaveValue("");
-    expect(await editorPage.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  } finally { await context.close(); }
+test("one editor retains original revisions across Projects and Board, reviews conflicts and keeps workspace ownership", async ({
+  page,
+  testWorkspaces,
+}) => {
+  const ws = await personal(page);
+  const task = await post(page, `/api/workspaces/${ws.id}/tasks`, {
+    title: "Canonical task",
+    description: "Saved text",
+  });
+  await page
+    .getByRole("button", { name: "Refresh planning", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Expand Standalone tasks", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Canonical task", exact: true })
+    .click();
+  const edit = page.getByRole("form", { name: "Edit task", exact: true });
+  await edit.getByLabel("Description").fill("Retained draft");
+  await retained(page);
+  await page
+    .getByRole("navigation")
+    .getByRole("link", { name: "Board", exact: true })
+    .click();
+  await page
+    .getByRole("article", { name: "Canonical task", exact: true })
+    .getByRole("button")
+    .click();
+  await expect(edit.getByLabel("Description")).toHaveValue("Retained draft");
+  expect(
+    (
+      await page.request.patch(`/api/workspaces/${ws.id}/tasks/${task.id}`, {
+        headers: { origin },
+        data: {
+          title: task.title,
+          description: "Newer server text",
+          status: "todo",
+          revision: 1,
+        },
+      })
+    ).status(),
+  ).toBe(200);
+  await edit.getByRole("button", { name: "Save changes", exact: true }).click();
+  await expect(
+    edit.getByRole("region", { name: "Saved version" }),
+  ).toContainText("Newer server text");
+  await expect(edit.getByLabel("Description")).toHaveValue("Retained draft");
+  await expect(
+    edit.getByRole("button", { name: "Save changes", exact: true }),
+  ).toBeDisabled();
+  await edit
+    .getByRole("button", {
+      name: "Review complete: keep my draft",
+      exact: true,
+    })
+    .click();
+  await edit.getByRole("button", { name: "Save changes", exact: true }).click();
+  await saved(page);
+  const shared = await post(page, "/api/workspaces", {
+    name: "Creation default",
+  });
+  testWorkspaces.push(shared.id);
+  await page
+    .getByRole("navigation")
+    .getByRole("link", { name: "Workspaces", exact: true })
+    .click();
+  await page
+    .getByRole("navigation")
+    .getByRole("link", { name: "Projects", exact: true })
+    .click();
+  await page.getByLabel("Creation workspace").selectOption(shared.id);
+  await expect(
+    page.getByText("Projects and tasks in Creation default.", { exact: false }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "New task", exact: true }).click();
+  await expect(
+    page
+      .getByRole("form", { name: "Create task", exact: true })
+      .getByLabel("Destination workspace"),
+  ).toHaveValue(shared.id);
+  await cleanClose(page);
+  expect(
+    (
+      await (
+        await page.request.get(`/api/workspaces/${ws.id}/tasks/${task.id}`)
+      ).json()
+    ).workspaceId,
+  ).toBe(ws.id);
+  await page.reload();
+  await expect(page.getByLabel("Creation workspace")).toHaveValue(shared.id);
 });

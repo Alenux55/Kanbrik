@@ -48,34 +48,35 @@ export async function accessibleWorkspaces(headers: Headers): Promise<WorkspaceS
   const userId = await actor(headers);
   const workspaces = await database().workspace.findMany({
     where: accessible(userId), orderBy: [{ kind: "asc" }, { createdAt: "asc" }, { id: "asc" }],
-    select: { id: true, name: true, kind: true, memberships: { where: { userId }, select: { role: true } } },
+    select: { id: true, name: true, kind: true, timeZone: true, memberships: { where: { userId }, select: { role: true } } },
   });
-  return workspaces.map(workspace => ({ id: workspace.id, name: workspace.name, kind: workspace.kind, role: workspace.memberships[0].role }));
+  return workspaces.map(workspace => ({ id: workspace.id, name: workspace.name, kind: workspace.kind, timeZone: workspace.timeZone, role: workspace.memberships[0].role }));
 }
 
 export async function readableWorkspace(headers: Headers, id: string): Promise<WorkspaceDetail | null> {
   const userId = await actor(headers);
   const workspace = await database().workspace.findFirst({
     where: { id, ...accessible(userId) },
-    select: { id: true, name: true, kind: true, memberships: {
+    select: { id: true, name: true, kind: true, timeZone: true, memberships: {
       orderBy: [{ role: "asc" }, { id: "asc" }],
       select: { id: true, role: true, user: { select: { id: true, name: true, email: true } } },
     } },
   });
   if (!workspace) return null;
   return {
-    id: workspace.id, name: workspace.name, kind: workspace.kind,
+    id: workspace.id, name: workspace.name, kind: workspace.kind, timeZone: workspace.timeZone,
     role: workspace.memberships.find(member => member.user.id === userId)!.role,
     members: workspace.memberships.map(member => ({ id: member.id, role: member.role, name: member.user.name, email: member.user.email, isYou: member.user.id === userId })),
   };
 }
 
-export async function createSharedWorkspace(headers: Headers, name: string): Promise<WorkspaceSummary> {
+export async function createSharedWorkspace(headers: Headers, name: string, timeZone?: string): Promise<WorkspaceSummary> {
   const userId = await actor(headers);
+  timeZone ??= (await database().plannerPreference.findUnique({ where: { userId } }))?.timeZone ?? "UTC";
   // Nested writes commit or roll back together, including the owner's membership.
   const workspace = await database().workspace.create({
-    data: { name, kind: "shared", memberships: { create: { userId, role: "owner" } } },
-    select: { id: true, name: true, kind: true },
+    data: { name, kind: "shared", timeZone, memberships: { create: { userId, role: "owner" } } },
+    select: { id: true, name: true, kind: true, timeZone: true },
   });
   return { ...workspace, role: "owner" };
 }

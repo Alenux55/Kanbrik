@@ -641,12 +641,12 @@ describe("calendar time blocks through authorized HTTP and PostgreSQL", () => {
     expect(await first.json()).toMatchObject({ workspaceIds: [personalId], timeZone: null });
     await request("/api/board/preferences", "PUT", { workspaceIds: [workspaceId] });
     expect((await request("/api/calendar/preferences", "PUT", { workspaceIds: [workspaceId, workspaceId, personalId], timeZone: "Asia/Tokyo" })).status).toBe(200);
-    expect(await (await request("/api/calendar/preferences")).json()).toMatchObject({ workspaceIds: [workspaceId, personalId], timeZone: "Asia/Tokyo" });
+    expect(await (await request("/api/calendar/preferences")).json()).toMatchObject({ workspaceIds: [workspaceId, personalId], timeZone: null });
     expect((await (await request("/api/board/preferences")).json()).workspaceIds).toEqual([workspaceId]);
     expect((await request("/api/calendar/preferences", "PUT", { workspaceIds: [], timeZone: "UTC" })).status).toBe(200);
     const login = await post("/api/auth/sign-in/email", { email: a.email, password: a.password }); expect(login.status).toBe(200);
     const cookie = login.headers.getSetCookie().map(value => value.split(";")[0]).join("; ");
-    expect(await (await request("/api/calendar/preferences", "GET", undefined, cookie)).json()).toMatchObject({ workspaceIds: [], timeZone: "UTC" });
+    expect(await (await request("/api/calendar/preferences", "GET", undefined, cookie)).json()).toMatchObject({ workspaceIds: [], timeZone: null });
     expect((await request("/api/calendar/preferences", "PUT", { workspaceIds: [personalId], timeZone: "UTC" }, b.cookie)).status).toBe(404);
     for (const extra of [{ userId: b.id }, { timeZone: "Invalid/zone" }]) expect((await request("/api/calendar/preferences", "PUT", { workspaceIds: [], timeZone: "UTC", ...extra })).status).toBe(400);
     expect((await (await request("/api/calendar/preferences", "GET", undefined, outsider.cookie)).json()).timeZone).toBeNull();
@@ -764,4 +764,67 @@ describe("calendar time blocks through authorized HTTP and PostgreSQL", () => {
     expect((await queued).status).toBe(404); expect((await db.timeBlock.findUniqueOrThrow({ where: { id: target.id } })).revision).toBe(1);
     const prefs = await (await request("/api/calendar/preferences", "GET", undefined, b.cookie)).json(); expect(prefs.workspaceIds).toEqual([]); expect(prefs.workspaces.some((w: { id: string }) => w.id === workspaceId)).toBe(false);
   });
+});
+
+describe("planner and workspace settings", () => {
+ let owner: Awaited<ReturnType<typeof account>>, editor: Awaited<ReturnType<typeof account>>, stranger: Awaited<ReturnType<typeof account>>, workspaceId: string, personalId: string;
+ const request = (path: string, method = "GET", body?: object, cookie = owner.cookie, extra = {}) => fetch(origin + path, { method, headers: { cookie, origin, "content-type": "application/json", ...extra }, body: body ? JSON.stringify(body) : undefined });
+ beforeAll(async () => { owner = await account(); editor = await account(); stranger = await account(); personalId=(await bootstrap(owner.cookie)).id; workspaceId=(await (await post("/api/workspaces",{name:"Settings fixture"},owner.cookie)).json()).id; sharedIds.push(workspaceId); await post(`/api/workspaces/${workspaceId}/members`,{email:editor.email},owner.cookie); });
+ it("persists only the verified account's accessible default and zone, preserving independent view selections", async () => {
+  expect(await (await request("/api/planner/preferences")).json()).toMatchObject({defaultWorkspaceId:personalId,timeZone:null});
+  expect((await request("/api/planner/preferences","PATCH",{defaultWorkspaceId:workspaceId,timeZone:"Europe/London"})).status).toBe(200);
+  expect((await request("/api/planner/preferences","PATCH",{defaultWorkspaceId:personalId},editor.cookie)).status).toBe(404);
+  expect((await request("/api/planner/preferences","PATCH",{timeZone:"Invalid/Zone"})).status).toBe(400);
+  expect((await request("/api/planner/preferences","PATCH",{timeZone:"UTC",userId:editor.id})).status).toBe(400);
+  expect((await request("/api/planner/preferences","PATCH",{timeZone:"UTC"},owner.cookie,{origin:"https://untrusted.invalid"})).status).toBe(403);
+  expect((await request("/api/planner/preferences","PATCH",{timeZone:"UTC"},owner.cookie,{[expectedAccountHeader]:editor.id})).status).toBe(412);
+  expect((await request("/api/planner/preferences","PATCH",{timeZone:"UTC"},"")).status).toBe(401);
+  await request("/api/calendar/preferences","PUT",{workspaceIds:[],timeZone:"Asia/Tokyo"});
+  expect(await (await request("/api/planner/preferences")).json()).toMatchObject({defaultWorkspaceId:workspaceId,timeZone:"Europe/London"});
+  expect(await (await request("/api/calendar/preferences")).json()).toMatchObject({workspaceIds:[],timeZone:"Europe/London"});
+  expect(await (await request("/api/board/preferences")).json()).toMatchObject({workspaceIds:[personalId]});
+  const fresh=await (await post("/api/workspaces",{name:"New zone default"},owner.cookie)).json();sharedIds.push(fresh.id);expect(fresh.timeZone).toBe("Europe/London");
+ });
+ it("allows members to read, restricts zone changes to owners and detects concurrent settings writes", async () => {
+  const path=`/api/workspaces/${workspaceId}/settings`;
+  expect(await (await request(path)).json()).toEqual({timeZone:"UTC",settingsRevision:1});
+  expect((await request(path,"GET",undefined,editor.cookie)).status).toBe(200);
+  expect((await request(path,"GET",undefined,stranger.cookie)).status).toBe(404);
+  expect((await request(path,"PATCH",{timeZone:"Asia/Tokyo",revision:1},editor.cookie)).status).toBe(403);
+  const results=await Promise.all(["America/New_York","Asia/Tokyo"].map(timeZone=>request(path,"PATCH",{timeZone,revision:1})));expect(results.map(r=>r.status).sort()).toEqual([200,409]);
+  const conflict=await results.find(r=>r.status===409)!.json();expect(conflict.current.settingsRevision).toBe(2);
+  expect((await request(path,"PATCH",{timeZone:"No/Zone",revision:2})).status).toBe(400);
+  const personal=`/api/workspaces/${personalId}/settings`;expect((await request(personal,"PATCH",{timeZone:"Europe/London",revision:1})).status).toBe(200);
+ });
+ it("settings representations do not move shared instants, work revisions or stored create payloads", async () => {
+  const path=`/api/workspaces/${workspaceId}/time-blocks`;
+  const input={requestKey:randomUUID(),label:"Midnight reference",schedule:{startAt:"2030-03-20T00:30+09:00",endAt:"2030-03-20T01:30+09:00",timeZone:"Asia/Tokyo"},assignment:{projectId:null,taskId:null}};
+  const block=await (await request(path,"POST",input)).json();
+  const intent=await db.calendarCreateIntent.findUniqueOrThrow({where:{workspaceId_requestKey:{workspaceId,requestKey:input.requestKey}}});
+  await request(`/api/workspaces/${workspaceId}/settings`,"PATCH",{timeZone:"Europe/London",revision:2});await request("/api/planner/preferences","PATCH",{timeZone:"America/New_York"},editor.cookie);
+  const retry=await (await request(path,"POST",input,editor.cookie)).json();expect(retry).toMatchObject({id:block.id,startAt:"2030-03-19T15:30:00.000Z",revision:1,timeZone:"Asia/Tokyo"});
+  expect((await db.calendarCreateIntent.findUniqueOrThrow({where:{workspaceId_requestKey:{workspaceId,requestKey:input.requestKey}}})).payload).toBe(intent.payload);
+  expect((await request(path+`/${block.id}`,"PATCH",{revision:1,changes:{label:"Same moment"}},editor.cookie)).status).toBe(200);
+  expect((await db.timeBlock.findUniqueOrThrow({where:{id:block.id}})).startAt.toISOString()).toBe(block.startAt);
+ });
+ it("falls back to personal after the saved default workspace is revoked", async () => {
+  await request("/api/planner/preferences","PATCH",{defaultWorkspaceId:workspaceId},editor.cookie);
+  const roster=await (await request(`/api/workspaces/${workspaceId}`)).json();const member=roster.members.find((m:{email:string})=>m.email===editor.email);
+  await request(`/api/workspaces/${workspaceId}/members/${member.id}`,"DELETE",{});
+  const pref=await (await request("/api/planner/preferences","GET",undefined,editor.cookie)).json();expect(pref.defaultWorkspaceId).not.toBe(workspaceId);expect(pref.workspaces.some((w:{id:string})=>w.id===workspaceId)).toBe(false);
+  expect((await request(`/api/workspaces/${workspaceId}/settings`,"PATCH",{timeZone:"UTC",revision:3},editor.cookie)).status).toBe(404);
+ });
+ it("rechecks owner role after a queued settings write acquires the workspace lock",async()=>{
+  await db.membership.create({data:{workspaceId,userId:editor.id,role:"owner"}});
+  let release!:()=>void,ready!:(pid:number)=>void;const gate=new Promise<void>(r=>release=r),locked=new Promise<number>(r=>ready=r);
+  const demotion=db.$transaction(async tx=>{
+   await tx.$queryRaw`SELECT id FROM "Workspace" WHERE id = ${workspaceId} FOR UPDATE`;
+   await tx.membership.update({where:{workspaceId_userId:{workspaceId,userId:editor.id}},data:{role:"editor"}});
+   const [{pid}]=await tx.$queryRaw<{pid:number}[]>`SELECT pg_backend_pid() AS pid`;ready(pid);await gate;
+  },{timeout:15000});
+  const pid=await locked;const queued=request(`/api/workspaces/${workspaceId}/settings`,"PATCH",{timeZone:"UTC",revision:3},editor.cookie);
+  try{let waiting=false;for(let i=0;i<60;i++){const [row]=await db.$queryRaw<{waiting:boolean}[]>`SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE ${pid} = ANY(pg_blocking_pids(pid))) AS waiting`;if(row.waiting){waiting=true;break;}await new Promise(r=>setTimeout(r,25));}expect(waiting).toBe(true);}finally{release();await demotion;}
+  expect((await queued).status).toBe(403);expect((await db.workspace.findUniqueOrThrow({where:{id:workspaceId}})).settingsRevision).toBe(3);
+ });
+
 });

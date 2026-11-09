@@ -21,6 +21,7 @@ model User {
   memberships Membership[]
   boardPreference BoardPreference?
   calendarPreference CalendarPreference?
+  plannerPreference PlannerPreference?
   @@map("user")
 }
 
@@ -82,6 +83,8 @@ model Workspace {
   id              String @id @default(cuid())
   name            String
   kind            WorkspaceKind
+  timeZone        String @default("UTC")
+  settingsRevision Int @default(1)
   personalOwnerId String? @unique
   personalOwner   User? @relation("PersonalOwner", fields: [personalOwnerId], references: [id], onDelete: Cascade)
   memberships     Membership[]
@@ -188,4 +191,11 @@ model CalendarCreateIntent {
   blockId String
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   @@id([workspaceId, requestKey])
+}
+
+model PlannerPreference {
+  userId String @id
+  defaultWorkspaceId String?
+  timeZone String?
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

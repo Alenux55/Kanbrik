@@ -8,7 +8,7 @@ export const assignmentInput = z.object({ projectId: id.nullable(), taskId: id.n
 export const createBlockInput = z.object({ requestKey: z.uuid(), label: z.string().trim().min(1).max(200), schedule: scheduleInput, assignment: assignmentInput }).strict();
 export const editBlockInput = z.object({ revision, changes: z.object({ label: z.string().trim().min(1).max(200).optional(), schedule: scheduleInput.optional(), assignment: assignmentInput.optional() }).strict().refine(value => Object.keys(value).length > 0) }).strict();
 export const deleteBlockInput = z.object({ revision }).strict();
-export const calendarPreferenceInput = z.object({ workspaceIds: z.array(id), timeZone: zoneInput }).strict();
+export const calendarPreferenceInput = z.object({ workspaceIds: z.array(id), timeZone: zoneInput.optional() }).strict();
 export const rangeInput = z.object({ start: z.string().max(60), end: z.string().max(60) }).strict().refine(value => {
   const start = instant(value.start), end = instant(value.end);
   return !!start && !!end && end.toMillis() > start.toMillis() && end.toMillis() - start.toMillis() <= 93 * 86400000;

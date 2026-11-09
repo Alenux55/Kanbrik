@@ -8,6 +8,6 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   return workspaceRequest(async () => {
     const body = await mutationBody(request, createWorkspaceInput);
-    return workspaceResponse(await createSharedWorkspace(request.headers, body.name), 201);
+    return workspaceResponse(await createSharedWorkspace(request.headers, body.name, body.timeZone), 201);
   });
 }

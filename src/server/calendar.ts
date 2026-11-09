@@ -46,13 +46,13 @@ export async function calendarPreferences(headers: Headers) {
   const session = await verifiedSession(headers); if (!session) throw new Unauthenticated();
   const workspaces = await accessibleWorkspaces(headers);
   const saved = await database().calendarPreference.findUnique({ where: { userId: session.user.id } });
-  return { workspaces, workspaceIds: saved ? saved.workspaceIds.filter(id => workspaces.some(item => item.id === id)) : workspaces.filter(item => item.kind === "personal").map(item => item.id), timeZone: saved?.timeZone ?? null };
+  return { workspaces, workspaceIds: saved ? saved.workspaceIds.filter(id => workspaces.some(item => item.id === id)) : workspaces.filter(item => item.kind === "personal").map(item => item.id), timeZone: (await database().plannerPreference.findUnique({ where: { userId: session.user.id } }))?.timeZone ?? null };
 }
 export async function saveCalendarPreferences(headers: Headers, input: z.infer<typeof calendarPreferenceInput>) {
   const session = await verifiedSession(headers); if (!session) throw new Unauthenticated();
   const workspaces = await accessibleWorkspaces(headers);
   const workspaceIds = [...new Set(input.workspaceIds)];
   if (workspaceIds.some(id => !workspaces.some(item => item.id === id))) throw new WorkspaceDenied(404, "Workspace not found");
-  await database().calendarPreference.upsert({ where: { userId: session.user.id }, create: { userId: session.user.id, workspaceIds, timeZone: input.timeZone }, update: { workspaceIds, timeZone: input.timeZone } });
-  return { workspaceIds, timeZone: input.timeZone };
+  await database().calendarPreference.upsert({ where: { userId: session.user.id }, create: { userId: session.user.id, workspaceIds, timeZone: input.timeZone ?? "UTC" }, update: { workspaceIds } });
+  return { workspaceIds, timeZone: (await database().plannerPreference.findUnique({ where: { userId: session.user.id } }))?.timeZone ?? null };
 }

@@ -212,6 +212,18 @@ pwsh -File scripts/portable-postgres.ps1 stop
 
 The script refuses to overwrite existing data/configuration. `.local` contains binaries, cluster data and logs and must stay private/ignored. Keep the portable database running while using the app or running tests.
 
+## Planner usability and settings
+
+After pulling task 011, run the existing restart sequence including **npm ci**, **npm run db:migrate**, a successful **npm run build -- --webpack**, then start the app. There are two new additive settings migrations; do not reset the database. They retain existing block instants and migrate the saved Calendar zone into User settings. Existing workspaces start with a UTC reference zone; owners can change it under Workspaces → workspace → Workspace settings.
+
+The navigation's Creation workspace is your saved default and the workspace Projects browses. Board/Calendar have independent visibility selections; Show creation workspace is an explicit action if the default is hidden. Projects uses expandable rows, while titles and Board cards open shared editors. Board filters have Apply/Cancel; project/date/title/Hide Done filters last for the current signed-in planner session, while workspace selections persist across devices.
+
+User settings → Preferred time zone controls viewing and ordinary schedule entry across devices. Workspace time zones are shared reference clocks, not separate scheduled moments. Settings changes do not move blocks. Unfinished forms keep their captured input zone.
+
+Calendar New block, event/agenda editing and Schedule work buttons open the same responsive editor. Desktop blank-slot work drops create a one-hour block; drops onto an existing empty block only assign it. Pending saves block dismissal. Dirty close/Escape/Back asks before discarding; Keep draft for later retains input for review during planner navigation. This is memory-only: document reload/closing or account changes lose it. Discarding an unconfirmed request does not undo a possible server commit.
+
+See the [task 011 handoff](docs/tasks/011-implementation.md) for slice-by-slice evidence and limitations. Focused checks: npm run test:e2e -- planning.spec.ts board.spec.ts calendar.spec.ts settings.spec.ts. The full npm run test:e2e run is required after integration.
+
 ## Verification and production-mode preview
 
 ```powershell

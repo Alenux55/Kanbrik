@@ -1,6 +1,7 @@
 import type { Browser, Page, Route } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import { test, expect } from "./base";
+import { retained } from "./planner-helpers";
 import { testDB } from "../database";
 
 test.setTimeout(90_000);
@@ -90,9 +91,14 @@ async function setup(browser: Browser, page: Page, accounts: string[], workspace
   } finally { await provisioning.close(); }
 }
 async function openTask(page: Page, workspaceId: string) {
-  await page.getByLabel("Planning workspace").selectOption(workspaceId);
-  await page.getByRole("button", { name: "Edit task: Shared session task", exact: true }).click();
-  return page.getByRole("form", { name: "Edit task", exact: true });
+  await page.getByLabel("Creation workspace").selectOption(workspaceId);
+  await expect(page.getByLabel("Creation workspace")).toBeEnabled();
+  const expand = page.getByRole("button", { name: "Expand Standalone tasks", exact: true });
+  await expect(expand).toBeVisible(); if (await expand.getAttribute("aria-expanded") === "false") await expand.click();
+  await page.getByRole("button", { name: "Shared session task", exact: true }).click();
+  const form = page.getByRole("form", { name: "Edit task", exact: true });
+  await expect(form.getByRole("button", { name: "Save changes", exact: true })).toBeEnabled();
+  return form;
 }
 async function fulfillIfActive(route: Route, response: Awaited<ReturnType<Route["fetch"]>>) {
   // An identity change deliberately aborts old requests/documents.
@@ -110,7 +116,8 @@ test("same-cookie tabs refresh account context, prevent draft resurrection, and 
   await control.goto("/sign-in"); await control.bringToFront(); await page.bringToFront();
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));
   await expect(form.getByLabel("Description")).toHaveValue(draft);
-  await expect(page.getByLabel("Planning workspace")).toHaveValue(workspaceId);
+  await expect(page.getByLabel("Creation workspace")).toHaveValue(workspaceId);
+  await retained(page);
   await page.getByRole("navigation").getByRole("link", { name: "Board", exact: true }).click();
   await page.getByRole("navigation").getByRole("link", { name: "Projects", exact: true }).click();
   const restored = await openTask(page, workspaceId);
@@ -125,14 +132,14 @@ test("same-cookie tabs refresh account context, prevent draft resurrection, and 
   if (isMobile) await board.tap(); else await board.click();
   await page.getByRole("navigation").getByRole("link", { name: "Projects", exact: true }).click();
   await expect(page.getByText(`Signed in as ${b.email}`, { exact: true })).toBeVisible();
-  await expect(page.getByLabel("Planning workspace")).toHaveValue("");
+  await expect(page.getByLabel("Creation workspace")).not.toHaveValue(workspaceId);
   const bForm = await openTask(page, workspaceId);
   await expect(bForm.getByLabel("Description")).toHaveValue("Saved shared text");
   expect(staleWrites).toBe(0); expect(prompts).toEqual([]);
   await control.bringToFront(); await signIn(control, a);
   await page.bringToFront();
   await expect(page.getByText(`Signed in as ${a.email}`, { exact: true })).toBeVisible();
-  await expect(page.getByLabel("Planning workspace")).toHaveValue("");
+  await expect(page.getByLabel("Creation workspace")).toHaveValue(workspaceId);
   const aAgain = await openTask(page, workspaceId);
   await expect(aAgain.getByLabel("Description")).toHaveValue("Saved shared text");
   await aAgain.getByLabel("Description").fill("Draft invalidated by remote logout");
@@ -173,7 +180,7 @@ test("session verification failures pause editing and obsolete verification cann
   await page.unroute(sessionPath);
   await page.getByRole("button", { name: "Retry session check" }).click();
   await expect(form.getByLabel("Description")).toHaveValue("Unconfirmed account A draft");
-  await expect(page.getByLabel("Planning workspace")).toHaveValue(workspaceId);
+  await expect(page.getByLabel("Creation workspace")).toHaveValue(workspaceId);
   const control = await context.newPage(); await control.goto("/sign-in");
   await page.bringToFront();
   await expect(form.getByLabel("Description")).toBeVisible();
@@ -238,7 +245,8 @@ test("an obsolete save completion cannot clear the new account's draft or pendin
     await expect(bForm.getByRole("button", { name: "Saving…" })).toBeDisabled();
     await expect(bForm.getByRole("status")).toHaveCount(0); expect(bWrites).toBe(1);
     heldB.release();
-    await expect(bForm.getByRole("status")).toHaveText("Saved.");
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(page.getByRole("status").filter({ hasText: "Saved Shared session task." })).toBeVisible();
     const saved = await (await context.request.get(`/api/workspaces/${workspaceId}/tasks/${taskId}`)).json();
     expect(saved.description).toBe(bText); expect(saved.revision).toBe(3);
   } finally { heldA.release(); heldB.release(); }

@@ -1,4 +1,5 @@
 import "server-only";
+import { zoneInput } from "@/lib/calendar-contracts";
 import { z } from "zod";
 import { serverConfig } from "./config";
 import { verifiedSession } from "./auth";
@@ -24,6 +25,6 @@ export async function mutationBody<T>(request: Request, schema: z.ZodType<T>): P
   return schema.parse(await request.json().catch(() => null));
 }
 export const emptyInput = z.object({}).strict();
-export const createWorkspaceInput = z.object({ name: z.string().trim().min(1).max(100) }).strict();
+export const createWorkspaceInput = z.object({ name: z.string().trim().min(1).max(100), timeZone: zoneInput.optional() }).strict();
 // Better Auth stores and queries email in lowercase; whitespace is trimmed here.
 export const addEditorInput = z.object({ email: z.string().trim().toLowerCase().max(254).pipe(z.email()) }).strict();

@@ -1,6 +1,6 @@
 # 011: Planner usability, shared editors and settings
 
-Status: Feedback and proposed design captured on 2026-11-08. Documentation only; no runtime changes implemented. Current application baseline: `0a16f7d` (HTTPS preview support). Deliver the ordered slices below as separate reviewed changes, not one undifferentiated rewrite.
+Status: The owner assigned all slices A–E together on 2026-11-08, followed by coordinator review. Runtime implementation and actual verification are recorded in [011 implementation handoff](011-implementation.md). The design below preserves the original requested acceptance criteria; it is not itself completion evidence. Workspace owner-only settings, UTC legacy backfill and new shared workspace user-zone defaults were approved by the owner during implementation.
 
 ## Outcome and inputs
 
@@ -108,7 +108,7 @@ Before runtime work, issue the chosen slice with its file ownership, concrete da
 - For runtime slices, run lint/types, schema/migration checks when applicable, production build, relevant backend tests and a final integrated browser suite after the connected workflow is complete. Do not count screenshot inspection as proof of successful writes. Report failures and focused/full runs separately.
 - Existing records, instants, revisions, membership boundaries and work references must survive additive migrations. Filters/defaults/settings never grant access, move ownership or copy tasks.
 - No custom statuses, deeper subtasks, record transfers, task/project deletion/archive, recurrence, external calendars, offline editing, viewer roles, registration changes, provider changes or deployment are bundled here. Do not add manual within-column ordering while changing Board dragging.
-- This preparation changed documentation only. No app tests were run for it, and the reported scrollbar defect has not yet been independently reproduced in the browser. Screenshots/current code informed the proposed fix direction.
+- The original preparation changed documentation only. Subsequent runtime implementation independently reproduced the scrollbar defect and records its verification separately in the implementation handoff.
 
 Sources checked for the design: [WAI modal dialog pattern](https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/) for focus/background semantics; [dnd-kit DragOverlay](https://dndkit.com/legacy/api-documentation/draggable/drag-overlay/) for a drag preview outside a scroll container. These inform implementation, not evidence that the current defect is already fixed.
 

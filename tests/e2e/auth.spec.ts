@@ -28,7 +28,7 @@ test("signup, session refresh, sign-out/back, invalid login, and sign-in", async
   release();
   await expect(page).toHaveURL(/\/projects$/);
   await expect(page.getByText(`Signed in as ${email}`, { exact: true })).toBeVisible();
-  await expect(page.getByText("Personal workspace", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Creation workspace", { exact: true })).toContainText("Personal workspace (personal)");
   await page.reload();
   await expect(page.getByRole("button", { name: "Sign out", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
