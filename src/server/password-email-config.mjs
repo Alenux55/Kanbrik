@@ -9,9 +9,16 @@ const smtpSchema = z.object({
 
 // Shared by the server and local diagnostic; never return raw validation errors.
 /** @param {Record<string, string | undefined>} [env] */
-export function passwordEmailSettings(env = process.env) {
+export function smtpSettings(env = process.env) {
   const parsed = smtpSchema.safeParse({ host: env.SMTP_HOST, port: env.SMTP_PORT ?? '587', user: env.SMTP_USER, password: env.SMTP_PASSWORD, from: env.SMTP_FROM });
-  const invalid = env.PASSWORD_RESET_ENABLED === 'true' ? [] : ['PASSWORD_RESET_ENABLED'];
+  const invalid = [];
   if (!parsed.success) for (const issue of parsed.error.issues) invalid.push(fields[issue.path[0]]);
   return { config: parsed.success && invalid.length === 0 ? parsed.data : null, invalid: [...new Set(invalid)] };
+}
+
+/** @param {Record<string, string | undefined>} [env] */
+export function passwordEmailSettings(env = process.env) {
+  const result = smtpSettings(env);
+  if (env.PASSWORD_RESET_ENABLED !== 'true') return { config: null, invalid: ['PASSWORD_RESET_ENABLED', ...result.invalid] };
+  return result;
 }

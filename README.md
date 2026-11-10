@@ -160,9 +160,26 @@ Configuration is server-only: `BETTER_AUTH_URL` is the exact trusted app origin,
 
 URL-encode special characters in database URL passwords. The portable setup generates hexadecimal credentials, which need no escaping.
 
-Local registration requires **all** of `KANBRIK_ENV=local` or `test`, `ENABLE_LOCAL_REGISTRATION=true`, and a loopback `BETTER_AUTH_URL`. The separate HTTPS preview flow above requires `KANBRIK_ENV=preview`, `ENABLE_PREVIEW_REGISTRATION=true`, and an HTTPS `BETTER_AUTH_URL`. Otherwise Better Auth rejects signup server-side. Unset `KANBRIK_ENV` defaults to `production`, which keeps signup disabled even if either flag is true; `NODE_ENV` does not enable registration. Signup requires matching password confirmation in the UI; that confirmation stays in the browser and is not sent or stored separately. Email verification, invitations and general public-registration policy remain deferred.
+Local registration requires **all** of `KANBRIK_ENV=local` or `test`, `ENABLE_LOCAL_REGISTRATION=true`, and a loopback `BETTER_AUTH_URL`. The separate HTTPS preview flow above requires `KANBRIK_ENV=preview`, `ENABLE_PREVIEW_REGISTRATION=true`, and an HTTPS `BETTER_AUTH_URL`. Both require an empty `INVITATION_ADMIN_EMAILS`; configuring administrators selects the invitation-only flow below. Otherwise Better Auth rejects public signup server-side. Unset `KANBRIK_ENV` defaults to `production`, which keeps public signup disabled even if either flag is true; `NODE_ENV` does not enable registration. Signup requires matching password confirmation in the UI; that confirmation stays in the browser and is not sent or stored separately. General verification of existing/publicly registered accounts remains deferred.
 
-### Password recovery email
+### Invite users without opening registration
+
+In the **Ubuntu server's** existing `~/github/Kanbrik/.env`, add your existing account email (replace the example):
+
+```dotenv
+INVITATION_ADMIN_EMAILS="your-account@example.com"
+ENABLE_PREVIEW_REGISTRATION=false
+```
+
+For multiple administrators, separate email addresses with commas inside the quotes. Use the emails of existing accounts you trust to admit new users. A nonempty administrator setting selects invitation-only signup, overriding old public-signup flags. Invalid addresses disable invitation administration; an empty value disables invitations and leaves the existing local/preview signup flags in control. Use your configured HTTPS origin in `BETTER_AUTH_URL`. Keep the existing SMTP settings; invitation mail works independently of `PASSWORD_RESET_ENABLED`.
+
+After pulling this change, use the restart sequence above, including `npm ci`, `npm run db:migrate`, and a successful build. It adds one additive invitation-table migration and preserves existing accounts/work. Changes to the server's `.env` need an app restart; Git does not synchronize that file.
+
+Sign in using the listed account, open **User settings → Account invitations**, enter the person's email and choose **Send account invitation**. They open the email, choose a name/password, confirm the password, then sign in normally. They receive only a private personal workspace. Grant shared access separately through **Workspaces → your shared workspace → Add existing account**.
+
+Links expire after seven days and work once. **Resend** replaces the previous link; wait one minute between sends to the same address. **Revoke** cancels an outstanding invitation, without deleting an already created account. Removing an administrator from the allowlist also invalidates invitations they issued. Recipients must be able to reach your HTTPS site through the intended LAN/VPN network. If they are signed in to another account, they should sign out or open the link in a private window. Reopen the email link after reloading the acceptance page. Administrators cannot set/reset another user's password through this flow.
+
+### Password recovery SMTP settings
 
 The sign-in screen links to **Forgot your password?**. To enable automatic reset emails, add these settings to your existing ignored `.env` with values from your SMTP provider, then restart Kanbrik:
 
@@ -273,5 +290,7 @@ The Dockerfile prepares a non-root standalone Next.js runtime. Compose keeps reg
 See the [task 001 handoff](docs/tasks/001-foundation.md#completion-handoff), [task 002 handoff](docs/tasks/002-accounts-personal-workspace.md#completion-handoff), and [task 003 handoff](docs/tasks/003-shared-workspaces-retry.md#completion-handoff) for actual verification evidence and limitations.
 
 Focused Calendar checks: `npm run test:e2e -- tests/e2e/calendar.spec.ts`. Run the full suite after integration; focused passes do not establish the existing regressions still pass.
+
+Invitation checks: `npm run test:e2e -- invitations.spec.ts` covers desktop and Android emulation. Browser verification also starts an invite-only app on loopback **3108**; backend invitation checks use **3112**. Keep those ports free along with the existing test ports. These fixtures override administrators/SMTP with isolated test values, keep public signup closed, and never contact your real provider.
 
 HTTPS preview browser checks additionally start two loopback app fixtures on **3104** (preview signup enabled) and **3106** (closed signup). A test-only route forwards a fictional browser-facing HTTPS origin to these HTTP upstreams; no real DNS, certificates or proxy are configured. Leave those ports free too. Run `npm run test:e2e -- preview.spec.ts` for the preview flow or `npm run test:e2e -- auth.spec.ts` for the existing account/origin/recovery-configuration regressions. These focused runs are distinct from a full integrated suite.

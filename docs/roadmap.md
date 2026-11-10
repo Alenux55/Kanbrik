@@ -2,7 +2,7 @@
 
 Tasks 001–009 implement the foundation, accounts/recovery, personal/shared access, project/task planning, corrected cross-tab verification, Kanban and Calendar. The Calendar correction passed coordinator re-review at `da206b5`. Task 010 adds the owner's requested HTTPS preview signup/configuration support; actual server/proxy setup remains owner-operated. See handoffs for exact evidence and limits. This sequence is a proposal and may change with product decisions.
 
-Current application baseline is `0a16f7d` (task 010 committed). The owner's next feedback is [011: Planner usability](tasks/011-planner-usability.md), including user-local time entry/display and each workspace's own canonical zone. UTC instants remain authoritative; server location is irrelevant. The owner assigned all task 011 slices together; implementation and actual verification are recorded in [011 completion](tasks/011-implementation.md), pending coordinator review.
+The committed application baseline is `a621e0f` (task 011), with coordinator review corrections documented at `fa0923e`. Task [011 completion](tasks/011-implementation.md) records the redesign and remaining review fixes. The owner separately assigned [012: account invitations](tasks/012-account-invitations.md); it does not resolve those corrections. UTC instants remain authoritative; server location is irrelevant.
 
 | Phase | Outcome | Evidence required for completion |
 | --- | --- | --- |
@@ -23,6 +23,8 @@ Current application baseline is `0a16f7d` (task 010 committed). The owner's next
 - Keep unselected product defaults visible. A roadmap entry does not settle an open question in `product.md`.
 
 ## Implementation handoffs
+
+- [012: account invitations](tasks/012-account-invitations.md): owner-requested individual account signup via administrator allowlist and expiring email links; no shared membership grant. Task 011 review fixes remain separate.
 
 - [001: application foundation](tasks/001-foundation.md): implemented; see completion evidence and runtime limitations.
 - [002: accounts and automatic personal-workspace creation](tasks/002-accounts-personal-workspace.md): identity and personal-workspace implementation; see its completion evidence and limitations. Shared-workspace membership follows separately.

@@ -22,6 +22,7 @@ model User {
   boardPreference BoardPreference?
   calendarPreference CalendarPreference?
   plannerPreference PlannerPreference?
+  sentInvitations AccountInvitation[]
   @@map("user")
 }
 
@@ -198,4 +199,16 @@ model PlannerPreference {
   defaultWorkspaceId String?
   timeZone String?
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AccountInvitation {
+  id String @id @default(cuid())
+  email String @unique
+  tokenHash String @unique
+  inviterId String
+  inviter User @relation(fields: [inviterId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  consumedAt DateTime?
+  @@index([inviterId, createdAt])
 }

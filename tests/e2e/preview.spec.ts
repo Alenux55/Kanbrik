@@ -53,6 +53,10 @@ test("HTTPS preview accounts persist with secure cookies and can sign in after s
   });
   expect(foreign.status()).toBe(403);
 
+  // Finish the authenticated page before replacing its backend/cookie jar.
+  // Otherwise its session gate can start a real redirect while goto is pending.
+  await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await expect(page).toHaveURL(`${origin}/sign-in`);
   backendPort = 3106;
   await context.clearCookies();
   await page.goto(`${origin}/sign-up`);

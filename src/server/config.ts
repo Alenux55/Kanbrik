@@ -8,6 +8,8 @@ export function serverConfig() {
   const databaseURL = z.string().min(1).parse(process.env.DATABASE_URL);
   const mode = process.env.KANBRIK_ENV ?? "production";
   if (!["local", "test", "preview", "production"].includes(mode)) throw new Error("Invalid application environment");
-  const registrationEnabled = registrationAllowed(mode, new URL(baseURL), process.env.ENABLE_LOCAL_REGISTRATION === "true", process.env.ENABLE_PREVIEW_REGISTRATION === "true");
+  // Configuring invitation administrators selects invite-only signup, even if
+  // an old public-preview flag was left enabled. Invalid allowlists fail closed.
+  const registrationEnabled = !process.env.INVITATION_ADMIN_EMAILS?.trim() && registrationAllowed(mode, new URL(baseURL), process.env.ENABLE_LOCAL_REGISTRATION === "true", process.env.ENABLE_PREVIEW_REGISTRATION === "true");
   return { baseURL, secret, databaseURL, registrationEnabled };
 }

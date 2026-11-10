@@ -70,7 +70,7 @@ Board displays canonical tasks/subtasks individually under the five shared statu
 
 ## HTTPS preview access (task 010)
 
-The owner chose an HTTPS subdomain through their existing reverse proxy, with LAN/VPN access to server `10.0.0.95`, and requested accounts for other preview users. Task [010](tasks/010-https-preview.md) adds an explicit HTTPS preview signup mode/flag; it does not configure the actual server or proxy. Disabling the flag closes signup while retaining sign-in. Signup alone grants only a personal workspace; shared access still requires owner-granted membership. Read-only viewers, invitations and email verification remain unimplemented.
+The owner chose an HTTPS subdomain through their existing reverse proxy, with LAN/VPN access to server `10.0.0.95`, and requested accounts for other preview users. Task [010](tasks/010-https-preview.md) adds an explicit HTTPS preview signup mode/flag; it does not configure the actual server or proxy. Disabling the flag closes signup while retaining sign-in. Signup alone grants only a personal workspace; shared access still requires owner-granted membership. Task 012 adds the later invitation-only policy below; read-only viewers and general email verification for existing/publicly registered accounts remain unimplemented.
 
 ## Planner usability (task 011)
 
@@ -89,13 +89,17 @@ Calendar uses the shared block overlay, event/agenda activation, New block, desk
 ## Decisions still open
 
 - Final acceptance of the recommended stack; verification of Docker and existing reverse-proxy configuration.
-- Sign-up/invitation process, login method, and whether viewer-only access is needed.
+- Whether viewer-only access or further login methods are needed. Account invitation policy is confirmed below.
 - Whether personal scheduling of shared tasks is needed initially and its exact visibility rules.
 - Recurring chores/checklists and whether checklist items are independently schedulable tasks.
 - Longer-term overlap/availability and snapping policy (task 009 implements overlaps allowed and 15-minute pointer snapping initially); project/task deletion/archive behavior remains undecided.
 - SilverBullet's role and whether linked notes are sufficient.
 - External calendars, notifications, and actual time tracking are uncommitted follow-ups.
 - Any future ability to move existing records between workspaces; task 011 preserves immutable ownership and has owner-approved zone initialization/permissions.
+
+## Invitation-only signup (task 012)
+
+On 2026-11-09 the owner chose account-only email invitations, administered only by existing accounts explicitly listed in the server's `INVITATION_ADMIN_EMAILS`. Configuring that list closes public signup even if a previous preview flag remains enabled. An invited recipient creates an account through a single-use, seven-day email link and signs in to their own personal workspace. Shared access is granted separately through existing workspace management. Neither workspace ownership nor accepting an invitation grants invitation-administrator privileges. The implementation record is [012](tasks/012-account-invitations.md); independent review is pending.
 
 ## First complete workflow
 

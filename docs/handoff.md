@@ -2,6 +2,8 @@
 
 ## Current state
 
+The owner subsequently requested invitation-only **account signup**, with shared access assigned separately, and explicitly restricted sending to accounts allowlisted in the server's `.env`. [Task 012](tasks/012-account-invitations.md) implements that request from `fa0923e`; task-owned files are staged for the owner to commit/push. It passed 94 backend checks and both desktop/Android invitation flows. Its integrated run was 61 pass / two fail / one intentional skip: known task 011 Retry plus an Android HTTPS-preview fixture navigation abort. The preview fixture was corrected to sign out before switching backends; both focused preview profiles then passed, without repeating the full suite. See the completion record for exact evidence, limitations and server configuration. This does not complete or supersede task 011's two outstanding review corrections. Independent review is pending; no deployment or live provider change is included.
+
 Task 011's full planner redesign is committed as `a621e0f`, following design commit `48aa587` and HTTPS preview `0a16f7d`. Sidebar defaults, shared editors, hierarchy, compact Board/filtering, Calendar gestures and user/workspace settings are implemented; see the [implementation record](tasks/011-implementation.md). Independent coordinator review on 2026-11-09 found two P2 corrections: phantom editor history entries and a swallowed Retry click in the overflow regression. The stale handoff status was a third, P3 finding, corrected by this preparation. The next assignment is [011 review fixes](tasks/011-review-fixes.md), followed by re-review. Checklist/inbox persistence remains unimplemented; no deployment was performed by the agent.
 
 Read `AGENTS.md`, `docs/product.md`, `docs/architecture.md`, `docs/stack.md`, and the task completion records before assigning dependent work. Task records contain the detailed verification evidence and contracts; this file summarizes the transfer to the coordinating agent.
@@ -128,6 +130,8 @@ Original transfer baseline: `6a1e5b0`. Task 005 is committed as `0929f9a`; the f
 Tasks 001–011 are committed through `a621e0f`. The current documentation preparation records the coordinator review and assigns corrective work; it does not implement those runtime/test fixes. Do not automatically commit, push, or deploy; credentials, generated files, local databases, and test artifacts do not belong in the staged diff.
 
 ## Next coordinator action
+
+Review the new [task 012 account-invitation implementation](tasks/012-account-invitations.md) against its own final completion evidence. The user's account-only/admin-allowlist choices are confirmed; shared membership remains separate. Do not interpret that new task's verification as approval of task 011's outstanding findings. The prior corrective assignment remains below.
 
 Implement the two P2 corrections in [011 review fixes](tasks/011-review-fixes.md), preserving the completed redesign and the corrected handoff metadata. Verify the history lifecycle and reliable post-drag session recovery, run the final integrated suite, and return completion evidence for independent re-review. Do not start later roadmap features or redo slices A–E.
 
