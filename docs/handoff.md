@@ -1,8 +1,8 @@
-# Coordinator handoff — 2026-11-08
+# Coordinator handoff — 2026-11-09
 
 ## Current state
 
-Tasks 001–010 are committed through `0a16f7d`. Task 009's deleted-block correction passed independent coordinator re-review; task 010 adds explicit HTTPS preview signup and reverse-proxy instructions. The owner has loaded the latest version and provided desktop usability feedback, then added user/workspace time-zone settings to that list. [011: Planner usability](tasks/011-planner-usability.md) now records the full feedback, recommendations and ordered implementation slices. This preparation changes documentation only; no redesigned UI/settings or new server configuration has been implemented. Checklist/inbox persistence remains unimplemented.
+Task 011's full planner redesign is committed as `a621e0f`, following design commit `48aa587` and HTTPS preview `0a16f7d`. Sidebar defaults, shared editors, hierarchy, compact Board/filtering, Calendar gestures and user/workspace settings are implemented; see the [implementation record](tasks/011-implementation.md). Independent coordinator review on 2026-11-09 found two P2 corrections: phantom editor history entries and a swallowed Retry click in the overflow regression. The stale handoff status was a third, P3 finding, corrected by this preparation. The next assignment is [011 review fixes](tasks/011-review-fixes.md), followed by re-review. Checklist/inbox persistence remains unimplemented; no deployment was performed by the agent.
 
 Read `AGENTS.md`, `docs/product.md`, `docs/architecture.md`, `docs/stack.md`, and the task completion records before assigning dependent work. Task records contain the detailed verification evidence and contracts; this file summarizes the transfer to the coordinating agent.
 
@@ -14,7 +14,7 @@ The owner reports that recovery is now working after correcting **the Ubuntu ser
 
 The owner hosts Mailcow and configured it themselves. Do not copy credentials into documentation, requests, fixtures, logs or commits. Real-provider success is **user-reported**, not an independently observed SMTP/inbox/TLS test by this agent.
 
-The Ubuntu app is manually run on loopback port **3005**, accessed through an SSH tunnel. Port 3000 was already occupied by another Docker service. `BETTER_AUTH_URL` must match the browser/tunnel origin, currently `http://127.0.0.1:3005`. The README documents full code-update restart commands, environment-only restart, tunnel reconnection, database setup and `npm run email:check`. Restart after editing the server environment file; Git pulls do not synchronize ignored `.env` files.
+The earlier Ubuntu setup used a manual loopback app on port **3005** and an SSH tunnel. The owner subsequently chose Nginx Proxy Manager HTTPS with an HTTP upstream at `10.0.0.95:3005`; keep the browser-facing HTTPS subdomain in `BETTER_AUTH_URL`. The owner reported Ubuntu Git HEAD at `a621e0f`, but the coordinator has not inspected the live instance or confirmed its running build. `npm run start` requires rebuilding and restarting after a pull; follow README migrations/build/start instructions. Git pulls do not synchronize ignored `.env` files.
 
 ## Verification carried forward
 
@@ -42,7 +42,7 @@ The owner requests a sidebar default workspace, shared overlay editors for proje
 
 Task 011 records the full list and recommendations: preserve saved ownership despite sidebar defaults, keep multi-workspace filters separate, and retain tap/keyboard alternatives. The clarified time model supersedes the initial proposal to use a workspace zone as the creation form's default: users enter/view/edit in their own zone; the workspace zone supplies the shared reference. Keep UTC instants and workspace IANA metadata separately so both views represent the same moment, independently of server location. Existing block instants and dirty input never shift with settings. Evolve the legacy per-block editing-zone API explicitly. Workspace-setting permissions/backfill and record transfers are not newly confirmed requirements.
 
-Implement in separate reviewed slices: A isolates the urgent palette overflow defect; B establishes shared context/settings/editor contracts; C redesigns Projects; D redesigns Board; E redesigns Calendar interactions. The design record does not automatically assign all slices. No application tests were run for this documentation-only preparation; validate links/diff and stage the documentation for the owner. The reported drag defect still needs an independent browser reproduction.
+The owner assigned all slices A–E together, and they are implemented in `a621e0f`. Do not restart slice A or the full redesign from this historical feedback. The independent review passed lint/types, schema/migration status, Webpack build and **85/85 backend checks**. The full browser run produced **60 passed / 1 failed / 1 intentional Android skip** in 14.2 minutes; the failure was the post-drag Retry activation, while the measured overflow dimensions stayed stable. A separate disposable-account test confirmed the extra dialog Back step and zero probe requests after the swallowed mouse click; keyboard Retry recovered. See [review fixes](tasks/011-review-fixes.md) for concrete reproductions, acceptance criteria and verification expectations. Task 011 is implemented but needs these corrections and re-review before acceptance.
 
 ## Task 008 integration contract
 
@@ -122,13 +122,15 @@ Original transfer baseline: `6a1e5b0`. Task 005 is committed as `0929f9a`; the f
 | `82d60e4` | Calendar time blocks; coordinator found the deleted-block gesture P2, corrected in the current follow-up |
 | `da206b5` | Deleted-block correction; independently re-reviewed without actionable findings |
 | `0a16f7d` | HTTPS preview registration support and proxy setup guidance |
+| `48aa587` | Planner usability and clarified user/workspace time-zone design |
+| `a621e0f` | Full task 011 implementation; coordinator review identified two P2 corrections |
 
-Tasks 001–010 and preparation `e4224a9` are committed through `0a16f7d`. Task 011's feedback/design documentation is the current owner-requested preparation. Do not automatically commit, push, or deploy; credentials, generated files, local databases, and test artifacts do not belong in the staged diff.
+Tasks 001–011 are committed through `a621e0f`. The current documentation preparation records the coordinator review and assigns corrective work; it does not implement those runtime/test fixes. Do not automatically commit, push, or deploy; credentials, generated files, local databases, and test artifacts do not belong in the staged diff.
 
 ## Next coordinator action
 
-Read task 011's complete feedback and proposed distinctions with the owner before broad UI work. The independent Calendar overflow fix can be assigned first without waiting for settings/schema decisions. Assign later slices individually after their shared contracts are agreed and integrated. Do not start capture/checklist work, data transfers or a full app rewrite as an implicit extension of this feedback.
+Implement the two P2 corrections in [011 review fixes](tasks/011-review-fixes.md), preserving the completed redesign and the corrected handoff metadata. Verify the history lifecycle and reliable post-drag session recovery, run the final integrated suite, and return completion evidence for independent re-review. Do not start later roadmap features or redo slices A–E.
 
-Suggested first implementation prompt: "Read AGENTS.md, docs/architecture.md, docs/stack.md and docs/tasks/011-planner-usability.md. Implement only slice A: reproduce and fix the Calendar palette's expanding overflow while dragging, preserving existing assignment, save and touch behavior. Add meaningful pointer/scroll-boundary regressions and update the completion evidence. Do not implement the later redesign slices or change settings/ownership contracts. Stage task-owned changes and provide a commit message; leave commit/push/deployment to me."
+Suggested implementation prompt: "Read AGENTS.md, docs/handoff.md, docs/tasks/011-implementation.md and docs/tasks/011-review-fixes.md. Starting from a621e0f, fix the extra dialog history entry and the unreliable post-drag Retry activation in the overflow regression. Preserve dirty/pending/Back/focus/account-boundary behavior and all delivered task 011 features. Add meaningful regressions, verify the final integrated suite, and update completion/handoff evidence. Stage task-owned changes and provide a commit message; leave commit/push/deployment to me."
 
 Provider/deployment, work deletion/archive/moves and identity/membership policy remain outside task 009; block removal is its expressly scoped lifecycle operation. The adopted Calendar defaults are bounded implementation choices, not new user-confirmed product requirements.

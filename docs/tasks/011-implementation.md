@@ -1,6 +1,6 @@
 # 011 implementation handoff
 
-Status: Implemented and verified; ready for independent coordinator review. The owner assigned all slices A–E together on 2026-11-08, superseding the planning record's instruction not to begin subsequent slices automatically. Base: `48aa587`.
+Status: Implemented as `a621e0f`; coordinator review on 2026-11-09 found two P2 corrections required before acceptance. See [review fixes](011-review-fixes.md). The owner assigned all slices A–E together on 2026-11-08, superseding the planning record's instruction not to begin subsequent slices automatically. Implementation base: `48aa587`.
 
 ## Delivered scope
 
@@ -47,6 +47,12 @@ Windows, Node 24.19.0/npm 12.0.2, portable PostgreSQL 17.11. Application depende
 Browser coverage includes real mouse drags/resize, touch scroll/tap emulation, keyboard controls, native dialog naming/dirty-close/Back/pending behavior, canonical cross-view conflicts, independent selections, date/project filters, viewport bounds, user/workspace zone equivalents, retained captured zones, ambiguous/gap times, unknown creates/deletes, deleted targets, genuine revocation, obsolete range/access/identity/save responses and logout. Screenshots supplement server-write assertions; they do not substitute for them.
 
 ## Limits and operating notes
+
+### Independent coordinator review — 2026-11-09
+
+Reviewed `a621e0f` and confirmed the redesigned UI is present in a fresh local build. Independently passed `npm run check`, `npm run db:validate`, `npm run db:test:migrate` (six migrations; none pending), `npm run build -- --webpack` and **85/85 backend checks**. The full `npm run test:e2e` result was **60 passed, 1 failed, 1 intentional Android skip** in **14.2 minutes**, exit 1. The overflow test measured stable dimensions but failed at its post-drag Retry click. Separate disposable-account reproductions showed the extra Back step after normal editor closure and zero verification requests after the suppressed Retry click; keyboard activation recovered. These results are distinct from the earlier implementation-era 61-pass/one-skip run above. Review left tracked files unchanged; the subsequent documentation handoff assigns [the corrections](011-review-fixes.md). No live Ubuntu/HTTPS or physical Android check was performed.
+
+### Implementation limits carried forward
 
 - Independent coordinator review is still required. No commit, push, deployment, SSH, firewall, reverse-proxy or production-server change was performed.
 - Desktop Chromium and Pixel 7/Android Chromium emulation are available; physical Android hardware, an actual soft keyboard, Ubuntu/container runtime and the owner's live HTTPS/SMTP infrastructure are not verified here.
