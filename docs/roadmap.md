@@ -2,7 +2,7 @@
 
 Tasks 001–009 implement the foundation, accounts/recovery, personal/shared access, project/task planning, corrected cross-tab verification, Kanban and Calendar. The Calendar correction passed coordinator re-review at `da206b5`. Task 010 adds the owner's requested HTTPS preview signup/configuration support; actual server/proxy setup remains owner-operated. See handoffs for exact evidence and limits. This sequence is a proposal and may change with product decisions.
 
-The committed application baseline is `a621e0f` (task 011), with coordinator review corrections documented at `fa0923e`. Task [011 completion](tasks/011-implementation.md) records the redesign and remaining review fixes. The owner separately assigned [012: account invitations](tasks/012-account-invitations.md); it does not resolve those corrections. UTC instants remain authoritative; server location is irrelevant.
+The committed application baseline is `1d93128` (task 012 invitations), independently reviewed without new actionable invitation findings. Task [011 completion](tasks/011-implementation.md) records the redesign and two remaining review fixes assigned at `fa0923e`; task 012 does not resolve them. See [012's review record](tasks/012-account-invitations.md) for focused verification and full-suite limitations. UTC instants remain authoritative; server location is irrelevant.
 
 | Phase | Outcome | Evidence required for completion |
 | --- | --- | --- |
@@ -24,7 +24,7 @@ The committed application baseline is `a621e0f` (task 011), with coordinator rev
 
 ## Implementation handoffs
 
-- [012: account invitations](tasks/012-account-invitations.md): owner-requested individual account signup via administrator allowlist and expiring email links; no shared membership grant. Task 011 review fixes remain separate.
+- [012: account invitations](tasks/012-account-invitations.md): implemented at `1d93128` and independently reviewed without new actionable findings; administrator allowlist and expiring email links grant account signup only. Focused account browser checks passed on desktop/Android; no clean final full-suite pass is claimed. Task 011 review fixes remain separate.
 
 - [001: application foundation](tasks/001-foundation.md): implemented; see completion evidence and runtime limitations.
 - [002: accounts and automatic personal-workspace creation](tasks/002-accounts-personal-workspace.md): identity and personal-workspace implementation; see its completion evidence and limitations. Shared-workspace membership follows separately.

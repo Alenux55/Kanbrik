@@ -1,6 +1,6 @@
 # 012: Invitation-only account signup
 
-Status: Implemented; ready for independent review with the integrated-suite limitations recorded below. Assigned by the owner on 2026-11-09; base `fa0923e`. No clean full-suite pass is claimed.
+Status: Implemented as `1d93128`; independently reviewed on 2026-11-09 without new actionable invitation findings. Assigned by the owner on 2026-11-09; base `fa0923e`. No clean final full-suite pass is claimed; task 011 corrections remain open.
 
 ## Outcome and approved scope
 
@@ -44,11 +44,11 @@ Checks actually run on Windows, Node 24.19.0/npm 12.0.2, portable PostgreSQL 17.
 - Integrated `npm run test:e2e`: **61 passed / 2 failed / one intentional Android skip**, 64 cases in 15.0 minutes, exit 1. Both invitation cases passed. The desktop overflow failure is the coordinator's known task 011 post-drag Retry failure at `011-overflow.spec.ts:71` (254px palette width before/during; session screen remained gated). The other failure was Android `preview.spec.ts:58`, `page.goto: net::ERR_ABORTED` while switching the simulated HTTPS backend and clearing cookies. This is not a clean integrated pass.
 - An unchanged isolated preview rerun reproduced the Android abort (**one passed / one failed**, 50.9 seconds). The fixture now signs out through the actual UI and waits for sign-in before replacing its backend/cookie jar, so an active planner gate cannot compete with the next navigation. No application auth safeguard or registration/cookie assertion was removed. Corrected focused `npm run test:e2e -- preview.spec.ts`: **2/2 passed** in 50.2 seconds. The full suite was not repeated after this test-only refinement; the earlier two failures remain part of the evidence. Task 011's Retry/history corrections are not implemented by this task.
 
-Independent review is pending. Physical Android, Ubuntu/container runtime and real Mailcow delivery are not checked by local automation. No server/SSH/proxy/firewall/provider changes, real emails, dependency updates, commit, push or deployment. The existing portable local database remains available; test accounts/workspaces are fixture-scoped. Task 011 history and post-drag Retry findings remain assigned separately in `011-review-fixes.md`, regardless of whether its intermittent test passes in this run.
+The implementation was subsequently committed as `1d93128`; independent review follows below. Physical Android, Ubuntu/container runtime and real Mailcow delivery are not checked by local automation. No server/SSH/proxy/firewall/provider changes, real emails, dependency updates or deployment were performed by the implementing agent. The existing portable local database remains available; test accounts/workspaces are fixture-scoped. Task 011 history and post-drag Retry findings remain assigned separately in `011-review-fixes.md`, regardless of whether its intermittent test passes in this run.
 
-The owner must commit/push, then pull on Ubuntu, preserve the server's existing `.env`/SMTP credentials, set `INVITATION_ADMIN_EMAILS` to their exact existing login email, migrate, rebuild and restart using README. `ENABLE_PREVIEW_REGISTRATION=false` may stay set. Invitation administration appears under User settings only after restarting with a valid allowlisted account and HTTPS canonical URL. An invitation does not grant shared access or reset an existing account's password. Independent review should focus on token lifecycle, concurrent claim/revoke/resend, account preconditions, allowlist enforcement, SMTP-failure cleanup and no shared access.
+For deployment, the owner pulls the committed implementation on Ubuntu, preserves the server's existing `.env`/SMTP credentials, sets `INVITATION_ADMIN_EMAILS` to their exact existing login email, migrates, rebuilds and restarts using README. `ENABLE_PREVIEW_REGISTRATION=false` may stay set. Invitation administration appears under User settings only after restarting with a valid allowlisted account and HTTPS canonical URL. An invitation does not grant shared access or reset an existing account's password. Deployment has not been performed or verified by the coordinator.
 
-Suggested commit message:
+Implementation commit message (subsequently committed as `1d93128`):
 
 ```text
 Add administrator-controlled account invitations
@@ -57,3 +57,18 @@ Keep public signup closed and send single-use account invitation emails.
 Add allowlisted administration, expiration, resend/revoke and atomic signup.
 Preserve separate workspace grants and existing password recovery.
 ```
+
+## Independent coordinator review — 2026-11-09
+
+Reviewed committed implementation `1d93128` against parent `fa0923e`. No new actionable invitation defects found. Reviewed server-derived administrator authority, expected-account and Origin rejection, public-signup closure, recipient binding, hash-only token storage, expiry/rotation/revocation, atomic single-use credential creation, SMTP-failure cleanup, fragment lifecycle and separate workspace grants. The task 011 dialog and overflow-test files are unchanged; their two assigned P2 findings remain open.
+
+Independently verified on the Windows checkout:
+
+- `npm run check`: lint/strict types passed.
+- `npm run db:validate`: passed. `npm run db:test:migrate`: all seven migrations present, none pending on the guarded loopback test database. This checks migration status, not fresh-cluster or pre-migration fixture preservation.
+- `npm run build -- --webpack`: passed on the reviewed source.
+- `npm run test -- --reporter=json --outputFile=.local/review012-tests.json`: **94/94 tests passed**, zero failures/skips, across nine files. Includes real PostgreSQL/HTTP invitation lifecycle and account-boundary checks plus loopback-only SMTP capture. The JSON run retained final counts after the preceding terminal output was truncated; its report is ignored local output, not a committed artifact.
+- `npm run test:e2e -- auth.spec.ts invitations.spec.ts preview.spec.ts`: **12/12 passed in 2.7 minutes**, desktop and Pixel 7 touch emulation, including the corrected preview fixture, closed signup, emailed acceptance/sign-in and personal-only/no-admin access.
+- `git diff --check fa0923e 1d93128`: passed. No application, dependency, schema or test changes made during review; only review/handoff documentation is updated.
+
+The coordinator did not rerun the full integrated browser suite, default Turbopack build, schema-drift comparison, development migration or fresh-cluster preservation proof. The implementer's integrated 61 pass / two fail / one skip remains historical evidence, not a final clean pass. Physical Android, real Ubuntu/Nginx Proxy Manager/TLS and Mailcow delivery remain unverified by the coordinator; no external email or deployment was attempted. Task 012 is suitable to retain while implementing the outstanding [task 011 corrections](011-review-fixes.md) from current baseline `1d93128`, followed by a final integrated run and independent re-review.
