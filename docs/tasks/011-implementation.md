@@ -1,6 +1,6 @@
 # 011 implementation handoff
 
-Status: Implemented as `a621e0f`; coordinator review on 2026-11-09 found two P2 corrections. The follow-up from `84037c2` implements and verifies those corrections; independent re-review remains pending. See [review fixes](011-review-fixes.md). The owner assigned all slices A–E together on 2026-11-08, superseding the planning record's instruction not to begin subsequent slices automatically. Original implementation base: `48aa587`.
+Status: Implemented as `a621e0f`; the two P2 findings from coordinator review are corrected in `75f678e` and independently re-reviewed on 2026-11-09 without actionable findings. See [review fixes](011-review-fixes.md) for the closed findings and separate verification evidence. The owner assigned all slices A–E together on 2026-11-08, superseding the planning record's instruction not to begin subsequent slices automatically. Original implementation base: `48aa587`.
 
 ## Delivered scope
 
@@ -56,11 +56,13 @@ Reviewed `a621e0f` and confirmed the redesigned UI is present in a fresh local b
 
 The current follow-up preserves reviewed task 012 and corrects dialog-owned history reconciliation plus the overflow fixture's post-drag Retry. It reproduced both findings at `84037c2`, including history growth 3 → 6 and one Back remaining on Board. The correction keeps one reusable owned slot, consumes it on normal closure/save/retention, restores it for blocked Back and preserves Next state/account guards. The Retry fixture uses a bounded 75 ms Space press and verifies a real successful probe; no pointer, bounds, hidden-preview or zero-write assertion is removed.
 
-New verification: 94 backend checks pass, both builds and lint/types/schema/migration-status checks pass, a development effect-replay smoke passes, and the final focused browser run has seven passes plus one intentional Android skip. The final integrated run passed 69 cases with zero failures and one intentional Android skip (70 total) in 15.8 minutes; the earlier 68-pass/one-failure/one-skip run and subsequent Calendar fixture refinement are recorded separately. These are follow-up results, separate from the original 85-check/62-case results and coordinator review above. See [correction completion](011-review-fixes.md#correction-completion--2026-11-09) for exact commands, failed baseline/intermediate attempts and final limitations. Independent re-review remains pending.
+Implementer verification: 94 backend checks pass, both builds and lint/types/schema/migration-status checks pass, a development effect-replay smoke passes, and the final focused browser run has seven passes plus one intentional Android skip. The final integrated run passed 69 cases with zero failures and one intentional Android skip (70 total) in 15.8 minutes; the earlier 68-pass/one-failure/one-skip run and subsequent Calendar fixture refinement are recorded separately. These are follow-up results, separate from the original 85-check/62-case results and coordinator review above. See [correction completion](011-review-fixes.md#correction-completion--2026-11-09) for exact commands, failed baseline/intermediate attempts and final limitations.
+
+Independent re-review of `75f678e` found no actionable defects and closed both P2 findings. The coordinator passed lint/types, schema/migration status, Webpack build, 94 backend checks and 17 focused desktop/Android browser cases with one intentional mouse-only skip in 4.2 minutes. Four isolated history-helper lifecycle scenarios also passed. The full 69-pass integrated run is implementer evidence, not a coordinator rerun. Detailed commands and limits are in the [correction review record](011-review-fixes.md#independent-correction-re-review--2026-11-09).
 
 ### Remaining operating limits
 
-- Independent re-review of the correction is still required. This follow-up performs no commit, push, deployment, SSH, firewall, reverse-proxy or production-server change.
+- Correction re-review is complete; no deployment, SSH, firewall, reverse-proxy or production-server change was performed by the coordinator. The owner committed the implementation as `75f678e`.
 - Desktop Chromium and Pixel 7/Android Chromium emulation are available; physical Android hardware, an actual soft keyboard, Ubuntu/container runtime and the owner's live HTTPS/SMTP infrastructure are not verified here.
 - Drafts, extra Board filters and hierarchy expansion are account-scoped memory, preserved through planner navigation/manual data refresh, not document reload/close. Among these UI preferences, account settings/default workspace and view workspace selections persist across devices. Full reload/account changes lose unfinished input; this is not offline editing.
 - Calendar creates retain an idempotent ledger/key. Project/task creates still use their existing API without a create-intent ledger: an unconfirmed create must be checked before retry; the editor says so. Discard never promises server rollback.
@@ -69,7 +71,7 @@ New verification: 94 backend checks pass, both builds and lint/types/schema/migr
 
 ## Review package
 
-The original redesign is committed as `a621e0f`; the current review-correction package contains the shared history helper/editor change, browser regressions and documentation. No new schema, migration, API or dependency change. Generated Prisma/build/test output, `.env` files and `.local` credentials/data are ignored. Leave commit/push to the owner.
+The original redesign is committed as `a621e0f`; correction `75f678e` contains the shared history helper/editor change, browser regressions and documentation and has passed independent re-review. No new schema, migration, API or dependency change. Generated Prisma/build/test output, `.env` files and `.local` credentials/data are ignored. Leave commit/push of review documentation to the owner.
 
 Suggested commit message:
 

@@ -1,6 +1,6 @@
 # Task 011: coordinator review corrections
 
-Status: Corrections implemented and verified; ready for independent re-review. Review baseline `a621e0f`; reviewed on 2026-11-09. Corrections are based on `84037c2`, preserving reviewed task 012 invitations. This file records corrections to the delivered planner redesign, not another implementation of slices A–E.
+Status: Corrections committed as `75f678e` and independently re-reviewed on 2026-11-09 without actionable findings. Both original P2 findings are closed. Review baseline `a621e0f`; correction base `84037c2`, preserving reviewed task 012 invitations. This file records corrections to the delivered planner redesign, not another implementation of slices A–E.
 
 ## Outcome and inputs
 
@@ -90,3 +90,18 @@ The checked-out application at `84037c2` retains both reviewed defects. Built it
 - `git diff --cached --check`: passed. Task-owned source/tests/docs are staged; generated output, `.env` files and the local smoke harness remain ignored.
 
 No schema, dependency or API change, production/provider action, commit or push. Physical Android remains unavailable; mobile verification uses Pixel 7 emulation. Existing task 012 approval is carried forward, not claimed as review of these changes.
+
+## Independent correction re-review — 2026-11-09
+
+Reviewed owner-committed `75f678e` against `84037c2`. No actionable defects found; both original P2 findings are closed. The dialog now consumes its own entry on ordinary closure/save/retention, restores the existing entry on blocked Back and avoids a second traversal after native Back closure. The Retry correction retains the real drag, stable bounds, hidden portal and zero-write assertions and requires a successful identity probe. Calendar/helper changes wait for actual UI/history completion before measuring another gesture target. Task 012 source and its access policy are preserved.
+
+Independent verification on the Windows checkout:
+
+- `npm run check`, `npm run db:validate`: passed. `npm run db:test:migrate`: seven migrations, none pending on the guarded loopback test database. The first restricted migration invocation could not run the schema engine; the same documented command passed outside that process sandbox.
+- `npm run build -- --webpack`: passed on the reviewed source.
+- `npm run test -- --reporter=json --outputFile=.local/review011-correction-tests.json`: **94/94 tests passed**, zero failures/skips across nine files; saved report is ignored local output.
+- `npm run test:e2e -- --grep 'ordinary editor closure|dirty Back|Back during a pending|palette drag keeps|work drops distinguish|same-cookie tabs|session verification failures|obsolete save completion|administrator emails'`: **17 passed / zero failures / one intentional Android skip**, 18 selected cases in **4.2 minutes**, exit 0. Covers all six new history cases, desktop post-drag Retry with a verified response, consecutive Calendar gestures, cross-account/session failures and obsolete saves, and invitation signup on desktop/Pixel 7 emulation. Repeated close history stayed **3 → 4**, with one Back reaching Projects. The skip remains the mouse-only palette case.
+- A separate ignored Chromium harness exercised the actual TypeScript history helper in an isolated same-origin page: effect replay, same-commit editor replacement, replacement during an in-progress traversal, and release during blocked-Back restoration all passed. Each preserved route state, kept at most one reusable Forward slot and returned to the previous route with one Back. This isolates the helper; it does not claim another full React development-mode run.
+- `git diff --check 84037c2 75f678e`: passed. Application, tests, dependencies and schema were left unchanged during review; only review/handoff documents are updated.
+
+The implementer's final integrated **69 passed / zero failures / one intentional skip** in 15.8 minutes is carried forward, not independently repeated. The coordinator did not repeat the default Turbopack build or development-mode React smoke. Physical Android, Ubuntu/container runtime, real TLS/proxy/Mailcow and deployment remain unverified here. No external messages, server changes, commit, push or deployment were performed by this review. The correction is suitable as the baseline for the next separately assigned feature.

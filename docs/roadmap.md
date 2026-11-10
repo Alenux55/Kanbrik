@@ -2,7 +2,7 @@
 
 Tasks 001–009 implement the foundation, accounts/recovery, personal/shared access, project/task planning, corrected cross-tab verification, Kanban and Calendar. The Calendar correction passed coordinator re-review at `da206b5`. Task 010 adds the owner's requested HTTPS preview signup/configuration support; actual server/proxy setup remains owner-operated. See handoffs for exact evidence and limits. This sequence is a proposal and may change with product decisions.
 
-The committed application baseline is `1d93128` (task 012 invitations), independently reviewed without new actionable invitation findings; its review documentation is `84037c2`. The current checkout implements the [011 review corrections](tasks/011-review-fixes.md), with a complete 69-pass/one-intentional-skip browser run and independent re-review pending. Task [011 completion](tasks/011-implementation.md) preserves the original redesign evidence, and [012's review record](tasks/012-account-invitations.md) preserves invitation-specific results. UTC instants remain authoritative; server location is irrelevant.
+The committed application baseline is `75f678e`: [011 review corrections](tasks/011-review-fixes.md), independently re-reviewed without actionable findings and preserving reviewed task 012 invitations. Both original P2 findings are closed. The implementer's full browser run passed 69 cases with one intentional skip; the coordinator separately passed 94 backend checks and 17 focused browser cases with one intentional skip. Task [011 completion](tasks/011-implementation.md) and [012's review record](tasks/012-account-invitations.md) preserve their separate evidence and limits. UTC instants remain authoritative; server location is irrelevant.
 
 | Phase | Outcome | Evidence required for completion |
 | --- | --- | --- |
@@ -24,7 +24,7 @@ The committed application baseline is `1d93128` (task 012 invitations), independ
 
 ## Implementation handoffs
 
-- [012: account invitations](tasks/012-account-invitations.md): implemented at `1d93128` and independently reviewed without new actionable findings; administrator allowlist and expiring email links grant account signup only. The original invitation review used focused account checks on desktop/Android; latest integrated verification is in the task 011 correction record. Correction re-review remains separate.
+- [012: account invitations](tasks/012-account-invitations.md): implemented at `1d93128` and independently reviewed without new actionable findings; administrator allowlist and expiring email links grant account signup only. The original invitation review used focused account checks on desktop/Android; latest integrated verification and independent correction re-review are in the task 011 correction record.
 
 - [001: application foundation](tasks/001-foundation.md): implemented; see completion evidence and runtime limitations.
 - [002: accounts and automatic personal-workspace creation](tasks/002-accounts-personal-workspace.md): identity and personal-workspace implementation; see its completion evidence and limitations. Shared-workspace membership follows separately.
@@ -36,4 +36,4 @@ The committed application baseline is `1d93128` (task 012 invitations), independ
 - [008: Kanban board](tasks/008-kanban-board.md): implemented as `500b136` and independently reviewed without actionable findings. Implementation passed 59 backend checks and 40 full browser cases; coordinator separately passed 59 backend checks and six focused board cases. See its completion handoff for distinctions and limits.
 - [009: Calendar time blocks](tasks/009-calendar-time-blocks.md): implemented as `82d60e4`, corrected and independently re-reviewed at `da206b5`; no remaining actionable findings. See its completion and coordinator records for checks and limits.
 - [010: HTTPS preview access](tasks/010-https-preview.md): requested reverse-proxy configuration guidance and explicit HTTPS preview signup; preserves existing account/workspace boundaries. Actual DNS/proxy/server changes are not performed by this task.
-- [011: Planner usability](tasks/011-planner-usability.md): all slices implemented as `a621e0f`; see [implementation handoff](tasks/011-implementation.md). The current [P2 correction package](tasks/011-review-fixes.md) fixes dialog history and the overflow regression's Retry activation; independent re-review is required before acceptance.
+- [011: Planner usability](tasks/011-planner-usability.md): all slices implemented as `a621e0f`; see [implementation handoff](tasks/011-implementation.md). [Correction `75f678e`](tasks/011-review-fixes.md) fixes dialog history and the overflow regression's Retry activation and passed independent re-review; both P2 findings are closed.
