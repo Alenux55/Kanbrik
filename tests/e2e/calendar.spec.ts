@@ -1,5 +1,5 @@
 import { test, expect } from "./fixtures";
-import { retained, saved, cleanClose } from "./planner-helpers";
+import { retained, saved, cleanClose, closedEditor } from "./planner-helpers";
 import type { Page } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import type { BlockRecord } from "../../src/lib/calendar-contracts";
@@ -824,7 +824,10 @@ test("work drops distinguish original-block assignment, foreground rejection and
       .toBe(project.id);
     expect(await events(page, ws.id)).toHaveLength(1);
     expect((await events(page, ws.id))[0].endAt).toBe(empty.endAt);
-    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(page.getByRole("status").filter({ hasText: "Saved calendar change." })).toBeVisible();
+    await closedEditor(page);
+    await expect(targetEvent).toContainText("Schedule project");
+    await showGridTime(page, "12:00:00");
     const before = (await events(page, ws.id))[0];
     const again = (await palette.boundingBox())!;
     const occupied = (await targetEvent.boundingBox())!;

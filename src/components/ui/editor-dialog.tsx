@@ -8,6 +8,7 @@ import {
 } from "react";
 import { usePlannerSession } from "../planner-session";
 import { button } from "./planner-controls";
+import { ownDialogHistory } from "@/lib/dialog-history";
 // Native modal supplies focus containment and inert background in Chromium/Android.
 // Close it during identity verification so the session Retry screen stays operable.
 export function EditorDialog({
@@ -56,32 +57,20 @@ export function EditorDialog({
   useEffect(() => {
     const node = dialog.current;
     source.current = document.activeElement as HTMLElement;
-    const token = historyToken.current;
-    window.history.pushState(
-      { ...window.history.state, kanbrikDialog: token },
-      "",
-      window.location.href,
-    );
-    const back = () => {
+    const releaseHistory = ownDialogHistory(historyToken.current,
+      () => session.isCurrent(lease) && !session.isLeaving(), () => {
       const state = callbacks.current;
+      if (session.getSnapshot().phase !== "ready") return true;
       if (state.pending || state.dirty) {
-        window.history.pushState(
-          { ...window.history.state, kanbrikDialog: token },
-          "",
-          window.location.href,
-        );
         if (!state.pending) setConfirm(true);
-      } else state.close();
-    };
-    window.addEventListener("popstate", back);
-    return () => {
-      window.removeEventListener("popstate", back);
-      node?.close();
-      if (window.history.state?.kanbrikDialog === token) {
-        const next = { ...window.history.state };
-        delete next.kanbrikDialog;
-        window.history.replaceState(next, "");
+        return true;
       }
+      state.close();
+      return false;
+    });
+    return () => {
+      releaseHistory();
+      node?.close();
       // A confirmed save can trigger a protected refetch. Wait until the
       // boundary is visible again before restoring focus, and never cross an
       // account lease while waiting.

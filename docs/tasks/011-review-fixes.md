@@ -1,6 +1,6 @@
 # Task 011: coordinator review corrections
 
-Status: Ready for corrective implementation. Review baseline `a621e0f`; reviewed on 2026-11-09. This file assigns corrections to the delivered planner redesign, not another implementation of slices A–E.
+Status: Corrections implemented and verified; ready for independent re-review. Review baseline `a621e0f`; reviewed on 2026-11-09. Corrections are based on `84037c2`, preserving reviewed task 012 invitations. This file records corrections to the delivered planner redesign, not another implementation of slices A–E.
 
 ## Outcome and inputs
 
@@ -48,7 +48,7 @@ The coordinator checked `a621e0f` and left tracked files unchanged during the re
 - Disposable-account Chromium reproduction confirmed the extra Back step and the swallowed Retry click; keyboard Retry recovered. Inspected the fresh Board/Projects UI, confirming the sidebar selector, User settings, compact cards, hierarchy and overlays exist in this commit.
 - The owner reported Ubuntu `HEAD`/`origin/main` at `a621e0f`. The coordinator did not inspect the live HTTPS instance or verify its running build/process. A production-mode `npm run start` serves the built app: after pulling, apply migrations, rebuild, stop the old process and start the new build using the README procedure. Correct Git HEAD alone does not establish which build is running.
 
-This evidence is from the completed review, not a fresh application test run for this documentation-only handoff. No real server/proxy/provider or physical Android checks were performed.
+The evidence above was carried forward from the completed review into `fa0923e`'s documentation-only preparation. New corrective implementation checks are recorded below, separately. No real server/proxy/provider or physical Android checks were performed by that review.
 
 ## Verification and completion handoff
 
@@ -59,3 +59,34 @@ This evidence is from the completed review, not a fresh application test run for
 5. Stage task-owned changes and provide a commit message. The owner commits/pushes; no deployment is authorized by this assignment.
 
 Boundaries: no further usability features, capture/checklists, time-zone policy changes, data moves, auth-policy changes, custom statuses, new dependencies, offline editing or server/proxy configuration.
+
+## Correction completion — 2026-11-09
+
+### Reproduction before the patch
+
+The checked-out application at `84037c2` retains both reviewed defects. Built it with `npm run build -- --webpack`, then ran `npm run test:e2e -- --project=desktop --grep 'ordinary editor closure|palette drag keeps'` against unchanged runtime code. Both cases failed as expected:
+
+- Three editor open/close cycles increased history length **3 → 6**; one real Back stayed on Board rather than reaching Projects.
+- Palette dimensions stayed **254 × 648**, with document width **1,440**, before/during the real mouse drag. The final Retry mouse activation left the session gate active and the palette hidden.
+
+### Delivered correction
+
+- Shared dialog history has one same-URL owned slot. Ordinary Close/Cancel/Escape, successful save and Keep draft closure consume it with one asynchronous Back traversal. Native Back has already consumed the slot and causes no second Back. Dirty/pending/session-gated Back restores the existing slot with Forward instead of pushing duplicates.
+- A small history owner coordinates asynchronous traversal, immediate editor replacement and React effect replay. Cleanup is deferred one microtask so a replacement can reuse the slot; a later mount waits for in-progress traversal. Every traversal/response remains account-lease guarded. Route state is copied intact; real route entries are not rewritten, and the implementation adds no reload/cache workaround.
+- Browser history can retain one consumed slot in the Forward direction; reopening prunes/reuses it. It does not accumulate behind the active route, and one Back after ordinary closure reaches the previous route. This is a browser history reconciliation contract, not a claim that history.length shrinks after Back.
+- Overflow Retry focuses the supported button and presses Space with a 75 ms key hold (the pinned dnd-kit sensor removes its click capture after 50 ms; the existing Board fixture uses the same key duration). It waits for an actual GET `/api/planner-session` response with status 200 and retains all pointer bounds, hidden-preview, ready-state and zero-unintended-block-write assertions. This adds no arbitrary long sleep or forced click. The intentional mouse-only Android skip is unchanged.
+- New desktop/Android history regressions exercise repeated Close/Cancel/Escape, native Back/Forward, dirty Keep editing/Discard, retained input through route navigation, successful saves, pending-save Back, focus restoration and one-write assertions.
+
+### Actual verification
+
+- Initial correction focus run: **six history cases passed**, one Retry case failed, one intentional Android skip (eight total). Zero-duration Space was still swallowed during the sensor's 50 ms document click capture; the bounded key duration above corrects that fixture activation. A successful probe remains mandatory.
+- `npm test`: **94/94 passed across nine files** on the corrected runtime (no backend source changed), including the reviewed invitation/auth/database regressions.
+- `npm run check`, `npm run db:validate`, `npm run db:test:migrate`: passed on the final candidate; seven migrations, none pending. No migration/reset was needed. Both `npm run build` (Turbopack) and `npm run build -- --webpack` passed. Browser verification uses the final Webpack build.
+- Local development/Strict Mode smoke: passed using an ignored loopback-only harness on port 3114, guarded test database and disposable account/task. Three repeated editor closures left history **3 → 4** (one reusable Forward slot), then one Back reached Projects. The fixture account and its records were removed; the owned development server was stopped. No development fixture was written to the app database.
+- Final focused `npm run test:e2e -- dialog-history.spec.ts 011-overflow.spec.ts`: **seven passed / one intentional Android skip**, eight cases in 2.0 minutes, exit 0. Both desktop/Android history suites pass; the desktop Retry emits a successful probe and returns to ready without a block write. History **3 → 4** remains bounded across repeated closures.
+- First integrated `npm run test:e2e`: **68 passed / one failed / one intentional skip**, 70 cases in 16.1 minutes. All history/Retry, account-boundary and invitation cases passed. The desktop consecutive Calendar drag fixture attempted its second raw-coordinate drop before observing the first assignment's client acknowledgement/history reconciliation. It now waits for the saved UI, actual dialog removal, consumed owned marker and ready view, verifies the assigned event label, then measures fresh visible targets. Shared close/save/retain helpers use the same completion barrier. No Calendar application behavior or assertion was removed.
+- Focused Calendar rerun after that fixture refinement: **2/2 passed** on desktop/Android in 49.6 seconds. Final `npm run check` also passed with the updated test helpers.
+- Final integrated `npm run test:e2e` after that fixture refinement: **69 passed / zero failures / one intentional Android skip**, 70 cases in **15.8 minutes**, exit 0. This is one complete run on the final Webpack application and final browser fixtures, including all six new history cases and the reviewed invitation/auth/session/Board/Calendar regressions. The skipped palette case is desktop-mouse-only; separate Android touch and scheduling workflows passed.
+- `git diff --cached --check`: passed. Task-owned source/tests/docs are staged; generated output, `.env` files and the local smoke harness remain ignored.
+
+No schema, dependency or API change, production/provider action, commit or push. Physical Android remains unavailable; mobile verification uses Pixel 7 emulation. Existing task 012 approval is carried forward, not claimed as review of these changes.

@@ -65,9 +65,18 @@ test("palette drag keeps scroll bounds stable", async ({ page, isMobile }) => {
   await page.mouse.up();
   expect(writes).toBe(0);
   await page.unroute("**/api/planner-session");
-  await page
-    .getByRole("button", { name: "Retry session check", exact: true })
-    .click();
+  const retry = page.getByRole("button", { name: "Retry session check", exact: true });
+  await retry.focus();
+  // Mouse up can leave dnd-kit's transient click suppression active. Keyboard
+  // activation is supported and must actually dispatch a fresh identity probe.
+  const probe = page.waitForResponse(response =>
+    new URL(response.url()).pathname === "/api/planner-session" && response.request().method() === "GET",
+  );
+  // The pinned sensor removes its document click capture after 50 ms. A 75 ms
+  // key hold activates on keyup after that cleanup, as in the Board fixture.
+  await page.keyboard.press("Space", { delay: 75 });
+  expect((await probe).status()).toBe(200);
   await expect(palette).toBeVisible();
   await expect(page.locator("[data-drag-preview]")).toHaveCount(0);
+  expect(writes).toBe(0);
 });

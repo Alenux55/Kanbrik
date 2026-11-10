@@ -24,14 +24,21 @@ export async function retained(page: Page) {
   await page
     .getByRole("button", { name: "Keep draft for later", exact: true })
     .click();
+  await closedEditor(page);
+}
+export async function closedEditor(page: Page) {
   await expect(page.locator("dialog")).toHaveCount(0);
+  // Dialog unmount starts an asynchronous owned-history traversal. Coordinate
+  // based gestures must observe its completion before measuring their targets.
+  await expect.poll(() => page.evaluate(() => window.history.state?.kanbrikDialog ?? null)).toBeNull();
+  await expect(page.locator('[data-session-state="ready"]')).toBeVisible();
 }
 export async function cleanClose(page: Page) {
   await page.getByRole("button", { name: "Close editor", exact: true }).click();
-  await expect(page.locator("dialog")).toHaveCount(0);
+  await closedEditor(page);
 }
 export async function saved(page: Page) {
-  await expect(page.locator("dialog")).toHaveCount(0);
+  await closedEditor(page);
   await expect(
     page.getByRole("status").filter({ hasText: /Saved/ }).last(),
   ).toBeVisible();

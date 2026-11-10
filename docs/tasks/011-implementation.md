@@ -1,6 +1,6 @@
 # 011 implementation handoff
 
-Status: Implemented as `a621e0f`; coordinator review on 2026-11-09 found two P2 corrections required before acceptance. See [review fixes](011-review-fixes.md). The owner assigned all slices A–E together on 2026-11-08, superseding the planning record's instruction not to begin subsequent slices automatically. Implementation base: `48aa587`.
+Status: Implemented as `a621e0f`; coordinator review on 2026-11-09 found two P2 corrections. The follow-up from `84037c2` implements and verifies those corrections; independent re-review remains pending. See [review fixes](011-review-fixes.md). The owner assigned all slices A–E together on 2026-11-08, superseding the planning record's instruction not to begin subsequent slices automatically. Original implementation base: `48aa587`.
 
 ## Delivered scope
 
@@ -52,9 +52,15 @@ Browser coverage includes real mouse drags/resize, touch scroll/tap emulation, k
 
 Reviewed `a621e0f` and confirmed the redesigned UI is present in a fresh local build. Independently passed `npm run check`, `npm run db:validate`, `npm run db:test:migrate` (six migrations; none pending), `npm run build -- --webpack` and **85/85 backend checks**. The full `npm run test:e2e` result was **60 passed, 1 failed, 1 intentional Android skip** in **14.2 minutes**, exit 1. The overflow test measured stable dimensions but failed at its post-drag Retry click. Separate disposable-account reproductions showed the extra Back step after normal editor closure and zero verification requests after the suppressed Retry click; keyboard activation recovered. These results are distinct from the earlier implementation-era 61-pass/one-skip run above. Review left tracked files unchanged; the subsequent documentation handoff assigns [the corrections](011-review-fixes.md). No live Ubuntu/HTTPS or physical Android check was performed.
 
-### Implementation limits carried forward
+### Review correction follow-up — 2026-11-09
 
-- Independent coordinator review is still required. No commit, push, deployment, SSH, firewall, reverse-proxy or production-server change was performed.
+The current follow-up preserves reviewed task 012 and corrects dialog-owned history reconciliation plus the overflow fixture's post-drag Retry. It reproduced both findings at `84037c2`, including history growth 3 → 6 and one Back remaining on Board. The correction keeps one reusable owned slot, consumes it on normal closure/save/retention, restores it for blocked Back and preserves Next state/account guards. The Retry fixture uses a bounded 75 ms Space press and verifies a real successful probe; no pointer, bounds, hidden-preview or zero-write assertion is removed.
+
+New verification: 94 backend checks pass, both builds and lint/types/schema/migration-status checks pass, a development effect-replay smoke passes, and the final focused browser run has seven passes plus one intentional Android skip. The final integrated run passed 69 cases with zero failures and one intentional Android skip (70 total) in 15.8 minutes; the earlier 68-pass/one-failure/one-skip run and subsequent Calendar fixture refinement are recorded separately. These are follow-up results, separate from the original 85-check/62-case results and coordinator review above. See [correction completion](011-review-fixes.md#correction-completion--2026-11-09) for exact commands, failed baseline/intermediate attempts and final limitations. Independent re-review remains pending.
+
+### Remaining operating limits
+
+- Independent re-review of the correction is still required. This follow-up performs no commit, push, deployment, SSH, firewall, reverse-proxy or production-server change.
 - Desktop Chromium and Pixel 7/Android Chromium emulation are available; physical Android hardware, an actual soft keyboard, Ubuntu/container runtime and the owner's live HTTPS/SMTP infrastructure are not verified here.
 - Drafts, extra Board filters and hierarchy expansion are account-scoped memory, preserved through planner navigation/manual data refresh, not document reload/close. Among these UI preferences, account settings/default workspace and view workspace selections persist across devices. Full reload/account changes lose unfinished input; this is not offline editing.
 - Calendar creates retain an idempotent ledger/key. Project/task creates still use their existing API without a create-intent ledger: an unconfirmed create must be checked before retry; the editor says so. Discard never promises server rollback.
@@ -63,14 +69,14 @@ Reviewed `a621e0f` and confirmed the redesigned UI is present in a fresh local b
 
 ## Review package
 
-Task-owned source, migrations, tests and docs are staged; generated Prisma/build/test output, `.env` files and `.local` credentials/data are ignored. Leave commit/push to the owner.
+The original redesign is committed as `a621e0f`; the current review-correction package contains the shared history helper/editor change, browser regressions and documentation. No new schema, migration, API or dependency change. Generated Prisma/build/test output, `.env` files and `.local` credentials/data are ignored. Leave commit/push to the owner.
 
 Suggested commit message:
 
 ```text
-Implement task 011 planner usability and workspace settings
+Fix editor history and post-drag session retry
 
-Add shared editors, creation defaults and user/workspace time zones.
-Redesign Projects, Board filters/cards and Calendar scheduling gestures.
-Preserve canonical revisions, membership boundaries and uncertain intents.
+Reconcile dialog-owned entries without adding phantom Back steps.
+Preserve dirty, pending, retained-draft and account-boundary behavior.
+Verify keyboard Retry dispatch and desktop/Android history navigation.
 ```
