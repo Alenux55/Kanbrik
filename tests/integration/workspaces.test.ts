@@ -220,7 +220,8 @@ describe("canonical projects/tasks through real HTTP and PostgreSQL", () => {
     expect(detail.headers.get("cache-control")).toBe("no-store");
     const record = await detail.json();
     expect(record.title).toBe("Plan"); expect(record.description).toBe("<b>Plain text</b>");
-    expect(Object.keys(record).sort()).toEqual(["createdAt", "description", "id", "revision", "title", "updatedAt", "workspaceId"]);
+    expect(Object.keys(record).sort()).toEqual(["createdAt", "deletedAt", "description", "id", "revision", "title", "trashBatchId", "updatedAt", "workspaceId"]);
+    expect(record).toMatchObject({ deletedAt: null, trashBatchId: null });
     expect((await (await get(`/api/workspaces/${personalId}/projects/${privateProject.id}`, cookie)).json()).id).toBe(privateProject.id);
     expect((await (await get(`${base()}/tasks/${child.id}`, editor.cookie)).json()).projectId).toBe(project.id);
     const rows = await (await get(`${base()}/tasks`)).json();

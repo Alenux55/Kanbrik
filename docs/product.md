@@ -86,13 +86,25 @@ Users enter/view/edit schedules in their own saved IANA zone. User settings owns
 
 Calendar uses the shared block overlay, event/agenda activation, New block, desktop slot activation and explicit Schedule work buttons. Desktop dropping work onto blank visible time creates one idempotent block of 60 elapsed minutes; dropping onto an existing empty block assigns it without changing its ID/interval. Occupied/foreign foreground events reject implicit replacement. Named zones, gap rejection and explicit repeated-time choices remain required. Scheduling never changes work status/revision. No recurrence or cross-workspace work references are added.
 
+## Implemented mobile planner and reversible deletion (013)
+
+On 2026-11-13 the owner requested a visible mobile Calendar, scrolling through all Board statuses instead of selecting each tab, deletion of projects/tasks/subtasks, and a short Calendar Remove action that preserves work. They explicitly chose deleting contained tasks/subtasks together and requested Trash/Restore so this is reversible. [Task 013](tasks/013-mobile-planner-and-trash.md) records the implementation and verification; coordinator review remains pending.
+
+Implemented bounded defaults: mobile day time grid with an agenda alternative; horizontal Board column scrolling; workspace-scoped Trash under existing owner/editor content rights; no automatic purge or permanent-delete UI; scheduled blocks remain visible with a Work in Trash state and retained links, allowing Restore to recover context without recreating removed/reassigned blocks. These implement the task recommendations; they are not additional owner-confirmed requirements. The earlier deletion deferral is superseded by this assignment; permanent purge, retention and work moves remain unassigned.
+
+Further confirmed Calendar requirements: remove the separate Schedule [work] box, click the main work card to edit that project/task/subtask, drag the same card to schedule directly, and do not open a block editor on drag release. Deliberate single-click/tap/keyboard activation opens an editor. Task 013 preserves New block/work selection for non-drag scheduling and retained gesture proposals with an explicit Review action; no failure or DST ambiguity may be silently treated as saved.
+
+## Assigned follow-up: comments and edit history (014)
+
+The owner requests Comments and Edit history on projects, tasks and subtasks, with original posting and last-edited times for comments. [Task 014](tasks/014-comments-and-edit-history.md) follows the reviewed task 013 lifecycle work; it is a specification, not an implemented feature. Recommended first version: plain text, current workspace visibility, author-only comment edits, append-only server-recorded actor/time/before-and-after activity, and retention through Trash/Restore. Earlier edits cannot be reconstructed; these permission/content defaults are recommendations, not new owner-confirmed policy. Rich text, attachments, mentions, notifications and comment deletion are outside this assignment.
+
 ## Decisions still open
 
 - Final acceptance of the recommended stack; verification of Docker and existing reverse-proxy configuration.
 - Whether viewer-only access or further login methods are needed. Account invitation policy is confirmed below.
 - Whether personal scheduling of shared tasks is needed initially and its exact visibility rules.
 - Recurring chores/checklists and whether checklist items are independently schedulable tasks.
-- Longer-term overlap/availability and snapping policy (task 009 implements overlaps allowed and 15-minute pointer snapping initially); project/task deletion/archive behavior remains undecided.
+- Longer-term overlap/availability and snapping policy (task 009 implements overlaps allowed and 15-minute pointer snapping initially); permanent purge/retention and work archive/move behavior remain undecided. Reversible deletion is assigned in task 013 above.
 - SilverBullet's role and whether linked notes are sufficient.
 - External calendars, notifications, and actual time tracking are uncommitted follow-ups.
 - Any future ability to move existing records between workspaces; task 011 preserves immutable ownership and has owner-approved zone initialization/permissions.

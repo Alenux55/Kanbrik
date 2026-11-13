@@ -23,6 +23,7 @@ model User {
   calendarPreference CalendarPreference?
   plannerPreference PlannerPreference?
   sentInvitations AccountInvitation[]
+  trashOperations TrashBatch[]
   @@map("user")
 }
 
@@ -93,6 +94,7 @@ model Workspace {
   tasks           Task[]
   timeBlocks      TimeBlock[]
   calendarIntents CalendarCreateIntent[]
+  trashBatches TrashBatch[]
   createdAt       DateTime @default(now())
 }
 
@@ -129,11 +131,15 @@ model Project {
   revision    Int @default(1)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+  trashBatchId String?
+  trashBatch TrashBatch? @relation(fields: [workspaceId, trashBatchId], references: [workspaceId, id], onDelete: NoAction)
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   tasks       Task[]
   timeBlocks  TimeBlock[]
   @@unique([id, workspaceId])
   @@index([workspaceId, createdAt, id])
+  @@index([workspaceId, trashBatchId])
 }
 
 model Task {
@@ -147,6 +153,9 @@ model Task {
   revision    Int @default(1)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+  trashBatchId String?
+  trashBatch TrashBatch? @relation(fields: [workspaceId, trashBatchId], references: [workspaceId, id], onDelete: NoAction)
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   project     Project? @relation(fields: [projectId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
   parent      Task? @relation("Subtasks", fields: [parentId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
@@ -156,6 +165,27 @@ model Task {
   @@index([workspaceId, createdAt, id])
   @@index([projectId, workspaceId])
   @@index([parentId, workspaceId])
+  @@index([workspaceId, trashBatchId])
+}
+
+model TrashBatch {
+  workspaceId String
+  id String
+  rootKind String
+  rootId String
+  rootTitle String
+  impactDigest String
+  members Json
+  revision Int @default(1)
+  createdAt DateTime @default(now())
+  restoredAt DateTime?
+  createdById String?
+  createdBy User? @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  projects Project[]
+  tasks Task[]
+  @@id([workspaceId, id])
+  @@index([workspaceId, createdAt, id])
 }
 
 model CalendarPreference {

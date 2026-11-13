@@ -399,7 +399,6 @@ function SelectedBoard({
   const store = usePlanningDrafts();
   const [scopes, setScopes] = useState<Scope[] | null>(null);
   const [message, setMessage] = useState("");
-  const [activeStatus, setActiveStatus] = useState<TaskStatus>("todo");
   const [dragged, setDragged] = useState<TaskRecord | null>(null);
   const alive = useRef(true);
   const generation = useRef(0);
@@ -522,7 +521,6 @@ function SelectedBoard({
         );
         return;
       }
-      setActiveStatus(status);
       setScopes(
         (current) =>
           current?.map((scope) => ({
@@ -574,21 +572,6 @@ function SelectedBoard({
         {message}
       </p>
       {!tasks.length && <p className="my-4">No tasks match these filters.</p>}
-      <div
-        className="mb-3 flex flex-wrap gap-2 lg:hidden"
-        aria-label="Status columns"
-      >
-        {taskStatusIds.map((s) => (
-          <button
-            key={s}
-            className={button}
-            aria-pressed={s === activeStatus}
-            onClick={() => setActiveStatus(s)}
-          >
-            {taskStatusLabels[s]} ({tasks.filter((t) => t.status === s).length})
-          </button>
-        ))}
-      </div>
       <DndContext
         sensors={sensors}
         autoScroll={false}
@@ -616,12 +599,16 @@ function SelectedBoard({
           },
         }}
       >
-        <div className="grid min-w-0 gap-3 lg:grid-cols-5">
+        <div
+          role="region"
+          aria-label="Board statuses"
+          tabIndex={0}
+          className="flex min-w-0 gap-3 overflow-x-auto overscroll-x-contain pb-3 lg:grid lg:grid-cols-5 lg:overflow-visible"
+        >
           {taskStatusIds.map((status) => (
             <Column
               key={status}
               status={status}
-              active={status === activeStatus}
               count={tasks.filter((t) => t.status === status).length}
             >
               {tasks
@@ -685,12 +672,10 @@ function SelectedBoard({
 }
 function Column({
   status,
-  active,
   count,
   children,
 }: {
   status: TaskStatus;
-  active: boolean;
   count: number;
   children: React.ReactNode;
 }) {
@@ -699,7 +684,7 @@ function Column({
     <section
       ref={setNodeRef}
       aria-label={`${taskStatusLabels[status]} column`}
-      className={`${active ? "block" : "hidden lg:block"} min-h-40 min-w-0 rounded-xl border p-2 ${isOver ? "border-teal-800 bg-teal-50" : "border-neutral-300 bg-neutral-100"}`}
+      className={`min-h-40 w-[min(82vw,20rem)] min-w-0 shrink-0 rounded-xl border p-2 lg:w-auto ${isOver ? "border-teal-800 bg-teal-50" : "border-neutral-300 bg-neutral-100"}`}
     >
       <h2 className="mb-3 break-words font-semibold">
         {taskStatusLabels[status]} ({count})

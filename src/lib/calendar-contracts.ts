@@ -13,4 +13,4 @@ export const rangeInput = z.object({ start: z.string().max(60), end: z.string().
   const start = instant(value.start), end = instant(value.end);
   return !!start && !!end && end.toMillis() > start.toMillis() && end.toMillis() - start.toMillis() <= 93 * 86400000;
 });
-export type BlockRecord = { id: string; workspaceId: string; label: string; startAt: string; endAt: string; timeZone: string; projectId: string | null; taskId: string | null; revision: number; project: { id: string; title: string } | null; task: { id: string; title: string; status: string; parentId: string | null } | null };
+export type BlockRecord = { id: string; workspaceId: string; label: string; startAt: string; endAt: string; timeZone: string; projectId: string | null; taskId: string | null; revision: number; workInTrash?: boolean; project: { id: string; title: string; trashed?: boolean } | null; task: { id: string; title: string; status: string; parentId: string | null; trashed?: boolean } | null };

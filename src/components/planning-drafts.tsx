@@ -14,6 +14,23 @@ import { emptyBoardFilters, type BoardFilters } from "@/lib/board-filters";
 import type { CalendarDraft } from "@/lib/calendar-draft";
 import type { EntityTarget } from "./entity-editor";
 import type { ProjectRecord, TaskRecord } from "@/lib/planning-contracts";
+import type { TrashImpact, TrashBatchRecord } from "@/lib/trash-contracts";
+
+export type TrashMoveDraft = {
+  target: EntityTarget;
+  impact: TrashImpact;
+  requestKey: string;
+  uncertain: boolean;
+  error?: string;
+  changed?: boolean;
+};
+export type TrashRestoreDraft = {
+  workspaceId: string;
+  batch: TrashBatchRecord;
+  uncertain: boolean;
+  error?: string;
+  requires?: string;
+};
 
 export type PlanningDraft = {
   title: string;
@@ -27,6 +44,14 @@ export type PlanningDraft = {
   uncertain?: boolean;
 };
 type DraftStore = {
+  trashMoves: Record<string, TrashMoveDraft>;
+  setTrashMoves: Dispatch<SetStateAction<Record<string, TrashMoveDraft>>>;
+  trashRestores: Record<string, TrashRestoreDraft>;
+  setTrashRestores: Dispatch<SetStateAction<Record<string, TrashRestoreDraft>>>;
+  retireWork: (
+    workspaceId: string,
+    rows: { kind: "project" | "task"; id: string }[],
+  ) => void;
   boardFilters: BoardFilters;
   setBoardFilters: Dispatch<SetStateAction<BoardFilters>>;
   expansion: Record<string, boolean>;
@@ -49,6 +74,12 @@ export function PlanningDrafts({ children }: { children: React.ReactNode }) {
   const session = usePlannerSession();
   const [lease] = useState(session.capture);
   const [drafts, setDrafts] = useState<Record<string, PlanningDraft>>({});
+  const [trashMoves, setTrashMoves] = useState<Record<string, TrashMoveDraft>>(
+    {},
+  );
+  const [trashRestores, setTrashRestores] = useState<
+    Record<string, TrashRestoreDraft>
+  >({});
   const [calendarDrafts, setCalendarDrafts] = useState<
     Record<string, CalendarDraft>
   >({});
@@ -59,10 +90,12 @@ export function PlanningDrafts({ children }: { children: React.ReactNode }) {
   const [savingKeys, setSavingKeys] = useState<string[]>([]);
   const [saveEpoch, setSaveEpoch] = useState(0);
   const documentExitAllowed = useRef(false);
-  const dirty = [
-    ...Object.values(drafts),
-    ...Object.values(calendarDrafts),
-  ].some((draft) => draft.dirty);
+  const dirty =
+    [...Object.values(drafts), ...Object.values(calendarDrafts)].some(
+      (draft) => draft.dirty,
+    ) ||
+    Object.keys(trashMoves).length > 0 ||
+    Object.keys(trashRestores).length > 0;
   useEffect(() => {
     if (!dirty) return;
     const warn = (event: BeforeUnloadEvent) => {
@@ -81,6 +114,8 @@ export function PlanningDrafts({ children }: { children: React.ReactNode }) {
         inFlight.current.clear();
         setDrafts({});
         setCalendarDrafts({});
+        setTrashMoves({});
+        setTrashRestores({});
         setSavingKeys([]);
         setSaveEpoch(0);
         setExpansion({});
@@ -95,6 +130,8 @@ export function PlanningDrafts({ children }: { children: React.ReactNode }) {
     documentExitAllowed.current = true;
     setDrafts({});
     setCalendarDrafts({});
+    setTrashMoves({});
+    setTrashRestores({});
   }
   function beginSave(key: string) {
     if (!session.isCurrent(lease)) return false;
@@ -114,6 +151,46 @@ export function PlanningDrafts({ children }: { children: React.ReactNode }) {
   return (
     <Context.Provider
       value={{
+        trashMoves,
+        setTrashMoves: (value) => {
+          if (session.isCurrent(lease)) setTrashMoves(value);
+        },
+        trashRestores,
+        setTrashRestores: (value) => {
+          if (session.isCurrent(lease)) setTrashRestores(value);
+        },
+        retireWork: (workspaceId, rows) => {
+          if (!session.isCurrent(lease)) return;
+          const projects = new Set(
+            rows.filter((row) => row.kind === "project").map((row) => row.id),
+          );
+          const tasks = new Set(
+            rows.filter((row) => row.kind === "task").map((row) => row.id),
+          );
+          setDrafts((current) =>
+            Object.fromEntries(
+              Object.entries(current).filter(([key, draft]) => {
+                if (!key.startsWith(workspaceId + "/")) return true;
+                const target = draft.target,
+                  record = target?.record;
+                const projectId =
+                  record && "projectId" in record
+                    ? record.projectId
+                    : (draft.projectId ?? target?.projectId);
+                const parentId =
+                  record && "parentId" in record
+                    ? record.parentId
+                    : target?.parentId;
+                return record
+                  ? !(target?.kind === "projects" ? projects : tasks).has(
+                      record.id,
+                    )
+                  : !(projectId && projects.has(projectId)) &&
+                      !(parentId && tasks.has(parentId));
+              }),
+            ),
+          );
+        },
         boardFilters,
         setBoardFilters,
         expansion,

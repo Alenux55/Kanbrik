@@ -306,7 +306,7 @@ export function CalendarPlanner() {
                     }}
                   >
                     <option value="week">Week grid</option>
-                    <option value="day">Day / agenda</option>
+                    <option value="day">Day grid</option>
                   </select>
                 </label>
               </div>
@@ -390,15 +390,28 @@ function CalendarScope({
     return () => document.removeEventListener("mousemove", track);
   }, []);
   const suppressClick = useRef(false);
+  const gestureActive = useRef(false);
   const alive = useRef(true);
   const version = useRef(0);
   const canceledGesture = useRef(false);
   useEffect(() => {
     const cancel = (event: KeyboardEvent) => {
       if (event.key === "Escape") canceledGesture.current = true;
+      else if (
+        !gestureActive.current &&
+        (event.key === "Enter" || event.key === " ")
+      )
+        suppressClick.current = false;
     };
-    document.addEventListener("keydown", cancel);
-    return () => document.removeEventListener("keydown", cancel);
+    const intentionalPress = () => {
+      if (!gestureActive.current) suppressClick.current = false;
+    };
+    document.addEventListener("keydown", cancel, true);
+    document.addEventListener("pointerdown", intentionalPress, true);
+    return () => {
+      document.removeEventListener("keydown", cancel, true);
+      document.removeEventListener("pointerdown", intentionalPress, true);
+    };
   }, []);
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
@@ -545,12 +558,10 @@ function CalendarScope({
       ...current,
       [`${block.workspaceId}/blocks/${block.id}`]: proposed,
     }));
-    if (alive.current) setEditing(block.id);
   }
   async function gesture(block: BlockRecord, changes: BlockChanges) {
     if (!alive.current || !session.isCurrent(lease)) return;
     if (calendarDrafts[`${block.workspaceId}/blocks/${block.id}`]?.dirty) {
-      setEditing(block.id);
       setError(
         "This block has a retained draft. Review or discard it before a gesture.",
       );
@@ -604,7 +615,6 @@ function CalendarScope({
               blocks: scope.blocks.filter((item) => item.id !== block.id),
             })) ?? null,
         );
-        setEditing(null);
         setError(
           "Time block is no longer available. Proposed change retained; other workspace content is unchanged.",
         );
@@ -620,7 +630,6 @@ function CalendarScope({
         return;
       }
       saved(result);
-      setEditing(null);
       setError("");
       setNotice("Saved calendar change.");
     } catch {
@@ -642,7 +651,7 @@ function CalendarScope({
     }
     const key = `${ws}/blocks/new`;
     setDestination(ws);
-    setEditing("new");
+    if (!autoSave) setEditing("new");
     if (calendarDrafts[key]?.dirty || savingKeys.includes(`calendar:${key}`)) {
       setError(
         "Review or discard the retained new-block intent before scheduling another.",
@@ -741,7 +750,6 @@ function CalendarScope({
         return;
       }
       saved(result);
-      setEditing(null);
       setError("");
       setNotice(
         `Saved one-hour block in ${workspaces.find((w) => w.id === ws)?.name}. Referenced work is unchanged.`,
@@ -797,6 +805,9 @@ function CalendarScope({
           {notice}
         </p>
       )}
+      {savingKeys.some((key) => key.startsWith("calendar:")) && (
+        <p role="status">Saving Calendar change…</p>
+      )}
       <p className="my-3">
         {incomplete ? "Loaded" : "Total"} blocks in range: {all.length}.
         Overlaps allowed; intervals end exclusively.
@@ -811,27 +822,6 @@ function CalendarScope({
       >
         New block
       </button>
-      <details className="my-3">
-        <summary className="flex min-h-11 cursor-pointer items-center underline">
-          Schedule work with buttons
-        </summary>
-        <div className="max-h-80 overflow-auto">
-          {scopes.map((scope) => (
-            <section key={scope.workspace.id}>
-              <h3>{scope.workspace.name}</h3>
-              {scope.work.map((item) => (
-                <button
-                  key={item.kind + item.id}
-                  className={button + " m-1"}
-                  onClick={() => openNew(item)}
-                >
-                  Schedule {item.kind}: {item.title}
-                </button>
-              ))}
-            </section>
-          ))}
-        </div>
-      </details>
       <DndContext
         sensors={sensors}
         autoScroll={false}
@@ -843,6 +833,7 @@ function CalendarScope({
             };
           }
           suppressClick.current = true;
+          gestureActive.current = true;
           setDragged(
             work.find((item) => item.kind + ":" + item.id === active.id) ??
               null,
@@ -850,15 +841,12 @@ function CalendarScope({
         }}
         onDragCancel={() => {
           setDragged(null);
-          window.setTimeout(() => {
-            suppressClick.current = false;
-          }, 100);
+          gestureActive.current = false;
+          setNotice("Gesture canceled. No change was saved.");
         }}
         onDragEnd={({ active }) => {
           setDragged(null);
-          window.setTimeout(() => {
-            suppressClick.current = false;
-          }, 100);
+          gestureActive.current = false;
           if (
             !alive.current ||
             !session.isCurrent(lease) ||
@@ -902,14 +890,13 @@ function CalendarScope({
           });
         }}
       >
-        <div className="lg:my-5 lg:grid lg:grid-cols-[16rem_minmax(0,1fr)] lg:gap-4">
+        <div className="my-5 flex min-w-0 flex-col gap-4 lg:grid lg:grid-cols-[16rem_minmax(0,1fr)]">
           <div
-            className="hidden max-h-[650px] overflow-auto rounded border p-3 lg:block"
+            className="order-2 max-h-[400px] min-w-0 overflow-auto rounded border p-3 lg:order-none lg:max-h-[650px]"
             aria-label="Calendar work palette"
           >
             <h2 className="font-semibold">
-              Drag onto an empty block to assign, or blank time to schedule one
-              hour
+              Work cards: edit, or drag onto the grid to schedule
             </h2>
             {scopes.map((scope) => (
               <div key={scope.workspace.id}>
@@ -918,187 +905,233 @@ function CalendarScope({
                   <Palette
                     key={`${item.kind}:${item.id}`}
                     item={item}
-                    schedule={() => openNew(item)}
+                    open={() => {
+                      if (
+                        !suppressClick.current &&
+                        session.getSnapshot().phase === "ready"
+                      )
+                        context.openEntity({
+                          kind: item.kind === "project" ? "projects" : "tasks",
+                          workspaceId: item.workspaceId,
+                          record: item.record,
+                        });
+                    }}
                   />
                 ))}
               </div>
             ))}
           </div>
-          <div className="hidden min-w-0 lg:block">
-            <FullCalendar
-              key={`${day}:${view}:${zone}`}
-              plugins={[timeGrid, interaction, luxonPlugin]}
-              initialView={view === "week" ? "timeGridWeek" : "timeGridDay"}
-              initialDate={day}
-              firstDay={1}
-              timeZone={zone}
-              fixedMirrorParent={document.querySelector<HTMLElement>(
-                "[data-session-state]",
-              )!}
-              dateClick={(info) => {
-                if (!suppressClick.current)
-                  openNew(
-                    undefined,
-                    DateTime.fromJSDate(info.date)
-                      .setZone(zone)
-                      .toFormat("yyyy-MM-dd'T'HH:mm"),
+          <div className="order-1 min-w-0 overflow-x-auto overscroll-x-contain lg:order-none">
+            <div
+              className={
+                view === "week" ? "min-w-[42rem] lg:min-w-0" : "min-w-0"
+              }
+            >
+              <FullCalendar
+                key={`${day}:${view}:${zone}`}
+                plugins={[timeGrid, interaction, luxonPlugin]}
+                initialView={view === "week" ? "timeGridWeek" : "timeGridDay"}
+                initialDate={day}
+                firstDay={1}
+                timeZone={zone}
+                fixedMirrorParent={document.querySelector<HTMLElement>(
+                  "[data-session-state]",
+                )!}
+                dateClick={(info) => {
+                  if (
+                    !suppressClick.current &&
+                    session.getSnapshot().phase === "ready"
+                  )
+                    openNew(
+                      undefined,
+                      DateTime.fromJSDate(info.date)
+                        .setZone(zone)
+                        .toFormat("yyyy-MM-dd'T'HH:mm"),
+                    );
+                }}
+                eventDidMount={(info) => {
+                  info.el.dataset.calendarBlockId = info.event.id;
+                }}
+                headerToolbar={false}
+                allDaySlot={false}
+                height="max(380px, min(70vh, 650px))"
+                eventLongPressDelay={600000}
+                slotMinTime="00:00:00"
+                scrollTime="09:00:00"
+                snapDuration="00:15:00"
+                editable
+                eventDragStop={() => {
+                  gestureActive.current = false;
+                  if (canceledGesture.current)
+                    setNotice("Gesture canceled. No change was saved.");
+                }}
+                eventResizeStop={() => {
+                  gestureActive.current = false;
+                  if (canceledGesture.current)
+                    setNotice("Gesture canceled. No change was saved.");
+                }}
+                eventDragStart={() => {
+                  canceledGesture.current = false;
+                  gestureActive.current = true;
+                  suppressClick.current = true;
+                }}
+                eventResizeStart={() => {
+                  canceledGesture.current = false;
+                  gestureActive.current = true;
+                  suppressClick.current = true;
+                }}
+                eventDragMinDistance={8}
+                eventDurationEditable
+                eventResizableFromStart
+                events={all.map((block) => ({
+                  id: block.id,
+                  title: block.label,
+                  start: block.startAt,
+                  end: block.endAt,
+                  editable:
+                    !savingKeys.includes(`calendar:${block.id}`) &&
+                    !calendarDrafts[`${block.workspaceId}/blocks/${block.id}`]
+                      ?.dirty,
+                }))}
+                eventContent={(info) => {
+                  const block = all.find((value) => value.id === info.event.id);
+                  if (!block) return null;
+                  return (
+                    <BlockTarget
+                      block={block}
+                      surface="grid"
+                      title={`${info.timeText} ${block.label} · ${scopes.find((scope) => scope.workspace.id === block.workspaceId)?.workspace.name} · ${block.workInTrash ? "Work in Trash · " : ""}${block.project?.title ?? block.task?.title ?? "Empty block"}`}
+                    />
                   );
-              }}
-              eventDidMount={(info) => {
-                info.el.dataset.calendarBlockId = info.event.id;
-              }}
-              headerToolbar={false}
-              allDaySlot={false}
-              height={650}
-              slotMinTime="00:00:00"
-              scrollTime="09:00:00"
-              snapDuration="00:15:00"
-              editable
-              eventDragStart={() => {
-                canceledGesture.current = false;
-              }}
-              eventResizeStart={() => {
-                canceledGesture.current = false;
-              }}
-              eventDragMinDistance={8}
-              eventDurationEditable
-              eventResizableFromStart
-              events={all.map((block) => ({
-                id: block.id,
-                title: block.label,
-                start: block.startAt,
-                end: block.endAt,
-                editable:
-                  !savingKeys.includes(`calendar:${block.id}`) &&
-                  !calendarDrafts[`${block.workspaceId}/blocks/${block.id}`]
-                    ?.dirty,
-              }))}
-              eventContent={(info) => {
-                const block = all.find((value) => value.id === info.event.id);
-                if (!block) return null;
-                return (
-                  <BlockTarget
-                    block={block}
-                    surface="grid"
-                    title={`${info.timeText} ${block.label} · ${scopes.find((scope) => scope.workspace.id === block.workspaceId)?.workspace.name} · ${block.project?.title ?? block.task?.title ?? "Empty block"}`}
-                  />
-                );
-              }}
-              eventClick={(info) => {
-                if (!suppressClick.current) setEditing(info.event.id);
-              }}
-              eventDrop={(info) => {
-                if (
-                  canceledGesture.current ||
-                  !alive.current ||
-                  session.getSnapshot().phase !== "ready" ||
-                  document.querySelector("dialog[open]")
-                ) {
-                  info.revert();
-                  return;
-                }
-                const block = all.find((value) => value.id === info.event.id);
-                if (!block) {
-                  info.revert();
-                  return;
-                }
-                const start = DateTime.fromJSDate(info.event.start!).setZone(
-                  zone,
-                );
-                const end = start.plus({
-                  milliseconds:
-                    Date.parse(block.endAt) - Date.parse(block.startAt),
-                });
-                info.revert();
-                if (start.toMillis() === Date.parse(block.startAt)) return;
-                if (
-                  start.getPossibleOffsets().length > 1 ||
-                  end.getPossibleOffsets().length > 1
-                ) {
-                  retainGesture(
-                    block,
-                    {
-                      schedule: {
-                        startAt: start.toISO()!,
-                        endAt: end.toISO()!,
-                        timeZone: zone,
-                      },
-                    },
-                    undefined,
-                    true,
-                  );
-                  setError(
-                    "Ambiguous pointer time. Confirm occurrences explicitly in the editing form.",
-                  );
-                  return;
-                }
-                void gesture(block, {
-                  schedule: {
-                    startAt: start.toISO()!,
-                    endAt: end.toISO()!,
-                    timeZone: zone,
-                  },
-                });
-              }}
-              eventResize={(info) => {
-                if (
-                  canceledGesture.current ||
-                  !alive.current ||
-                  session.getSnapshot().phase !== "ready" ||
-                  document.querySelector("dialog[open]")
-                ) {
-                  info.revert();
-                  return;
-                }
-                const block = all.find((value) => value.id === info.event.id);
-                if (!block) {
-                  info.revert();
-                  return;
-                }
-                const start = DateTime.fromJSDate(info.event.start!).setZone(
+                }}
+                eventClick={(info) => {
+                  if (
+                    !suppressClick.current &&
+                    session.getSnapshot().phase === "ready" &&
+                    !savingKeys.includes(`calendar:${info.event.id}`)
+                  )
+                    setEditing(info.event.id);
+                }}
+                eventDrop={(info) => {
+                  if (
+                    canceledGesture.current ||
+                    !alive.current ||
+                    session.getSnapshot().phase !== "ready" ||
+                    document.querySelector("dialog[open]")
+                  ) {
+                    info.revert();
+                    return;
+                  }
+                  const block = all.find((value) => value.id === info.event.id);
+                  if (!block) {
+                    info.revert();
+                    return;
+                  }
+                  const start = DateTime.fromJSDate(info.event.start!).setZone(
                     zone,
-                  ),
-                  end = DateTime.fromJSDate(info.event.end!).setZone(zone);
-                info.revert();
-                if (
-                  start.toMillis() === Date.parse(block.startAt) &&
-                  end.toMillis() === Date.parse(block.endAt)
-                )
-                  return;
-                if (
-                  start.getPossibleOffsets().length > 1 ||
-                  end.getPossibleOffsets().length > 1
-                ) {
-                  retainGesture(
-                    block,
-                    {
-                      schedule: {
-                        startAt: start.toISO()!,
-                        endAt: end.toISO()!,
-                        timeZone: zone,
-                      },
-                    },
-                    undefined,
-                    true,
                   );
-                  setError("Ambiguous boundary. Confirm in the editing form.");
-                  return;
-                }
-                void gesture(block, {
-                  schedule: {
-                    startAt: start.toISO()!,
-                    endAt: end.toISO()!,
-                    timeZone: zone,
-                  },
-                });
-              }}
-            />
+                  const end = start.plus({
+                    milliseconds:
+                      Date.parse(block.endAt) - Date.parse(block.startAt),
+                  });
+                  info.revert();
+                  if (start.toMillis() === Date.parse(block.startAt)) return;
+                  if (
+                    start.getPossibleOffsets().length > 1 ||
+                    end.getPossibleOffsets().length > 1
+                  ) {
+                    retainGesture(
+                      block,
+                      {
+                        schedule: {
+                          startAt: start.toISO()!,
+                          endAt: end.toISO()!,
+                          timeZone: zone,
+                        },
+                      },
+                      undefined,
+                      true,
+                    );
+                    setError(
+                      "Ambiguous pointer time. Confirm occurrences explicitly in the editing form.",
+                    );
+                    return;
+                  }
+                  void gesture(block, {
+                    schedule: {
+                      startAt: start.toISO()!,
+                      endAt: end.toISO()!,
+                      timeZone: zone,
+                    },
+                  });
+                }}
+                eventResize={(info) => {
+                  if (
+                    canceledGesture.current ||
+                    !alive.current ||
+                    session.getSnapshot().phase !== "ready" ||
+                    document.querySelector("dialog[open]")
+                  ) {
+                    info.revert();
+                    return;
+                  }
+                  const block = all.find((value) => value.id === info.event.id);
+                  if (!block) {
+                    info.revert();
+                    return;
+                  }
+                  const start = DateTime.fromJSDate(info.event.start!).setZone(
+                      zone,
+                    ),
+                    end = DateTime.fromJSDate(info.event.end!).setZone(zone);
+                  info.revert();
+                  if (
+                    start.toMillis() === Date.parse(block.startAt) &&
+                    end.toMillis() === Date.parse(block.endAt)
+                  )
+                    return;
+                  if (
+                    start.getPossibleOffsets().length > 1 ||
+                    end.getPossibleOffsets().length > 1
+                  ) {
+                    retainGesture(
+                      block,
+                      {
+                        schedule: {
+                          startAt: start.toISO()!,
+                          endAt: end.toISO()!,
+                          timeZone: zone,
+                        },
+                      },
+                      undefined,
+                      true,
+                    );
+                    setError(
+                      "Ambiguous boundary. Confirm in the editing form.",
+                    );
+                    return;
+                  }
+                  void gesture(block, {
+                    schedule: {
+                      startAt: start.toISO()!,
+                      endAt: end.toISO()!,
+                      timeZone: zone,
+                    },
+                  });
+                }}
+              />
+            </div>
           </div>
         </div>
         <details open className="mt-6">
           <summary className="min-h-11 cursor-pointer text-xl font-semibold">
             Agenda and explicit controls
           </summary>
+          {!all.length && (
+            <p className="my-4">
+              No blocks in this range. Use New block to choose work and time.
+            </p>
+          )}
           {all
             .sort((a, b) => a.startAt.localeCompare(b.startAt))
             .map((block) => (
@@ -1106,6 +1139,17 @@ function CalendarScope({
                 key={block.id}
                 className="my-3 min-w-0 rounded border bg-white p-4"
               >
+                {block.workInTrash && (
+                  <p className="my-2 font-semibold">
+                    Work in Trash ·{" "}
+                    <Link
+                      className="underline"
+                      href={`/trash?workspaceId=${encodeURIComponent(block.workspaceId)}`}
+                    >
+                      Review workspace Trash / Restore
+                    </Link>
+                  </p>
+                )}
                 <BlockTarget
                   block={block}
                   surface="agenda"
@@ -1127,7 +1171,11 @@ function CalendarScope({
                   · {block.project?.title ?? block.task?.title ?? "Empty block"}{" "}
                   {block.task?.status ?? ""}
                 </p>
-                <button className={button} onClick={() => setEditing(block.id)}>
+                <button
+                  className={button}
+                  disabled={savingKeys.includes(`calendar:${block.id}`)}
+                  onClick={() => setEditing(block.id)}
+                >
                   Edit block: {block.label}
                 </button>
               </div>
@@ -1158,6 +1206,7 @@ function CalendarScope({
           <button
             type="button"
             key={key}
+            disabled={savingKeys.includes("calendar:" + key)}
             className={button + " my-3"}
             onClick={() => {
               setDestination(key.split("/")[0]);
@@ -1182,6 +1231,7 @@ function CalendarScope({
             <button
               type="button"
               key={draft.base!.id}
+              disabled={savingKeys.includes("calendar:" + draft.base!.id)}
               className={`${button} mr-2`}
               onClick={() => setEditing(draft.base!.id)}
             >
@@ -1252,7 +1302,7 @@ function CalendarScope({
     </div>
   );
 }
-function Palette({ item, schedule }: { item: Work; schedule: () => void }) {
+function Palette({ item, open }: { item: Work; open: () => void }) {
   const { setNodeRef, listeners, attributes, isDragging } = useDraggable({
     id: item.kind + ":" + item.id,
   });
@@ -1260,16 +1310,14 @@ function Palette({ item, schedule }: { item: Work; schedule: () => void }) {
     <div className="my-2 min-w-0 rounded border bg-white p-2">
       <button
         ref={setNodeRef}
+        onClick={open}
         {...listeners}
         {...attributes}
-        aria-label={"Drag " + item.kind + ": " + item.title}
+        aria-label={"Edit " + item.kind + ": " + item.title}
         className={button + " w-full break-words text-left"}
         style={{ opacity: isDragging ? 0.4 : 1 }}
       >
         {item.title} · {item.context}
-      </button>
-      <button type="button" className={button + " mt-1"} onClick={schedule}>
-        Schedule {item.title}
       </button>
     </div>
   );

@@ -96,7 +96,7 @@ async function staleAssignment(
     );
     await showGridTime(page, "12:00:00");
     const source = (await page
-      .getByRole("button", { name: "Drag project: Race project", exact: true })
+      .getByRole("button", { name: "Edit project: Race project", exact: true })
       .boundingBox())!;
     const target = (await event.boundingBox())!;
     await drag(
@@ -453,7 +453,7 @@ test("calendar pointer move/resize persist duration while no-op, canceled and to
   await open(page);
   if (isMobile) {
     await expect(page.getByLabel("View", { exact: true })).toHaveValue("day");
-    const agendaLabel = page.locator(`[data-block-id="${block.id}"]:visible`);
+    const agendaLabel = page.locator(`.fc [data-block-id="${block.id}"]`);
     await agendaLabel.scrollIntoViewIfNeeded();
     const agendaBox = (await agendaLabel.boundingBox())!;
     const touchX = agendaBox.x + agendaBox.width / 2,
@@ -681,7 +681,7 @@ test("calendar overlays retain uncertain create/delete intents, dirty input and 
       await route.abort("failed");
     } else await route.continue();
   });
-  await edit.getByRole("button", { name: "Remove block", exact: true }).click();
+  await edit.getByRole("button", { name: /^Remove time block:/ }).click();
   await edit
     .getByRole("button", { name: "Confirm removal", exact: true })
     .click();
@@ -782,14 +782,11 @@ test("work drops distinguish original-block assignment, foreground rejection and
     .getByRole("button", { name: "Apply calendar preferences", exact: true })
     .click();
   if (isMobile) {
-    await page.getByText("Schedule work with buttons", { exact: true }).click();
-    await page
-      .getByRole("button", {
-        name: "Schedule task: Schedule task",
-        exact: true,
-      })
-      .tap();
+    await page.getByRole("button", { name: "New block", exact: true }).tap();
     const form = createForm(page);
+    await form.getByLabel("Assigned work", { exact: true }).selectOption(`task:${task.id}`);
+    await form.getByLabel("Start time", { exact: true }).fill("2030-06-03T12:00");
+    await form.getByLabel("End time", { exact: true }).fill("2030-06-03T13:00");
     await expect(form.getByLabel("Assigned work", { exact: true })).toHaveValue(
       `task:${task.id}`,
     );
@@ -802,7 +799,7 @@ test("work drops distinguish original-block assignment, foreground rejection and
     const grid = page.locator(".fc");
     await grid.scrollIntoViewIfNeeded();
     const palette = page.getByRole("button", {
-      name: "Drag project: Schedule project",
+      name: "Edit project: Schedule project",
       exact: true,
     });
     const targetEvent = grid.locator(
@@ -848,7 +845,7 @@ test("work drops distinguish original-block assignment, foreground rejection and
       .locator('.fc-timegrid-slot-lane[data-time="10:00:00"]')
       .boundingBox())!;
     const next = (await page
-      .getByRole("button", { name: "Drag task: Schedule task", exact: true })
+      .getByRole("button", { name: "Edit task: Schedule task", exact: true })
       .boundingBox())!;
     await drag(
       page,

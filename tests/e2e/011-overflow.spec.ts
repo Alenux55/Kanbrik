@@ -18,7 +18,7 @@ test("palette drag keeps scroll bounds stable", async ({ page, isMobile }) => {
   const before = await dims();
   const box = (await page
     .getByRole("button", {
-      name: "Drag project: Overflow reproduction",
+      name: "Edit project: Overflow reproduction",
       exact: true,
     })
     .boundingBox())!;
@@ -35,7 +35,7 @@ test("palette drag keeps scroll bounds stable", async ({ page, isMobile }) => {
   // outside the palette's scroller.
   const source = (await page
     .getByRole("button", {
-      name: "Drag project: Overflow reproduction",
+      name: "Edit project: Overflow reproduction",
       exact: true,
     })
     .boundingBox())!;

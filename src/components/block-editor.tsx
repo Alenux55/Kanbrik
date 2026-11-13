@@ -15,6 +15,7 @@ import {
 import type { BlockRecord, editBlockInput } from "@/lib/calendar-contracts";
 import type { z } from "zod";
 import type { Work } from "./calendar";
+import Link from "next/link";
 type BlockChanges = z.infer<typeof editBlockInput>["changes"];
 export function BlockEditor({
   workspaceId,
@@ -79,6 +80,16 @@ export function BlockEditor({
   const conflict = draft.conflict;
   const [confirm, setConfirm] = useState(false);
   const pending = savingKeys.includes(`calendar:${record?.id ?? key}`);
+  const retainedAssignment = record?.projectId
+    ? `project:${record.projectId}`
+    : record?.taskId
+      ? `task:${record.taskId}`
+      : "";
+  const missingAssignment =
+    !!draft.assignment &&
+    !work.some((item) => `${item.kind}:${item.id}` === draft.assignment);
+  const unavailableAssignment =
+    missingAssignment && draft.assignment !== retainedAssignment;
   const startOptions = wallOptions(draft.start, draft.zone),
     endOptions = wallOptions(draft.end, draft.zone);
   const original = draft.base ? blockDraft(draft.base, draft.zone) : null;
@@ -362,6 +373,17 @@ export function BlockEditor({
               onChange={(event) => change({ assignment: event.target.value })}
             >
               <option value="">Empty block (unassigned)</option>
+              {draft.assignment &&
+                !work.some(
+                  (item) => `${item.kind}:${item.id}` === draft.assignment,
+                ) && (
+                  <option value={draft.assignment}>
+                    {record?.workInTrash &&
+                    draft.assignment === retainedAssignment
+                      ? "Work in Trash (retained reference)"
+                      : "Unavailable work — choose active work or Restore"}
+                  </option>
+                )}
               {work.map((item) => (
                 <option
                   key={`${item.kind}:${item.id}`}
@@ -372,6 +394,22 @@ export function BlockEditor({
               ))}
             </select>
           </label>
+          {(record?.workInTrash || missingAssignment) && (
+            <p role="status">
+              {record?.workInTrash
+                ? "Work in Trash. You can keep its reference while editing this existing interval, clear the assignment, or Remove this time block."
+                : unavailableAssignment
+                  ? "This proposed assignment is unavailable. Choose active work or restore it first."
+                  : "Referenced work is not active in this picker. You can retain this existing reference, clear it, or review workspace Trash."}{" "}
+              <Link
+                className="underline"
+                href={`/trash?workspaceId=${encodeURIComponent(workspaceId)}`}
+              >
+                Review workspace Trash / Restore
+              </Link>
+              .
+            </p>
+          )}
         </fieldset>
         {work
           .filter((item) => `${item.kind}:${item.id}` === draft.assignment)
@@ -403,6 +441,7 @@ export function BlockEditor({
               pending ||
               !!conflict ||
               pickerFailed ||
+              (unavailableAssignment && draft.uncertain !== "create") ||
               draft.uncertain === "delete"
             }
           >
@@ -413,16 +452,18 @@ export function BlockEditor({
               className={button}
               disabled={pending}
               type="button"
+              aria-label={`Remove time block: ${record.label}`}
               onClick={() => setConfirm(true)}
             >
-              Remove block
+              Remove
             </button>
           )}
         </div>
         {(confirm || draft.uncertain === "delete") && (
           <div role="alert">
             <p className="break-words">
-              Remove block “{record!.label}”? Only this block is removed.
+              Remove time block “{record!.label}”? Only this time block is
+              removed. The task or project and its other blocks are kept.
             </p>
             <button
               className={button}

@@ -14,6 +14,7 @@ export function Navigation() {
     >
       {[
         ...sections,
+        { slug: "trash", label: "Trash" },
         { slug: "workspaces", label: "Workspaces" },
         { slug: "settings", label: "User settings" },
       ].map((section) => {

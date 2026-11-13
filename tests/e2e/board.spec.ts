@@ -202,15 +202,11 @@ test("compact cards use stable project colors, whole-card mouse dragging and tou
   await expect(
     page.getByText("Matching tasks: 2 of 3 total.", { exact: false }),
   ).toBeVisible();
-  if (isMobile)
-    await page.getByRole("button", { name: "Blocked (1)", exact: true }).tap();
+  if (isMobile) await page.getByRole("region", { name: "Blocked column", exact: true }).scrollIntoViewIfNeeded();
   await expect(
     page.getByRole("article", { name: "Subtask card", exact: true }),
   ).toContainText("Subtask of Parent card");
-  if (isMobile)
-    await page
-      .getByRole("button", { name: "In progress (1)", exact: true })
-      .tap();
+  if (isMobile) await card.scrollIntoViewIfNeeded();
   expect(
     await card
       .getByRole("button")

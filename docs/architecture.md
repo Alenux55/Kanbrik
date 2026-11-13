@@ -174,6 +174,22 @@ Personal work uses a one-member private workspace, not a separate task model. Th
 
 ## Ownership and authorization
 
+### Reversible lifecycle (task 013)
+
+Task 013 adds nullable deletedAt/trashBatchId to the canonical Project/Task rows and a workspace-owned TrashBatch containing the exact IDs and post-move revisions. Project moves include currently active tasks/subtasks; root-task moves include active subtasks. Previously trashed descendants retain separate batches. Active reads, details, status/content changes, creation parents and new Calendar assignments enforce active ancestors. Deferred database checks reject active work underneath trashed ancestors. Missing work causes a separate workspace-access check; it does not imply membership revocation.
+
+Every Trash read/preview/move/restore uses the existing identity/account/Origin boundary and workspace lock/recheck. Preview returns counts and a digest of target/subtree/ancestor and linked-block revisions. Move requires that digest and a stable UUID operation key; changed impact returns 409 without expanding the confirmed group. Restore checks exact members/revisions and required external ancestors, returning a prerequisite batch on conflict. The original batch revision reconciles a lost Restore response. Replaying an already completed operation acknowledges that original action without undoing later Trash operations. No purge, expiration, ownership transfer or new role is added.
+
+Existing scheduled blocks and create-intent ledgers are untouched by Trash/Restore. Blocks expose Work in Trash metadata and retain IDs, intervals and work references. Existing reference retention, assignment clearing and block removal remain allowed; new assignments to trashed work fail. Restore neither recreates removed blocks nor overwrites reassignment. Confirmed moves retire only affected canonical drafts and new drafts under affected ancestors; unrelated work, prior separate batches and Calendar drafts remain. Operation intents/locks live in the account-scoped provider and use existing lease guards. Full reload/sign-out loses memory-only input.
+
+The mobile Calendar now renders a day time grid by default; desktop initially uses week. Explicit view choices survive resizing; narrow week overflow stays inside the grid. Board presents all fixed statuses in one horizontal region below the desktop breakpoint. Work-card activation edits canonical work; mouse dragging schedules, while New block/work selection supplies keyboard/touch scheduling. Gesture draft retention is independent of editor mounting: pending, successful, failed and ambiguous gestures never auto-open an editor. Recovery requires explicit Review; residual gesture clicks are suppressed until a new intentional pointer/key activation. Calendar Remove deletes only its block after confirmation.
+
+### Planned comments and history (task 014; not implemented)
+
+Planned [task 014 comments/history](tasks/014-comments-and-edit-history.md), after task 013 review, adds workspace-scoped comments referencing canonical work and append-only activity generated transactionally with tracked mutations. The specification requires server identity/timestamps, independent comment revisions/idempotent creates, current membership for history reads, exact before/after data and retained records through Trash/Restore. It must integrate all mutation entry points (including Board status and lifecycle actions), not only editor saves. No comment/history schema, API or activity backfill exists yet; the task documents recommended author-only comment editing and no fabricated past history.
+
+### Existing ownership boundary
+
 - Every domain record has a workspace ID. Check membership on the server for all reads/writes, lists/searches, nested content, relationship changes, and membership management.
 - Relations/constraints reject inconsistent ownership: tasks and their projects/parents share a workspace; assigned blocks reference work in their own workspace.
 - Requested workspace filters are intersected with authorized scope or rejected if invalid. Client selection alone never grants access.

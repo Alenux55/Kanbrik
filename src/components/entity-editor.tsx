@@ -8,6 +8,8 @@ import { usePlannerContext } from "./planner-context";
 import { EditorDialog } from "./ui/editor-dialog";
 import { button, control } from "./ui/planner-controls";
 import { matchesBoard } from "@/lib/board-filters";
+import { TrashAction, trashMoveKey } from "./trash-action";
+import Link from "next/link";
 export type EntityTarget = {
   kind: "projects" | "tasks";
   workspaceId: string;
@@ -26,8 +28,16 @@ export function EntityEditor({
   const session = usePlannerSession();
   const [lease] = useState(session.capture);
   const context = usePlannerContext();
-  const { drafts, setDrafts, savingKeys, beginSave, finishSave, boardFilters } =
-    usePlanningDrafts();
+  const {
+    drafts,
+    setDrafts,
+    savingKeys,
+    beginSave,
+    finishSave,
+    boardFilters,
+    trashMoves,
+    setTrashMoves,
+  } = usePlanningDrafts();
   const key =
     workspaceId +
     "/" +
@@ -48,7 +58,10 @@ export function EntityEditor({
         : (target.projectId ?? null),
   };
   const draft = drafts[key] ?? initial;
-  const pending = savingKeys.includes(key);
+  const moveKey = record ? trashMoveKey(target) : "";
+  const pending =
+    savingKeys.includes(key) || savingKeys.includes("trash:" + moveKey);
+  const [unavailable, setUnavailable] = useState(false);
   const conflict = draft.conflict;
   const [data, setData] = useState<{
     projects: ProjectRecord[];
@@ -69,7 +82,13 @@ export function EntityEditor({
       .then(async (responses) => {
         if (!active || !alive.current || !session.isCurrent(lease)) return;
         if (responses.some((r) => r.status === 404)) {
-          context.revoke(workspaceId);
+          const access = await session.fetch(`/api/workspaces/${workspaceId}`);
+          if (!active || !alive.current || !session.isCurrent(lease)) return;
+          if (access.status === 404) context.revoke(workspaceId);
+          else
+            setContextError(
+              "Workspace context could not be checked. Your input is kept; retry editor context.",
+            );
           return;
         }
         if (responses.some((r) => !r.ok)) throw new Error();
@@ -78,6 +97,12 @@ export function EntityEditor({
         );
         if (active && alive.current && session.isCurrent(lease)) {
           setData({ projects, tasks });
+          setUnavailable(
+            !!record &&
+              !(kind === "projects" ? projects : tasks).some(
+                (item: ProjectRecord) => item.id === record.id,
+              ),
+          );
           setContextError("");
         }
       })
@@ -107,8 +132,17 @@ export function EntityEditor({
       return next;
     });
   }
+  function discardEditor() {
+    discard();
+    if (record)
+      setTrashMoves((current) => {
+        const next = { ...current };
+        delete next[moveKey];
+        return next;
+      });
+  }
   async function save() {
-    if (conflict || !data || !beginSave(key)) return;
+    if (conflict || unavailable || pending || !data || !beginSave(key)) return;
     let committed = false;
     setError("");
     change({ uncertain: !record });
@@ -164,6 +198,7 @@ export function EntityEditor({
             ? "Record unavailable. Your input and unrelated drafts are retained."
             : "Save unconfirmed; workspace access could not be checked.",
         );
+        if (access.ok) setUnavailable(true);
         return;
       }
       if (response.status === 409)
@@ -195,9 +230,9 @@ export function EntityEditor({
   return (
     <EditorDialog
       title={heading}
-      dirty={draft.dirty}
+      dirty={draft.dirty || !!trashMoves[moveKey]}
       pending={pending}
-      discard={discard}
+      discard={discardEditor}
       close={close}
       focusAfterClose={() =>
         filteredOut.current ? document.getElementById("main-content") : null
@@ -254,7 +289,23 @@ export function EntityEditor({
             discarding input does not undo a committed request.
           </p>
         )}
-        <fieldset disabled={pending} className="min-w-0 space-y-4">
+        {unavailable && (
+          <p role="alert">
+            This work is in Trash or unavailable. Your input and unrelated
+            drafts are retained.{" "}
+            <Link
+              className="underline"
+              href={`/trash?workspaceId=${encodeURIComponent(workspaceId)}`}
+            >
+              Review workspace Trash
+            </Link>
+            .
+          </p>
+        )}
+        <fieldset
+          disabled={pending || unavailable}
+          className="min-w-0 space-y-4"
+        >
           <label className="block">
             Title
             <input
@@ -378,6 +429,7 @@ export function EntityEditor({
           </section>
         )}
       </form>
+      {record && <TrashAction target={target} close={close} />}
     </EditorDialog>
   );
 }

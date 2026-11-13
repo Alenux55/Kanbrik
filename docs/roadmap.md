@@ -2,7 +2,9 @@
 
 Tasks 001–009 implement the foundation, accounts/recovery, personal/shared access, project/task planning, corrected cross-tab verification, Kanban and Calendar. The Calendar correction passed coordinator re-review at `da206b5`. Task 010 adds the owner's requested HTTPS preview signup/configuration support; actual server/proxy setup remains owner-operated. See handoffs for exact evidence and limits. This sequence is a proposal and may change with product decisions.
 
-The committed application baseline is `75f678e`: [011 review corrections](tasks/011-review-fixes.md), independently re-reviewed without actionable findings and preserving reviewed task 012 invitations. Both original P2 findings are closed. The implementer's full browser run passed 69 cases with one intentional skip; the coordinator separately passed 94 backend checks and 17 focused browser cases with one intentional skip. Task [011 completion](tasks/011-implementation.md) and [012's review record](tasks/012-account-invitations.md) preserve their separate evidence and limits. UTC instants remain authoritative; server location is irrelevant.
+The reviewed planner baseline is `75f678e`: [011 review corrections](tasks/011-review-fixes.md), independently re-reviewed without actionable findings and preserving reviewed task 012 invitations. Both original P2 findings are closed. The implementer's full browser run passed 69 cases with one intentional skip; the coordinator separately passed 94 backend checks and 17 focused browser cases with one intentional skip. Task [011 completion](tasks/011-implementation.md) and [012's review record](tasks/012-account-invitations.md) preserve their separate evidence and limits. UTC instants remain authoritative; server location is irrelevant.
+
+Current checkout `ac30934` adds the independently reviewed development-hostname allowance. Next is [013: mobile planner and Trash](tasks/013-mobile-planner-and-trash.md), an implemented and verified change awaiting independent review for mobile Calendar visibility, scrolling Board columns, distinct block removal, reversible project/task/subtask deletion, click-to-edit work cards and direct scheduling without an automatic editor after gestures. After its review, [014: comments and edit history](tasks/014-comments-and-edit-history.md) adds the owner's requested work-item discussion/activity with comment timestamps. These precede everyday capture; they do not reopen the closed task 011 findings.
 
 | Phase | Outcome | Evidence required for completion |
 | --- | --- | --- |
@@ -23,6 +25,10 @@ The committed application baseline is `75f678e`: [011 review corrections](tasks/
 - Keep unselected product defaults visible. A roadmap entry does not settle an open question in `product.md`.
 
 ## Implementation handoffs
+
+- [013: mobile planner and Trash](tasks/013-mobile-planner-and-trash.md): implemented and verified from `ac30934`, with coordinator review pending (106 backend passes; final full browser run 85 passes / 3 intentional skips). Owner-confirmed contained-work deletion is reversible; recommended mobile and scheduled-block preservation defaults are documented as implementation choices. No deployment performed.
+
+- [014: comments and edit history](tasks/014-comments-and-edit-history.md): specified after reviewed task 013, covering projects/tasks/subtasks, original/edited comment timestamps and transactionally recorded changes. Scope and recommended permissions are explicit; not implemented.
 
 - [012: account invitations](tasks/012-account-invitations.md): implemented at `1d93128` and independently reviewed without new actionable findings; administrator allowlist and expiring email links grant account signup only. The original invitation review used focused account checks on desktop/Android; latest integrated verification and independent correction re-review are in the task 011 correction record.
 

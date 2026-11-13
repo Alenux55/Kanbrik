@@ -46,8 +46,16 @@ export function PlannerContext({
   const [notice, setNotice] = useState("");
   const [epoch, setEpoch] = useState(0);
   const [target, setTarget] = useState<EntityTarget | null>(null);
-  const { drafts, calendarDrafts, setDrafts, setCalendarDrafts } =
-    usePlanningDrafts();
+  const {
+    drafts,
+    calendarDrafts,
+    setDrafts,
+    setCalendarDrafts,
+    trashMoves,
+    setTrashMoves,
+    trashRestores,
+    setTrashRestores,
+  } = usePlanningDrafts();
   useEffect(() => {
     const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     if (validZone(zone)) queueMicrotask(() => setDetected(zone));
@@ -127,6 +135,20 @@ export function PlannerContext({
       ),
     );
     setTarget((current) => (current?.workspaceId === id ? null : current));
+    setTrashMoves((current) =>
+      Object.fromEntries(
+        Object.entries(current).filter(
+          ([, intent]) => intent.target.workspaceId !== id,
+        ),
+      ),
+    );
+    setTrashRestores((current) =>
+      Object.fromEntries(
+        Object.entries(current).filter(
+          ([, intent]) => intent.workspaceId !== id,
+        ),
+      ),
+    );
   }
   return (
     <Context.Provider
@@ -143,6 +165,37 @@ export function PlannerContext({
       }}
     >
       {children}
+      {Object.entries(trashMoves)
+        .filter(([, intent]) =>
+          prefs.workspaces.some((w) => w.id === intent.target.workspaceId),
+        )
+        .map(([key, intent]) => (
+          <p key={key} className="m-4 rounded border bg-amber-50 p-3">
+            Retained Trash action for {intent.impact.title}.{" "}
+            <button
+              type="button"
+              className={button}
+              onClick={() => setTarget(intent.target)}
+            >
+              Review Trash action: {intent.impact.title}
+            </button>
+          </p>
+        ))}
+      {Object.entries(trashRestores)
+        .filter(([, intent]) =>
+          prefs.workspaces.some((w) => w.id === intent.workspaceId),
+        )
+        .map(([key, intent]) => (
+          <p key={key} className="m-4 rounded border bg-amber-50 p-3">
+            Restore is unconfirmed for {intent.batch.rootTitle}.{" "}
+            <Link
+              className="underline"
+              href={`/trash?workspaceId=${encodeURIComponent(intent.workspaceId)}`}
+            >
+              Review Restore in Trash
+            </Link>
+          </p>
+        ))}
       {notice && (
         <p
           role="status"
