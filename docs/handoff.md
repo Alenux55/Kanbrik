@@ -1,6 +1,8 @@
-# Coordinator handoff — 2026-11-09
+# Coordinator handoff — 2026-11-13
 
 ## Current state
+
+Operational follow-up from `2faa0af`: the owner reported Next dev rejecting `kanbrik.spurious-emissions.com` for `/_next/hmr`. The staged configuration now allows that exact development hostname; README and [task 010 follow-up](tasks/010-https-preview.md#development-hostname-follow-up--2026-11-13) record startup guidance, actual lint/types and real loopback upgrade/rejection checks. This does not change application auth/registration or deploy to Ubuntu. The live session-check hang remains undiagnosed until the owner supplies the account-probe result or verifies recovery after restart; HMR evidence alone is not a session diagnosis. The committed/reviewed application baseline below is preserved.
 
 The latest implementation is [task 011 review corrections](tasks/011-review-fixes.md), committed as `75f678e` from `84037c2`. Independent coordinator re-review on 2026-11-09 found no actionable defects and closed both original P2 findings. Lint/types, schema validation, guarded migration status, Webpack build, **94 backend checks** and **17 focused browser cases with one intentional Android skip** passed. Four isolated history-helper lifecycle checks also passed. The corrected baseline is suitable for the next separately assigned feature; no deployment or live provider change is included.
 

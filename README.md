@@ -123,6 +123,10 @@ Refresh [http://127.0.0.1:3005](http://127.0.0.1:3005) on your own computer. Thi
 
 ### Share the preview through your HTTPS reverse proxy
 
+For the shared HTTPS preview, use the **build/start** sequence below. The earlier `dev` commands are the development workflow. If intentionally using hot reload through `kanbrik.spurious-emissions.com`, start with `npm run dev -- --webpack --hostname 10.0.0.95 --port 3005`. `next.config.ts` explicitly allows that development hostname; other custom domains need their own exact entries in `allowedDevOrigins` (hostname only). Restart after configuration changes. The proxy must also forward WebSocket upgrades for hot reload. This setting permits development resources only; account/session trusted Origins still come from `BETTER_AUTH_URL`.
+
+The `Blocked cross-origin request ... /_next/hmr` warning identifies a blocked development connection. A stuck **Checking your session** screen also needs the browser's `/api/planner-session` request checked; the HMR warning alone does not establish its cause. A root `307` redirect is expected, and a missing `favicon.ico` is cosmetic.
+
 For the owner's LAN/VPN server at **10.0.0.95**, point your chosen subdomain's DNS at the server as appropriate for that network. Configure your existing proxy to terminate HTTPS and forward to **http://10.0.0.95:3005**. Preserve the original Host and set the usual forwarded host/protocol headers. If the proxy runs directly on this Ubuntu host, it can instead forward to **http://127.0.0.1:3005** and the app can keep its default loopback binding. A proxy in another container/machine needs an upstream address it can actually reach.
 
 In **Nginx Proxy Manager**, the Proxy Host's destination scheme is **http**, Forward Hostname/IP is **10.0.0.95**, and Forward Port is **3005**. In its SSL tab, select/request the subdomain's certificate and enable **Force SSL**. The browser connects to the proxy over HTTPS; the proxy-to-app connection stays HTTP. This uses [NPM's SSL termination](https://nginxproxymanager.com/guide/); choosing HTTPS as the destination would require the upstream app itself to serve TLS.
