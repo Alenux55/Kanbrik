@@ -1,6 +1,6 @@
 # 014: Work-item comments and edit history
 
-Status: Ready as the next specification after task 013 integration/review. Owner-requested on 2026-11-13; not implemented. Current source baseline is `ac30934`; implement against the eventual reviewed task 013 commit, not an older checkout that omits Trash or Calendar fixes.
+Status: Specification only; runtime implementation waits for independent re-review of [task 013's navigation correction](013-review-fixes.md). Owner-requested on 2026-11-13; not implemented. Task 013 is committed as `e4f7bfb`; its focused correction is implemented and verified in staged changes, awaiting coordinator approval. Implement this feature against that eventual corrected/reviewed successor, not an older checkout that omits Trash or Calendar fixes.
 
 ## Outcome
 

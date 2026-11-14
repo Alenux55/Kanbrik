@@ -5,11 +5,10 @@ import { taskStatusIds, taskStatusLabels } from "@/lib/task-statuses";
 import { usePlannerSession } from "./planner-session";
 import { usePlanningDrafts, type PlanningDraft } from "./planning-drafts";
 import { usePlannerContext } from "./planner-context";
-import { EditorDialog } from "./ui/editor-dialog";
+import { EditorDialog, EditorNavigationLink } from "./ui/editor-dialog";
 import { button, control } from "./ui/planner-controls";
 import { matchesBoard } from "@/lib/board-filters";
 import { TrashAction, trashMoveKey } from "./trash-action";
-import Link from "next/link";
 export type EntityTarget = {
   kind: "projects" | "tasks";
   workspaceId: string;
@@ -293,12 +292,12 @@ export function EntityEditor({
           <p role="alert">
             This work is in Trash or unavailable. Your input and unrelated
             drafts are retained.{" "}
-            <Link
+            <EditorNavigationLink
               className="underline"
               href={`/trash?workspaceId=${encodeURIComponent(workspaceId)}`}
             >
               Review workspace Trash
-            </Link>
+            </EditorNavigationLink>
             .
           </p>
         )}

@@ -730,7 +730,7 @@ test("a collaborator's Trash does not revoke workspace access or erase unrelated
     await page
       .getByRole("link", { name: "Open workspace Trash", exact: true })
       .click();
-    await retained(page);
+    await closedEditor(page);
     await expect(
       page.getByLabel("Trash workspace", { exact: true }),
     ).toHaveValue(own.id);

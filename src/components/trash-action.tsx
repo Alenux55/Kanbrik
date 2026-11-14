@@ -1,5 +1,5 @@
 "use client";
-import Link from "next/link";
+import { EditorNavigationLink } from "./ui/editor-dialog";
 import { useEffect, useRef, useState } from "react";
 import type { EntityTarget } from "./entity-editor";
 import { usePlanningDrafts } from "./planning-drafts";
@@ -243,12 +243,12 @@ export function TrashAction({
       )}
       {error && <p role="alert">{error}</p>}
       {!blocked && (
-        <Link
+        <EditorNavigationLink
           className="inline-flex min-h-12 items-center underline"
           href={`/trash?workspaceId=${encodeURIComponent(target.workspaceId)}`}
         >
           Open workspace Trash
-        </Link>
+        </EditorNavigationLink>
       )}
     </section>
   );

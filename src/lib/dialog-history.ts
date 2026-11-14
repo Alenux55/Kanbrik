@@ -6,7 +6,9 @@ let traversal: Promise<void> | undefined;
 
 function traverse(delta: -1 | 1) {
   let finish!: () => void;
-  const result = new Promise<void>(resolve => { finish = resolve; });
+  const result = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
   traversal = result;
   const settled = () => {
     window.removeEventListener("popstate", settled);
@@ -34,7 +36,13 @@ export function ownDialogHistory(
     if (back()) void traverse(1);
   };
   const install = () => {
-    if (owner !== mine || !mine.active || !currentAccount() || window.location.href !== mine.url) return;
+    if (
+      owner !== mine ||
+      !mine.active ||
+      !currentAccount() ||
+      window.location.href !== mine.url
+    )
+      return;
     const state = { ...window.history.state, kanbrikDialog: token };
     if (typeof window.history.state?.kanbrikDialog === "string") {
       // A same-commit editor handoff/Strict Mode replay takes over the existing
@@ -48,21 +56,32 @@ export function ownDialogHistory(
   if (traversal) void traversal.then(install);
   else install();
 
+  let released: Promise<void> | undefined;
   return () => {
+    if (released) return released;
     mine.active = false;
     window.removeEventListener("popstate", pop);
-    const remove = () => {
+    const remove = async () => {
       if (owner !== mine) return;
       owner = undefined;
-      if (!currentAccount() || window.location.href !== mine.url || window.history.state?.kanbrikDialog !== token) return;
+      if (
+        !currentAccount() ||
+        window.location.href !== mine.url ||
+        window.history.state?.kanbrikDialog !== token
+      )
+        return;
       // Native Back already consumed the entry, so only an ordinary close/save
       // still on our marker traverses once. Never strip Next's routing state.
-      void traverse(-1);
+      await traverse(-1);
     };
     // Let an immediate replacement/effect replay claim this slot first.
-    queueMicrotask(() => {
-      if (traversal) void traversal.then(remove);
-      else remove();
+    released = new Promise<void>((resolve) => {
+      queueMicrotask(async () => {
+        if (traversal) await traversal;
+        await remove();
+        resolve();
+      });
     });
+    return released;
   };
 }

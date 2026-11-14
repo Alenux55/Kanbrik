@@ -4,7 +4,7 @@ Tasks 001–009 implement the foundation, accounts/recovery, personal/shared acc
 
 The reviewed planner baseline is `75f678e`: [011 review corrections](tasks/011-review-fixes.md), independently re-reviewed without actionable findings and preserving reviewed task 012 invitations. Both original P2 findings are closed. The implementer's full browser run passed 69 cases with one intentional skip; the coordinator separately passed 94 backend checks and 17 focused browser cases with one intentional skip. Task [011 completion](tasks/011-implementation.md) and [012's review record](tasks/012-account-invitations.md) preserve their separate evidence and limits. UTC instants remain authoritative; server location is irrelevant.
 
-Current checkout `ac30934` adds the independently reviewed development-hostname allowance. Next is [013: mobile planner and Trash](tasks/013-mobile-planner-and-trash.md), an implemented and verified change awaiting independent review for mobile Calendar visibility, scrolling Board columns, distinct block removal, reversible project/task/subtask deletion, click-to-edit work cards and direct scheduling without an automatic editor after gestures. After its review, [014: comments and edit history](tasks/014-comments-and-edit-history.md) adds the owner's requested work-item discussion/activity with comment timestamps. These precede everyday capture; they do not reopen the closed task 011 findings.
+Base `e4f7bfb` implements [013: mobile planner and Trash](tasks/013-mobile-planner-and-trash.md). Its [P2 navigation correction](tasks/013-review-fixes.md) is now implemented and verified in staged changes: final full browser run 93 passes / three intentional skips, zero failures. Independent correction re-review remains pending before [014: comments and edit history](tasks/014-comments-and-edit-history.md). These precede everyday capture and do not reopen the closed task 011 findings.
 
 | Phase | Outcome | Evidence required for completion |
 | --- | --- | --- |
@@ -26,7 +26,7 @@ Current checkout `ac30934` adds the independently reviewed development-hostname 
 
 ## Implementation handoffs
 
-- [013: mobile planner and Trash](tasks/013-mobile-planner-and-trash.md): implemented and verified from `ac30934`, with coordinator review pending (106 backend passes; final full browser run 85 passes / 3 intentional skips). Owner-confirmed contained-work deletion is reversible; recommended mobile and scheduled-block preservation defaults are documented as implementation choices. No deployment performed.
+- [013: mobile planner and Trash](tasks/013-mobile-planner-and-trash.md): committed as `e4f7bfb`; independent review passed 106 backend and 23 focused browser cases with three intentional skips, but found one P2 in Trash recovery navigation. The [correction](tasks/013-review-fixes.md) is now implemented/verified and staged (93 full browser passes / three intentional skips), awaiting independent re-review before task 014. No deployment performed.
 
 - [014: comments and edit history](tasks/014-comments-and-edit-history.md): specified after reviewed task 013, covering projects/tasks/subtasks, original/edited comment timestamps and transactionally recorded changes. Scope and recommended permissions are explicit; not implemented.
 

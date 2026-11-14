@@ -1,6 +1,6 @@
 # 013: Visible mobile Calendar, scrolling Board and reversible work deletion
 
-Status: Implemented and verified from `ac30934`; staged for independent coordinator review. Assigned by the owner on 2026-11-13. The pre-existing staged planning documents are preserved. Task 014 remains dependent on task 013 review.
+Status: Delivered as `e4f7bfb` from `ac30934`; its P2 Trash-navigation correction is implemented and verified in staged changes. Independent correction re-review remains pending before acceptance/task 014. See [013 review fixes](013-review-fixes.md) for current evidence and the original independent review below. Assigned by the owner on 2026-11-13.
 
 ## Outcome
 
@@ -154,3 +154,24 @@ Physical Android, Firefox/WebKit, the owner's Ubuntu deployment, actual HTTPS pr
 All implementation/verification work for task 013 is complete. The owner commits and pushes the staged changes. Apply the new migration through the existing README restart sequence before serving the updated build; no database reset is needed. Review the lifecycle, retained drafts, mouse/keyboard suppression and shared authorization before assigning task 014 runtime implementation.
 
 Suggested commit message: `feat: improve mobile planning and add workspace Trash`
+
+## Independent coordinator review — 2026-11-13
+
+Reviewed owner-committed `e4f7bfb` against `ac30934`. One P2 remains: the work editor's **Review workspace Trash** / **Open workspace Trash** links navigate to the correct workspace route while leaving the source modal open, preventing interaction with Restore. `PlannerContext` keeps the editor target across navigation. The delivered browser case manually closes via `retained(page)` after following the link, masking the problem. See [013 review fixes](013-review-fixes.md) for exact locations, reproduction, acceptance and the next assignment. Task 014 runtime work must wait for correction/re-review.
+
+Independent checks on the reviewed Windows checkout:
+
+- `npm run check`, `npm run db:validate`: passed. `npm run db:test:migrate`: eight migrations, none pending on the guarded loopback test database.
+- `npm run build -- --webpack`: passed on the reviewed source.
+- `npm run test -- --reporter=json --outputFile=.local/review013-tests.json`: **106/106 passed**, zero failures/skips across ten files. Includes all twelve Trash PostgreSQL/HTTP cases plus existing account/time/membership protections. The saved JSON report is ignored local output.
+- `npm run test:e2e -- mobile-surfaces.spec.ts calendar-gesture-review.spec.ts trash.spec.ts dialog-history.spec.ts 011-overflow.spec.ts`: **23 passed / zero failures / three intentional Android mouse-only skips**, 26 selected cases in **5.8 minutes**, exit 0. Includes desktop/Android mobile surfaces, exact-one-write/no-editor gestures, DST recovery, uncertain Trash/Restore retries, old block references, cross-account responses, collaborator revocation and the previous history/Retry corrections.
+- Inspected the fresh Android 390px Calendar screenshot: the day grid and saved event are visible and contained; the source/tests also retain non-drag scheduling. This is emulation, not physical Android evidence.
+- An isolated ignored harness on owned loopback port 3115 reproduced the P2 on desktop and Pixel 7. A task was trashed through a separate authorized request while its dirty editor remained open. After its save correctly returned unavailable, following the recovery link loaded `/trash` with **one open dialog** and the actual Restore click was blocked. Manually choosing Keep draft for later made Restore work on both profiles. Only disposable fixture accounts/work were used; the owned server and fixtures were cleaned up.
+- `git diff --check ac30934 e4f7bfb`: passed. Review made no application/test/schema/dependency changes; only review/handoff documents are updated.
+
+The implementer's full **85 passed / three intentional skips** in 18.6 minutes is carried forward, not independently repeated. The coordinator did not rerun the default Turbopack build, client generation, development migration, populated-upgrade preservation, fresh-target/schema-drift proof or actual provider/deployment checks. Physical Android, Ubuntu/container runtime and live proxy/TLS/Mailcow remain unverified by this review. No commit, push or deployment performed. Existing task 011 P2 findings remain closed; this is a new recovery-link lifecycle issue.
+
+
+## Navigation correction completion — 2026-11-13
+
+The follow-up from `e4f7bfb` implements the reviewed P2: both canonical work-editor Trash links preserve input, await their owned-history cleanup, close and navigate to directly operable Restore controls. Pending, uncertain, session-failure and account-change paths retain their guards. The previous test's extra manual dismissal is removed. New lint/types, Webpack build, guarded migration status and four isolated history-helper cases passed; focused browser checks passed 19 cases with one intentional skip, and the final full run passed **93 cases / three intentional Android mouse-only skips, zero failures, 20.6 minutes** on final sources. Detailed failed/interrupted attempts, carried backend/schema evidence and limits are in [013 review fixes](013-review-fixes.md). The owner commits/pushes staged changes and arranges independent re-review; task 014 remains gated. No schema/dependency/API change or deployment.
