@@ -74,16 +74,21 @@ test("compact cards use stable project colors, whole-card mouse dragging and tou
     ).revision,
   ).toBe(2);
   if (!isMobile) {
+    const destination = page
+      .getByRole("region", {
+        name: "Workspace workflow: Board shared",
+        exact: true,
+      })
+      .getByRole("region", { name: "Done column", exact: true });
+    await destination.scrollIntoViewIfNeeded();
     const source = (await page
       .getByRole("article", { name: "Whole card move", exact: true })
       .getByRole("button")
       .boundingBox())!;
-    const target = (await page
-      .getByRole("region", { name: "Done column", exact: true })
-      .boundingBox())!;
+    const target = (await destination.boundingBox())!;
     await drag(
       page,
-      { x: source.x + 20, y: source.y + 20 },
+      { x: source.x + source.width / 2, y: source.y + 20 },
       { x: target.x + target.width / 2, y: target.y + 100 },
     );
     await expect
@@ -202,7 +207,14 @@ test("compact cards use stable project colors, whole-card mouse dragging and tou
   await expect(
     page.getByText("Matching tasks: 2 of 3 total.", { exact: false }),
   ).toBeVisible();
-  if (isMobile) await page.getByRole("region", { name: "Blocked column", exact: true }).scrollIntoViewIfNeeded();
+  if (isMobile)
+    await page
+      .getByRole("region", {
+        name: "Workspace workflow: " + ws.name,
+        exact: true,
+      })
+      .getByRole("region", { name: "Blocked column", exact: true })
+      .scrollIntoViewIfNeeded();
   await expect(
     page.getByRole("article", { name: "Subtask card", exact: true }),
   ).toContainText("Subtask of Parent card");

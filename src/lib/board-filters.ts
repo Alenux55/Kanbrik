@@ -1,3 +1,5 @@
+import { projectPalette } from "./project-palette";
+import { matchesLabels } from "./task-labels";
 import { DateTime } from "luxon";
 import type { TaskRecord } from "./planning-contracts";
 export type BoardFilters = {
@@ -8,6 +10,9 @@ export type BoardFilters = {
   editedTo: string;
   search: string;
   hideDone: boolean;
+  tagIds: string[];
+  tagScopes: Record<string, string>;
+  matchAll: boolean;
 };
 export const emptyBoardFilters: BoardFilters = {
   projects: [],
@@ -17,6 +22,9 @@ export const emptyBoardFilters: BoardFilters = {
   editedTo: "",
   search: "",
   hideDone: false,
+  tagIds: [],
+  tagScopes: {},
+  matchAll: false,
 };
 export function dateBounds(from: string, to: string, zone: string) {
   const start = from ? DateTime.fromISO(from, { zone }).startOf("day") : null;
@@ -46,9 +54,10 @@ export function matchesBoard(
     (range.start === undefined || Date.parse(iso) >= range.start) &&
     (range.end === undefined || Date.parse(iso) < range.end);
   return (
+    matchesLabels(task, filters) &&
     (!filters.projects.length ||
       filters.projects.includes(task.projectId ?? "standalone")) &&
-    (!filters.hideDone || task.status !== "done") &&
+    (!filters.hideDone || task.completed !== true) &&
     task.title
       .toLocaleLowerCase()
       .includes(filters.search.toLocaleLowerCase()) &&
@@ -56,14 +65,7 @@ export function matchesBoard(
     inRange(task.updatedAt, edited)
   );
 }
-const colors = [
-  "#ccfbf1",
-  "#dbeafe",
-  "#ede9fe",
-  "#fef3c7",
-  "#fce7f3",
-  "#e0f2fe",
-];
+const colors = projectPalette.map((c) => c.color);
 export function projectColor(id: string | null) {
   let hash = 0;
   for (const char of id ?? "")

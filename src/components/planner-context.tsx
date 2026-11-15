@@ -1,4 +1,5 @@
 "use client";
+import { OrderReviewDialog } from "./task-order-controls";
 import Link from "next/link";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
@@ -45,8 +46,13 @@ export function PlannerContext({
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [epoch, setEpoch] = useState(0);
+  const [orderReview, setOrderReview] = useState<string | null>(null);
   const [target, setTarget] = useState<EntityTarget | null>(null);
   const {
+    supplementalDrafts,
+    setSupplementalDrafts,
+    commentDrafts,
+    setCommentDrafts,
     drafts,
     calendarDrafts,
     setDrafts,
@@ -124,6 +130,16 @@ export function PlannerContext({
           ? (current.workspaces.find((w) => w.kind === "personal")?.id ?? "")
           : current.defaultWorkspaceId,
     }));
+    setSupplementalDrafts((current) =>
+      Object.fromEntries(
+        Object.entries(current).filter(([, draft]) => draft.workspaceId !== id),
+      ),
+    );
+    setCommentDrafts((current) =>
+      Object.fromEntries(
+        Object.entries(current).filter(([key]) => !key.startsWith(id + "/")),
+      ),
+    );
     setDrafts((current) =>
       Object.fromEntries(
         Object.entries(current).filter(([key]) => !key.startsWith(id + "/")),
@@ -250,6 +266,85 @@ export function PlannerContext({
               </button>
             ))}
         </section>
+      )}
+      {Object.keys(commentDrafts).length > 0 && (
+        <section
+          aria-label="Retained comment drafts"
+          className="m-4 rounded border bg-amber-50 p-3"
+        >
+          <h2 className="font-semibold">Retained comment drafts</h2>
+          <p>
+            Unsaved comments remain in this signed-in session. Trashed work must
+            be restored before changing comments.
+          </p>
+          {Object.entries(commentDrafts)
+            .filter(([, d]) =>
+              prefs.workspaces.some((w) => w.id === d.target.workspaceId),
+            )
+            .map(([key, d]) => (
+              <button
+                key={key}
+                type="button"
+                className={button}
+                onClick={() => setTarget(d.target)}
+              >
+                Review comment draft: {d.target.record!.title}
+              </button>
+            ))}
+        </section>
+      )}
+      {Object.entries(supplementalDrafts).length > 0 && (
+        <section
+          aria-label="Retained list and configuration drafts"
+          className="m-4 rounded border bg-amber-50 p-3"
+        >
+          <h2 className="font-semibold">
+            Retained list and configuration drafts
+          </h2>
+          <p>
+            Changes are not confirmed saved. Restore inactive work before
+            changing it.
+          </p>
+          {Object.entries(supplementalDrafts)
+            .filter(([, d]) =>
+              prefs.workspaces.some((w) => w.id === d.workspaceId),
+            )
+            .map(([key, d]) =>
+              d.form === "order" ? (
+                <button
+                  key={key}
+                  type="button"
+                  className={button}
+                  onClick={() => setOrderReview(key)}
+                >
+                  Review retained ordering: {d.label}
+                </button>
+              ) : d.target ? (
+                <button
+                  key={key}
+                  className={button}
+                  type="button"
+                  onClick={() => setTarget(d.target!)}
+                >
+                  Review retained input: {d.label}
+                </button>
+              ) : (
+                <Link
+                  key={key}
+                  href={`/workspaces/${d.workspaceId}`}
+                  className="block underline"
+                >
+                  Review retained input: {d.label}
+                </Link>
+              ),
+            )}
+        </section>
+      )}
+      {orderReview && supplementalDrafts[orderReview] && (
+        <OrderReviewDialog
+          draftKey={orderReview}
+          close={() => setOrderReview(null)}
+        />
       )}
       {target && (
         <EntityEditor

@@ -1,5 +1,8 @@
 "use client";
+import { TaskLabelBadges } from "./task-labels";
 import Link from "next/link";
+import { WorkListsPanel } from "./work-lists-panel";
+import { WorkActivityPanel } from "./work-activity-panel";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { DateTime } from "luxon";
@@ -224,7 +227,15 @@ function Batch({
       const response = await session.fetch(path + "/restore", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ revision: original.batch.revision }),
+        body: JSON.stringify({
+          revision: original.batch.revision,
+          ...(original.statusResolution
+            ? {
+                statusImpactDigest: original.statusResolution.impactDigest,
+                statusReplacements: original.statusReplacements ?? {},
+              }
+            : {}),
+        }),
       });
       const result = await response.json();
       committed = response.ok;
@@ -248,6 +259,8 @@ function Batch({
             error:
               result.error ?? "Restore is not confirmed. Refresh and review.",
             requires: result.current?.requires,
+            statusResolution:
+              result.current?.statusResolution ?? original.statusResolution,
           },
         }));
         return;
@@ -316,18 +329,71 @@ function Batch({
           Review the required ancestor’s Trash operation
         </Link>
       )}
+      {intent?.statusResolution && (
+        <section
+          aria-label="Restore status replacements"
+          className="space-y-3 border p-3"
+        >
+          <h3 className="font-semibold">Review status replacements</h3>
+          <p>
+            These original statuses were retired. Restoring will keep the work
+            IDs and use your explicit replacements.
+          </p>
+          {intent.statusResolution.requirements.map((r) => (
+            <label key={r.statusId} className="block">
+              {r.name}: {r.count} tasks
+              <select
+                aria-label={"Replacement for " + r.name}
+                className={control}
+                disabled={pending || intent.uncertain}
+                value={intent.statusReplacements?.[r.statusId] ?? ""}
+                onChange={(e) =>
+                  store.setTrashRestores((current) => ({
+                    ...current,
+                    [key]: {
+                      ...current[key],
+                      statusReplacements: {
+                        ...current[key].statusReplacements,
+                        [r.statusId]: e.target.value,
+                      },
+                    },
+                  }))
+                }
+              >
+                <option value="">Choose an active status</option>
+                {intent.statusResolution!.choices.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                    {d.completed ? " (completed)" : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ))}
+        </section>
+      )}
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
           className={button}
-          disabled={pending}
+          disabled={
+            pending ||
+            !!intent?.statusResolution?.requirements.some(
+              (r) =>
+                !intent.statusResolution!.choices.some(
+                  (d) => d.id === intent.statusReplacements?.[r.statusId],
+                ),
+            )
+          }
           onClick={() => void restore()}
         >
           {pending
             ? "Restoring…"
             : intent?.uncertain
               ? "Retry same Restore"
-              : "Restore"}
+              : intent?.statusResolution
+                ? "Confirm Restore with replacements"
+                : "Restore"}
         </button>
         <button
           type="button"
@@ -371,12 +437,14 @@ function Batch({
             ...detail.projects.map((item) => ({
               ...item,
               kind: "Project",
+              tags: [],
               status: "",
             })),
             ...detail.tasks.map((item) => ({
               ...item,
               kind: item.parentId ? "Subtask" : "Task",
-              status: taskStatusLabels[item.status as TaskStatus],
+              status:
+                item.statusName ?? taskStatusLabels[item.status as TaskStatus],
             })),
           ].map((item) => (
             <div key={item.kind + item.id} className="space-y-2">
@@ -390,6 +458,29 @@ function Batch({
               <p className="whitespace-pre-wrap break-words">
                 {item.description}
               </p>
+              <TaskLabelBadges task={item} />
+              <WorkActivityPanel
+                readOnly
+                target={{
+                  workspaceId: batch.workspaceId,
+                  kind: item.kind === "Project" ? "projects" : "tasks",
+                  record:
+                    item.kind === "Project"
+                      ? detail.projects.find((row) => row.id === item.id)!
+                      : detail.tasks.find((row) => row.id === item.id)!,
+                }}
+              />
+              <WorkListsPanel
+                readOnly
+                target={{
+                  workspaceId: batch.workspaceId,
+                  kind: item.kind === "Project" ? "projects" : "tasks",
+                  record:
+                    item.kind === "Project"
+                      ? detail.projects.find((row) => row.id === item.id)!
+                      : detail.tasks.find((row) => row.id === item.id)!,
+                }}
+              />
             </div>
           ))}
         </section>

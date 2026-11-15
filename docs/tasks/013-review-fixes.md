@@ -1,6 +1,6 @@
 # 013: Trash recovery navigation correction
 
-Status: Correction implemented and verified from `e4f7bfb`; staged for independent re-review. Independent review of `e4f7bfb` on 2026-11-13 found one P2. Task 014 runtime work waits for this correction and independent re-review. Preserve the delivered mobile, Calendar, Trash and account/permission behavior.
+Status: Correction committed as `0af0865` from `e4f7bfb`; independently re-reviewed on 2026-11-14 without actionable findings. The original P2 is closed and task 014 is ready for implementation against this reviewed baseline. Preserve the delivered mobile, Calendar, Trash and account/permission behavior. The original finding and implementer evidence below remain historical records.
 
 ## Outcome and inputs
 
@@ -73,3 +73,17 @@ The coordinator's `e4f7bfb` backend **106/106** and schema validation, together 
 The P2 navigation correction is implemented and verified; coordinator closure remains pending. Both links now leave an operable destination without an extra manual dismissal, retain unfinished input/uncertain intents, and consume the editor's history slot before pushing Trash. Task 014 runtime implementation stays gated on independent re-review. No commit, push or deployment was performed.
 
 Suggested commit message: `fix: close work editors before navigating to Trash`
+
+## Independent correction re-review — 2026-11-14
+
+Reviewed owner-committed `0af0865` against `e4f7bfb`. No new actionable defects found; the P2 is closed. Both links use the shared explicit preserve-and-navigate action, verify current identity, await idempotent history release and recheck mounted editor/account/pending state before closing and routing. Canceled transfers can reacquire the slot. Modified-click behavior and existing ordinary close/dirty/native Back behavior are preserved.
+
+Independent evidence on Windows:
+
+- `npm run check`: lint/strict types passed. `npm run build -- --webpack`: passed on reviewed source. `git diff --check e4f7bfb 0af0865`: passed.
+- Four isolated actual-Chromium history-helper scenarios passed: effect replay, same-commit replacement, replacement during traversal and release during blocked-Back restoration. These exercise the committed helper, not another full React development-mode run.
+- A separate ignored reproduction on owned app port 3115 repeated the original dirty/unavailable-editor flow on desktop and Pixel 7. Following Review workspace Trash left zero dialogs, Restore worked directly, one Back returned to Projects and reopening the retained draft preserved its description. The owned fixture accounts/app were cleaned up.
+- Focused browser selection: `trash-navigation.spec.ts`, `dialog-history.spec.ts`, `trash.spec.ts`, `calendar-gesture-review.spec.ts`, `session-isolation.spec.ts`, with grep `Trash links close|record-unavailable recovery|pending saves guard|failed session checks|ordinary editor closure|dirty Back|Back during a pending|a collaborator|real Calendar drops|obsolete save completion`: **19 passed / zero failures / one intentional Android mouse-only skip**, 20 selected cases in **4.6 minutes**, exit 0. Covers all eight new navigation cases, direct Restore from all three source views, retained/uncertain input, pending/session/account guards, one-Back/history behavior, stale-save isolation and real Calendar gestures.
+- Database environment adaptation: the usual guarded migration check initially failed because the database was stopped and Windows now excludes TCP ports 55346–55445, including 55432; an actual bind probe confirmed EACCES there. The existing cluster was temporarily started on available loopback port 15432 without initialization/reset. An ignored wrapper reused `scripts/test-command.mjs` with only a process-local guarded test URL port override. Its `migrate` check found eight migrations and none pending; its `browser` command ran the selection above. No saved `.env`, credentials, PostgreSQL configuration or Windows networking settings changed. The owned temporary cluster was stopped after verification, restoring the stopped state found initially.
+
+The implementer's final full **93 passed / three intentional skips** in 20.6 minutes is carried evidence, not an independent rerun. Backend/schema/API sources are unchanged; the earlier coordinator **106/106** backend result and migration/upgrade/drift proofs were not rerun for this UI correction. No new default Turbopack, physical Android, Ubuntu/container, live proxy/TLS/Mailcow or deployment verification. This review changes documentation only; no source fixes, dependency changes, commit, push or deployment. Task 014 can now proceed as its own bounded assignment from `0af0865`.

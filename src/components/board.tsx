@@ -10,6 +10,7 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
+import { TaskLabelBadges, TaskLabelFilter } from "./task-labels";
 import { usePlannerSession } from "./planner-session";
 import { usePlanningDrafts } from "./planning-drafts";
 import { usePlannerContext } from "./planner-context";
@@ -17,11 +18,7 @@ import { EditorDialog } from "./ui/editor-dialog";
 import { button, control } from "./ui/planner-controls";
 import type { WorkspaceSummary } from "@/lib/workspace-contracts";
 import type { ProjectRecord, TaskRecord } from "@/lib/planning-contracts";
-import {
-  taskStatusIds,
-  taskStatusLabels,
-  type TaskStatus,
-} from "@/lib/task-statuses";
+import { type TaskStatus } from "@/lib/task-statuses";
 import {
   dateBounds,
   emptyBoardFilters,
@@ -29,6 +26,10 @@ import {
   projectColor,
   type BoardFilters,
 } from "@/lib/board-filters";
+import type {
+  WorkflowRecord,
+  StatusDefinition,
+} from "@/lib/workflow-contracts";
 type Preferences = { workspaces: WorkspaceSummary[]; workspaceIds: string[] };
 export function Board() {
   const session = usePlannerSession();
@@ -144,13 +145,14 @@ export function Board() {
       filters.editedTo,
       filters.search,
     ].filter(Boolean).length +
-    Number(filters.hideDone);
+    Number(filters.hideDone) +
+    filters.tagIds.length;
   return (
     <section className="min-w-0">
       <h1 className="text-4xl font-semibold">Board</h1>
       <p className="mt-3">
-        Canonical tasks, five statuses. Click a card to edit; desktop dragging
-        changes status.
+        Canonical tasks, workspace workflows. Click a card to edit; desktop
+        dragging changes status.
       </p>
       <div className="my-4 flex flex-wrap gap-2">
         <button
@@ -303,6 +305,12 @@ export function Board() {
                   </p>
                 )}
               </fieldset>
+              <TaskLabelFilter
+                value={draftFilters}
+                onChange={(value) =>
+                  setDraftFilters((current) => ({ ...current, ...value }))
+                }
+              />
               <label className="block">
                 Title search
                 <input
@@ -324,7 +332,7 @@ export function Board() {
                     }))
                   }
                 />
-                Hide Done
+                Hide completed
               </label>
               {(
                 [
@@ -381,6 +389,7 @@ type Scope = {
   tasks: TaskRecord[];
   projects: ProjectRecord[];
   failed: boolean;
+  workflow: WorkflowRecord | null;
 };
 function SelectedBoard({
   workspaces,
@@ -410,11 +419,12 @@ function SelectedBoard({
     alive.current = true;
     const seq = ++generation.current;
     Promise.all(
-      workspaces.map(async (workspace) => {
+      workspaces.map(async (workspace): Promise<Scope | null> => {
         try {
           const responses = await Promise.all([
             session.fetch(`/api/workspaces/${workspace.id}/tasks`),
             session.fetch(`/api/workspaces/${workspace.id}/projects`),
+            session.fetch(`/api/workspaces/${workspace.id}/workflow`),
           ]);
           if (responses.some((r) => r.status === 404)) {
             if (
@@ -430,10 +440,17 @@ function SelectedBoard({
             workspace,
             tasks: (await responses[0].json()) as TaskRecord[],
             projects: (await responses[1].json()) as ProjectRecord[],
+            workflow: (await responses[2].json()) as WorkflowRecord,
             failed: false,
           };
         } catch {
-          return { workspace, tasks: [], projects: [], failed: true };
+          return {
+            workspace,
+            tasks: [],
+            projects: [],
+            workflow: null,
+            failed: true,
+          };
         }
       }),
     ).then((result) => {
@@ -470,6 +487,7 @@ function SelectedBoard({
       title: task.title,
       description: task.description,
       status,
+      tags: task.tags,
       revision: task.revision,
       dirty: true,
       target,
@@ -481,7 +499,11 @@ function SelectedBoard({
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status, revision: task.revision }),
+          body: JSON.stringify({
+            status,
+            statusWorkspaceId: task.workspaceId,
+            revision: task.revision,
+          }),
         },
       );
       const result = await r.json();
@@ -529,7 +551,7 @@ function SelectedBoard({
           })) ?? null,
       );
       setMessage(
-        `Saved ${task.title}: ${taskStatusLabels[status]}. It may be outside the current filters.`,
+        `Saved ${task.title}: ${result.statusName ?? "Status saved"}. It may be outside the current filters.`,
       );
       document.getElementById("main-content")?.focus();
     } catch {
@@ -589,8 +611,25 @@ function SelectedBoard({
           )
             return;
           const task = tasks.find((t) => t.id === active.id);
-          if (task && over && taskStatusIds.includes(over.id as TaskStatus))
-            void move(task, over.id as TaskStatus);
+          if (task && over) {
+            const destination = over.data.current as
+              { workspaceId: string; statusId: string } | undefined;
+            if (!destination) return;
+            if (destination.workspaceId !== task.workspaceId) {
+              setMessage(
+                "A task can only move within its own workspace workflow. Nothing was changed.",
+              );
+              return;
+            }
+            if (
+              scopes
+                .find((scope) => scope.workspace.id === task.workspaceId)
+                ?.workflow?.definitions.some(
+                  (d) => d.id === destination.statusId && !d.archivedAt,
+                )
+            )
+              void move(task, destination.statusId);
+          }
         }}
         accessibility={{
           screenReaderInstructions: {
@@ -603,54 +642,107 @@ function SelectedBoard({
           role="region"
           aria-label="Board statuses"
           tabIndex={0}
-          className="flex min-w-0 gap-3 overflow-x-auto overscroll-x-contain pb-3 lg:grid lg:grid-cols-5 lg:overflow-visible"
+          className="min-w-0 overflow-x-auto overscroll-x-contain pb-3"
         >
-          {taskStatusIds.map((status) => (
-            <Column
-              key={status}
-              status={status}
-              count={tasks.filter((t) => t.status === status).length}
-            >
-              {tasks
-                .filter((t) => t.status === status)
-                .map((task) => {
-                  const scope = scopes.find(
-                    (s) => s.workspace.id === task.workspaceId,
-                  )!;
-                  return (
-                    <Card
-                      key={task.id}
-                      task={task}
-                      workspace={
-                        workspaces.length > 1 ? scope.workspace.name : undefined
+          <div className="flex min-w-0 gap-6">
+            {scopes
+              .filter((scope) => !scope.failed && scope.workflow)
+              .map((scope) => {
+                const compact =
+                  workspaces.length === 1 &&
+                  scope.workflow!.definitions.filter((d) => !d.archivedAt)
+                    .length <= 5;
+                return (
+                  <section
+                    key={scope.workspace.id}
+                    aria-label={"Workspace workflow: " + scope.workspace.name}
+                    className={
+                      compact ? "min-w-0 w-full shrink-0" : "min-w-0 shrink-0"
+                    }
+                  >
+                    <h2 className="mb-3 font-semibold">
+                      {scope.workspace.name}
+                    </h2>
+                    <div
+                      className={
+                        compact
+                          ? "flex min-w-0 gap-3 lg:grid lg:grid-cols-5"
+                          : "flex gap-3"
                       }
-                      project={
-                        scope.projects.find((p) => p.id === task.projectId)
-                          ?.title ?? "Standalone"
-                      }
-                      parent={
-                        scope.tasks.find((t) => t.id === task.parentId)?.title
-                      }
-                      pending={store.savingKeys.includes(
-                        `${task.workspaceId}/tasks/${task.id}`,
-                      )}
-                      dirty={
-                        !!store.drafts[`${task.workspaceId}/tasks/${task.id}`]
-                          ?.dirty
-                      }
-                      open={() => {
-                        if (!suppressClick.current)
-                          context.openEntity({
-                            kind: "tasks",
-                            workspaceId: task.workspaceId,
-                            record: task,
-                          });
-                      }}
-                    />
-                  );
-                })}
-            </Column>
-          ))}
+                    >
+                      {scope
+                        .workflow!.definitions.filter(
+                          (status) => !status.archivedAt,
+                        )
+                        .map((status) => (
+                          <Column
+                            key={status.id}
+                            status={status}
+                            workspaceId={scope.workspace.id}
+                            compact={compact}
+                            count={
+                              tasks.filter(
+                                (t) =>
+                                  t.workspaceId === scope.workspace.id &&
+                                  t.status === status.id,
+                              ).length
+                            }
+                          >
+                            {tasks
+                              .filter(
+                                (t) =>
+                                  t.workspaceId === scope.workspace.id &&
+                                  t.status === status.id,
+                              )
+                              .map((task) => (
+                                <Card
+                                  key={task.id}
+                                  task={task}
+                                  workspace={
+                                    workspaces.length > 1
+                                      ? scope.workspace.name
+                                      : undefined
+                                  }
+                                  project={
+                                    scope.projects.find(
+                                      (p) => p.id === task.projectId,
+                                    )?.title ?? "Standalone"
+                                  }
+                                  parent={
+                                    scope.tasks.find(
+                                      (t) => t.id === task.parentId,
+                                    )?.title
+                                  }
+                                  pending={
+                                    store.savingKeys.includes(
+                                      `${task.workspaceId}/tasks/${task.id}`,
+                                    ) ||
+                                    store.savingKeys.includes(
+                                      `activity:${task.workspaceId}/tasks/${task.id}`,
+                                    )
+                                  }
+                                  dirty={
+                                    !!store.drafts[
+                                      `${task.workspaceId}/tasks/${task.id}`
+                                    ]?.dirty
+                                  }
+                                  open={() => {
+                                    if (!suppressClick.current)
+                                      context.openEntity({
+                                        kind: "tasks",
+                                        workspaceId: task.workspaceId,
+                                        record: task,
+                                      });
+                                  }}
+                                />
+                              ))}
+                          </Column>
+                        ))}
+                    </div>
+                  </section>
+                );
+              })}
+          </div>
         </div>
         {createPortal(
           <DragOverlay dropAnimation={null}>
@@ -672,22 +764,32 @@ function SelectedBoard({
 }
 function Column({
   status,
+  workspaceId,
+  compact,
   count,
   children,
 }: {
-  status: TaskStatus;
+  status: StatusDefinition;
+  workspaceId: string;
+  compact: boolean;
   count: number;
   children: React.ReactNode;
 }) {
-  const { setNodeRef, isOver } = useDroppable({ id: status });
+  const { setNodeRef, isOver } = useDroppable({
+    id: workspaceId + ":" + status.id,
+    data: { workspaceId, statusId: status.id },
+  });
   return (
     <section
       ref={setNodeRef}
-      aria-label={`${taskStatusLabels[status]} column`}
-      className={`min-h-40 w-[min(82vw,20rem)] min-w-0 shrink-0 rounded-xl border p-2 lg:w-auto ${isOver ? "border-teal-800 bg-teal-50" : "border-neutral-300 bg-neutral-100"}`}
+      aria-label={`${status.name} column`}
+      className={`min-h-40 w-[min(82vw,20rem)] min-w-0 shrink-0 rounded-xl border p-2 ${compact ? "lg:w-auto" : "lg:w-72"} ${isOver ? "border-teal-800 bg-teal-50" : "border-neutral-300 bg-neutral-100"}`}
     >
       <h2 className="mb-3 break-words font-semibold">
-        {taskStatusLabels[status]} ({count})
+        {status.name} ({count})
+        <span className="block text-xs">
+          {status.completed ? "Completed" : "Open"}
+        </span>
       </h2>
       {children}
     </section>
@@ -722,6 +824,13 @@ function Card({
         {...listeners}
         type="button"
         aria-disabled={pending}
+        aria-label={task.title}
+        title={
+          (task.tags ?? [])
+            .map((t) => t.name)
+            .filter(Boolean)
+            .join(", ") || undefined
+        }
         onClick={open}
         disabled={pending}
         className="block min-h-14 w-full min-w-0 rounded-lg border border-neutral-300 p-3 text-left text-neutral-950 shadow-sm"
@@ -736,6 +845,7 @@ function Card({
           {workspace && ` · ${workspace}`}
           {parent && ` · Subtask of ${parent}`}
         </span>
+        <TaskLabelBadges task={task} />
         {pending && <span role="status">Saving move…</span>}
         {dirty && (
           <span className="block text-xs text-amber-950">

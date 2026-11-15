@@ -4,7 +4,7 @@ Tasks 001–009 implement the foundation, accounts/recovery, personal/shared acc
 
 The reviewed planner baseline is `75f678e`: [011 review corrections](tasks/011-review-fixes.md), independently re-reviewed without actionable findings and preserving reviewed task 012 invitations. Both original P2 findings are closed. The implementer's full browser run passed 69 cases with one intentional skip; the coordinator separately passed 94 backend checks and 17 focused browser cases with one intentional skip. Task [011 completion](tasks/011-implementation.md) and [012's review record](tasks/012-account-invitations.md) preserve their separate evidence and limits. UTC instants remain authoritative; server location is irrelevant.
 
-Base `e4f7bfb` implements [013: mobile planner and Trash](tasks/013-mobile-planner-and-trash.md). Its [P2 navigation correction](tasks/013-review-fixes.md) is now implemented and verified in staged changes: final full browser run 93 passes / three intentional skips, zero failures. Independent correction re-review remains pending before [014: comments and edit history](tasks/014-comments-and-edit-history.md). These precede everyday capture and do not reopen the closed task 011 findings.
+Current independently reviewed baseline is `0af0865`, with task 013's Trash navigation P2 closed. The owner assigned tasks **014–018 as one candidate** and explicitly deferred intermediate independent review until all five are implemented. That candidate includes the restored-editor correction, work lists/vendors, workspace workflows, revised arbitrary tags/Calendar search and sibling ordering. Implementation verification passed (128 backend checks; 135 browser passes and three intentional skips; schema/build/migration preservation checks). Final evidence is in [handoff](handoff.md); independent review remains pending. Task 019 is separately specified and unimplemented.
 
 | Phase | Outcome | Evidence required for completion |
 | --- | --- | --- |
@@ -14,7 +14,7 @@ Base `e4f7bfb` implements [013: mobile planner and Trash](tasks/013-mobile-plann
 | 3. Calendar | Workspace-filtered time blocks and project/task assignment | Drag and explicit controls work; workspace consistency/visibility/time zones are tested; tasks survive block removal |
 | 4. Desktop and Android workflow | Complete the personal/shared workspace-to-board-to-calendar journey | Full journey works with one or several workspaces selected on desktop and Android, including failed/conflicting saves and refresh |
 | 5. Everyday capture | Personal lists/checklists, inbox, and basic notes | Personal data stays private; captured work can become a task without retyping; list/task semantics are documented |
-| 6. Optional extensions | Custom statuses, SilverBullet links, recurrence, installability, or integrations | Scope chosen separately from the initial core; each extension gets its own task and acceptance criteria |
+| 6. Extensions | Workspace-specific statuses (assigned separately as 016); optional SilverBullet links, recurrence, installability or integrations | Each extension gets its own scope, task and acceptance criteria; requests do not implicitly authorize the other extensions |
 
 ## How to issue implementation tasks
 
@@ -26,9 +26,16 @@ Base `e4f7bfb` implements [013: mobile planner and Trash](tasks/013-mobile-plann
 
 ## Implementation handoffs
 
-- [013: mobile planner and Trash](tasks/013-mobile-planner-and-trash.md): committed as `e4f7bfb`; independent review passed 106 backend and 23 focused browser cases with three intentional skips, but found one P2 in Trash recovery navigation. The [correction](tasks/013-review-fixes.md) is now implemented/verified and staged (93 full browser passes / three intentional skips), awaiting independent re-review before task 014. No deployment performed.
+- [014 review correction](tasks/014-review-fixes.md): implemented bidirectional restored-editor availability with retained original draft revisions; pending combined independent re-review.
+- [015: checklists and shopping lists](tasks/015-custom-work-lists.md): implemented independent work-attached sections/items, vendors, archive, activity and draft integration; pending combined review.
+- [016: configurable workspace statuses](tasks/016-workspace-statuses.md): implemented owner configuration, completion/default metadata, workspace-labeled Board and explicit retirement/Restore resolution; pending combined review.
+- [017: custom colored tags and filters](tasks/017-important-urgent-filters.md): latest revised specification implemented, replacing earlier flags with arbitrary tags/autocomplete/palette colors and three-view filters plus Calendar project/text search; pending combined review.
+- [018: sibling ordering](tasks/018-project-task-ordering.md): implemented shared root-within-project/child-within-parent order, explicit controls, retained slots/receipts and full-scope guards; pending combined review.
+- [019: live Calendar drop preview](tasks/019-calendar-drop-preview.md): separate specification only; not implemented in 014–018.
 
-- [014: comments and edit history](tasks/014-comments-and-edit-history.md): specified after reviewed task 013, covering projects/tasks/subtasks, original/edited comment timestamps and transactionally recorded changes. Scope and recommended permissions are explicit; not implemented.
+- [013: mobile planner and Trash](tasks/013-mobile-planner-and-trash.md): committed as `e4f7bfb`, corrected at `0af0865` and independently re-reviewed with its navigation P2 closed. Separate verification/operating limits are in the [correction record](tasks/013-review-fixes.md). No deployment performed.
+
+- [014: comments and edit history](tasks/014-comments-and-edit-history.md): included in the combined candidate above `0af0865`, together with the [restored-editor correction](tasks/014-review-fixes.md). Prior coordinator evidence remains separate; combined independent review is pending under the owner's explicit assignment.
 
 - [012: account invitations](tasks/012-account-invitations.md): implemented at `1d93128` and independently reviewed without new actionable findings; administrator allowlist and expiring email links grant account signup only. The original invitation review used focused account checks on desktop/Android; latest integrated verification and independent correction re-review are in the task 011 correction record.
 

@@ -1,3 +1,7 @@
+import {touchTaskOrders} from "./task-order";
+import { digest } from "./extension-support";
+import { taskStatusSelection, taskView } from "./task-view";
+import type { FieldChange } from "@/lib/activity-contracts";
 import "server-only";
 import { createHash } from "node:crypto";
 import { z } from "zod";
@@ -9,6 +13,7 @@ import type {
   restoreTrashInput,
 } from "@/lib/trash-contracts";
 import { workspaceContent, WorkspaceDenied } from "./workspaces";
+import { lifecycleEvents } from "./activity-events";
 import { activeProject, activeTask } from "./active-work";
 
 export class TrashConflict extends Error {
@@ -180,14 +185,19 @@ export function trashDetail(headers: Headers, workspaceId: string, id: string) {
           },
         },
       }),
-      tasks: await tx.task.findMany({
-        where: {
-          workspaceId,
-          id: {
-            in: rows.filter((row) => row.kind === "task").map((row) => row.id),
+      tasks: (
+        await tx.task.findMany({
+          where: {
+            workspaceId,
+            id: {
+              in: rows
+                .filter((row) => row.kind === "task")
+                .map((row) => row.id),
+            },
           },
-        },
-      }),
+          include: { workflowStatus: { select: taskStatusSelection },tagLinks:{include:{tag:true}} },
+        })
+      ).map(taskView),
     };
   });
 }
@@ -298,6 +308,21 @@ export function moveToTrash(
         "Work changed during this operation. Nothing was moved; review again.",
         current.impact,
       );
+    await touchTaskOrders(tx,workspaceId,current.tasks);
+    await lifecycleEvents(
+      tx,
+      userId,
+      workspaceId,
+      [
+        ...current.projects.map((row) => ({
+          ...row,
+          kind: "project" as const,
+        })),
+        ...current.tasks.map((row) => ({ ...row, kind: "task" as const })),
+      ],
+      batch,
+      deletedAt,
+    );
     return {
       batch: summary(batch),
       replayed: false,
@@ -311,7 +336,7 @@ export function restoreTrash(
   id: string,
   input: z.infer<typeof restoreTrashInput>,
 ) {
-  return workspaceContent(headers, workspaceId, async (tx) => {
+  return workspaceContent(headers, workspaceId, async (tx, userId) => {
     const batch = await findBatch(tx, workspaceId, id);
     if (batch.restoredAt && batch.revision === input.revision + 1)
       return { batch: summary(batch), replayed: true };
@@ -376,14 +401,86 @@ export function restoreTrash(
           );
       }
     }
+    const definitions = await tx.workspaceStatus.findMany({
+        where: { workspaceId },
+        orderBy: [{ position: "asc" }, { id: "asc" }],
+      }),
+      cfg = await tx.workspaceWorkflow.findUniqueOrThrow({
+        where: { workspaceId },
+      });
+    const activeDefinitions = definitions.filter((d) => !d.archivedAt),
+      missing = tasks.filter(
+        (t) => !activeDefinitions.some((d) => d.id === t.status),
+      );
+    const resolution = {
+      impactDigest: digest({
+        batch: batch.id,
+        revision: batch.revision,
+        workflow: cfg.revision,
+        tasks: tasks.map((t) => [t.id, t.revision, t.status]).sort(),
+      }),
+      requirements: [...new Set(missing.map((t) => t.status))].map(
+        (statusId) => ({
+          statusId,
+          name:
+            definitions.find((d) => d.id === statusId)?.name ??
+            "Unavailable status",
+          count: missing.filter((t) => t.status === statusId).length,
+        }),
+      ),
+      choices: activeDefinitions.map((d) => ({
+        id: d.id,
+        name: d.name,
+        completed: d.completed,
+      })),
+    };
+    if (missing.length || input.statusImpactDigest) {
+      if (
+        input.statusImpactDigest !== resolution.impactDigest ||
+        resolution.requirements.some(
+          (r) =>
+            !activeDefinitions.some(
+              (d) => d.id === input.statusReplacements?.[r.statusId],
+            ),
+        ) ||
+        Object.keys(input.statusReplacements ?? {}).some(
+          (id) => !resolution.requirements.some((r) => r.statusId === id),
+        )
+      )
+        throw new TrashConflict(
+          "Review the archived statuses and choose explicit active replacements before Restore.",
+          { statusResolution: resolution },
+        );
+    }
+    const statusChanges = new Map<string, FieldChange>();
+    for (const task of missing) {
+      const replacement = input.statusReplacements![task.status];
+      statusChanges.set(task.id, {
+        field: "status",
+        before: task.status,
+        after: replacement,
+        beforeLabel: definitions.find((d) => d.id === task.status)!.name,
+        afterLabel: activeDefinitions.find((d) => d.id === replacement)!.name,
+      });
+    }
     const changedProjects = await tx.project.updateMany({
       where: { workspaceId, trashBatchId: batch.id },
       data: { deletedAt: null, trashBatchId: null, revision: { increment: 1 } },
     });
-    const changedTasks = await tx.task.updateMany({
-      where: { workspaceId, trashBatchId: batch.id },
-      data: { deletedAt: null, trashBatchId: null, revision: { increment: 1 } },
-    });
+    const changedTasks = { count: 0 };
+    for (const status of new Set(tasks.map((t) => t.status))) {
+      const replacement = input.statusReplacements?.[status] ?? status;
+      const result = await tx.task.updateMany({
+        where: { workspaceId, trashBatchId: batch.id, status },
+        data: {
+          status: replacement,
+          deletedAt: null,
+          trashBatchId: null,
+          revision: { increment: 1 },
+        },
+      });
+      changedTasks.count += result.count;
+    }
     if (
       changedProjects.count !== projects.length ||
       changedTasks.count !== tasks.length
@@ -396,6 +493,22 @@ export function restoreTrash(
       where: { workspaceId_id: { workspaceId, id } },
       data: { restoredAt: new Date(), revision: { increment: 1 } },
     });
+    await touchTaskOrders(tx,workspaceId,tasks);
+    await lifecycleEvents(
+      tx,
+      userId,
+      workspaceId,
+      [
+        ...projects.map((row) => ({ ...row, kind: "project" as const })),
+        ...tasks.map((row) => ({
+          ...row,
+          kind: "task" as const,
+          statusChange: statusChanges.get(row.id),
+        })),
+      ],
+      batch,
+      null,
+    );
     return { batch: summary(restored), replayed: false };
   });
 }

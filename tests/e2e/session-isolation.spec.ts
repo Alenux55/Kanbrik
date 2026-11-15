@@ -144,7 +144,8 @@ test("same-cookie tabs refresh account context, prevent draft resurrection, and 
   await expect(aAgain.getByLabel("Description")).toHaveValue("Saved shared text");
   await aAgain.getByLabel("Description").fill("Draft invalidated by remote logout");
   const current = await (await context.request.get(`/api/workspaces/${workspaceId}/tasks/${taskId}`)).json();
-  expect((await context.request.patch(`/api/workspaces/${workspaceId}/tasks/${taskId}`, { headers: { origin }, data: { title: current.title, description: current.description, status: current.status, revision: current.revision } })).status()).toBe(200);
+  // A real competing edit is required: task 014 leaves unchanged saves at the same revision.
+  expect((await context.request.patch(`/api/workspaces/${workspaceId}/tasks/${taskId}`, { headers: { origin }, data: { title: current.title, description: current.description + " (saved elsewhere)", status: current.status, revision: current.revision } })).status()).toBe(200);
   await aAgain.getByRole("button", { name: "Save changes", exact: true }).click();
   await expect(aAgain.getByRole("region", { name: "Saved version" })).toBeVisible();
   const sameUserCheck = page.waitForResponse(response => response.url().includes("/api/planner-session"));

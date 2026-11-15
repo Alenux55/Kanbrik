@@ -42,7 +42,7 @@ The implemented sections record tasks 001–009; capture sections remain a plann
 
 ## Projects and tasks (implemented task 005)
 
-- `Project` and `Task` are canonical workspace-owned records added by `202611050002_projects_tasks`; the original applied migration is unchanged. Both have stable IDs, title, plain-text description, timestamps, and revision starting at 1. Task adds fixed status (default `todo`), optional project, and optional parent task. The shared status labels/completion definition live in `src/lib/task-statuses.ts`; PostgreSQL's enum rejects unsupported IDs.
+- `Project` and `Task` are canonical workspace-owned records added by `202611050002_projects_tasks`; the original applied migration is unchanged. Both have stable IDs, title, plain-text description, timestamps, and revision starting at 1. Task initially added enum status (default `todo`), optional project and optional parent. Task 016 converts the existing column in place to a workspace-owned status reference; task DTOs expose saved labels/completion metadata. Legacy constants remain for seeds/older history.
 - Composite foreign keys `(projectId, workspaceId)` and `(parentId, workspaceId)` prevent foreign-workspace references. A trigger enforces NULL-safe parent/project equality and a root-only parent; a child is the same Task model and cannot have children. Self-parenting, invalid lengths/revisions, and context changes are rejected in SQL too. Task workspace/project/parent and Project workspace assignments are immutable in this slice. Server validation gives deliberate errors before writing. Parent/child statuses never cascade.
 - Workspace owner/editor access follows the existing personal-owner predicate and shared membership boundary. `workspaceContent` verifies the session, checks scope, takes the same workspace row lock used by membership mutation, then rechecks current access inside the transaction. Content operations (including reads) serialize with membership removal. A queued removed editor cannot write after the removal commits; content authorship adds no private sharing exception.
 - `src/server/planning.ts` centralizes list/detail/create/update operations. Resource collections are `/api/workspaces/[id]/projects` and `/api/workspaces/[id]/tasks`; details append `/[recordId]`. GET collection returns an array ordered by creation time then ID; GET detail returns one record. POST returns 201 and the committed record. PATCH returns 200 and the committed record. Responses contain scalar record fields only (timestamps serialize as ISO strings); no user/session/membership records. Reads/responses use `no-store` and protected pages are dynamic.
@@ -165,7 +165,7 @@ Acceptance revalidates Origin and absence of a signed-in session, checks the tok
 | User view preference | Selected workspace IDs; never grants membership |
 | Project | Workspace-owned planning context and description |
 | Task | Canonical work with workspace, optional project/parent task, and status |
-| Status definition | Central fixed definitions with stable IDs; no customization initially |
+| Status definition | Workspace-local stable IDs, owner-managed definitions and explicit default/completion metadata (016) |
 | List/checklist | Workspace-owned simpler task/item organization; exact item semantics remain open |
 | Time block | Workspace-owned start/end/time-zone context and optional project/task reference |
 | Inbox item/note | Workspace-owned capture or reference content |
@@ -182,13 +182,51 @@ Every Trash read/preview/move/restore uses the existing identity/account/Origin 
 
 Existing scheduled blocks and create-intent ledgers are untouched by Trash/Restore. Blocks expose Work in Trash metadata and retain IDs, intervals and work references. Existing reference retention, assignment clearing and block removal remain allowed; new assignments to trashed work fail. Restore neither recreates removed blocks nor overwrites reassignment. Confirmed moves retire only affected canonical drafts and new drafts under affected ancestors; unrelated work, prior separate batches and Calendar drafts remain. Operation intents/locks live in the account-scoped provider and use existing lease guards. Full reload/sign-out loses memory-only input.
 
-The mobile Calendar now renders a day time grid by default; desktop initially uses week. Explicit view choices survive resizing; narrow week overflow stays inside the grid. Board presents all fixed statuses in one horizontal region below the desktop breakpoint. Work-card activation edits canonical work; mouse dragging schedules, while New block/work selection supplies keyboard/touch scheduling. Gesture draft retention is independent of editor mounting: pending, successful, failed and ambiguous gestures never auto-open an editor. Recovery requires explicit Review; residual gesture clicks are suppressed until a new intentional pointer/key activation. Calendar Remove deletes only its block after confirmation.
+The mobile Calendar now renders a day time grid by default; desktop initially uses week. Explicit view choices survive resizing; narrow week overflow stays inside the grid. Board presents each workspace workflow in a labeled horizontal region on narrow screens. Work-card activation edits canonical work; mouse dragging schedules, while New block/work selection supplies keyboard/touch scheduling. Gesture draft retention is independent of editor mounting: pending, successful, failed and ambiguous gestures never auto-open an editor. Recovery requires explicit Review; residual gesture clicks are suppressed until a new intentional pointer/key activation. Calendar Remove deletes only its block after confirmation.
 
 Work-editor Trash links use the shared dialog's explicit preserve-and-navigate action. It verifies the account, awaits an idempotent release of its owned history entry, checks the mounted editor/account and pending state again, then closes and pushes the real workspace route. Ordinary dirty close still offers discard confirmation. Failed identity verification retains the editor/input; a canceled transfer after history release reacquires the slot for the same live account. Navigation never discards work or Trash intents, changes the creation default, or releases save locks. A completed transfer restores focus to main content rather than an obsolete source control.
 
-### Planned comments and history (task 014; not implemented)
+### Comments and edit history (task 014)
 
-Planned [task 014 comments/history](tasks/014-comments-and-edit-history.md), after task 013 review, adds workspace-scoped comments referencing canonical work and append-only activity generated transactionally with tracked mutations. The specification requires server identity/timestamps, independent comment revisions/idempotent creates, current membership for history reads, exact before/after data and retained records through Trash/Restore. It must integrate all mutation entry points (including Board status and lifecycle actions), not only editor saves. No comment/history schema, API or activity backfill exists yet; the task documents recommended author-only comment editing and no fabricated past history.
+`WorkComment` references exactly one canonical Project or Task using workspace-consistent foreign keys; subtasks remain Tasks. Authors and posting time come from the server, with an immutable safe display-name snapshot retained if the account becomes unavailable. Text is bounded plain text, escaped by React. A comment has its own revision, immutable created time and optional edited time; work revisions/updated times do not change when comments are posted or edited. Author-only edits check current membership and expected comment revision. Matching unchanged text does not acquire a new revision or timestamp; stale revisions require explicit review even when text happens to match.
+
+GET/POST `/api/workspaces/[id]/projects/[recordId]/comments`, PATCH `.../comments/[commentId]` and GET `.../history` have equivalent Task routes. Responses are no-store. Strict bodies reject supplied author/context/times, mutations check Origin/account, and every read/write/cursor uses the existing workspace lock and membership/personal-owner recheck. A workspace-unique UUID create key binds the author, exact target and immutable original text. Retry returns the existing comment, including a later edited version, without inserting again. A committed replay can reconcile in Trash; fresh changes cannot. Comments order oldest first and history newest first by timestamp plus ID; cursors are looked up under the same authorized target, default 25/max 50 rows.
+
+`WorkActivity` stores trusted actor snapshot, UTC instant, target, work/comment revision and actual before/after fields. The shared transaction writes each work create/update, Board status, comment mutation and each affected Trash/Restore member together with its event. No-op operations, idempotent replays, scheduling and rollback produce no content event. Subtree events share the original TrashBatch ID/title and identify cascade members. Event keys enforce one entry per tracked revision. Database guards reject rewriting/reassigning events or original comment context, and check comment-event target consistency. Nullable user FKs can be cleared on account removal without erasing display snapshots. There is no public history mutation/purge API; these records are application activity, not tamper-proof compliance auditing against a database administrator.
+
+The additive migration seeds `ActivityBoundary` at activation and deliberately backfills no events. The UI says when recording became available and identifies work lacking a recorded creation event. Existing table data is unchanged. Comments/history remain attached through Trash/Restore; authorized Trash detail is always read-only, and comment services independently reject fresh changes to inactive work or work under an inactive ancestor.
+
+Account-bound `PlanningDrafts` holds comment input separately by workspace/kind/record/comment or new intent. A common per-target in-flight exclusion prevents work, comment and Trash saves competing in the same editor, while comments retain independent server revisions. Both draft types participate in dirty/pending/Keep draft/discard, native Back and explicit preserve-and-navigate Trash links. Successful comment saves keep work drafts; saving work keeps any comment draft open. Uncertain creates freeze the original input/key for reconciliation. Conflict review changes only the comment revision. Trash retirement clears affected work drafts but retains paused comment drafts. Workspace revocation/sign-out/account invalidation clear protected comment data, and lease/mounted/generation guards reject late loads/saves. Explicit Refresh activity leaves drafts untouched; failed lists are labeled incomplete and editable stale content is removed. Timestamps use the viewing user's saved zone with offset and original ISO instant available on each time element.
+
+### Work-attached lists and extension receipts (015)
+
+`WorkList` references exactly one project/task; `WorkListItem` duplicates its supported kind through a composite FK. Typed checklist/shopping columns and same-workspace vendor references prevent arbitrary-field/foreign assignments. Independent revisions and reversible archive preserve work/comment revisions. Work-level activity has explicit subject kind/ID/revision for list/item/order events; vendor and workflow/tag metadata use append-only `WorkspaceActivity`, not fabricated task edits. Configuration UI shows the latest 50 events and says so.
+
+All supplemental APIs use `workspaceContent`: verified current identity, personal-owner/current membership predicates, workspace row lock followed by reauthorization. Mutations require exact Origin/strict bodies and honor expected-account rejection. `WorkspaceIntent` binds stable UUID, actor, kind, exact payload and result. A successful replay acknowledges original creation/move without reapplying over later changes; another actor/payload cannot reuse it. No-op/failed mutations create no false event. Activity/receipt/row commits are one transaction.
+
+Supplemental drafts share the account-bound memory provider, pending dismissal/native Back, beforeunload and genuine revocation cleanup. Target work/comment/list/tag mutations exclude duplicate in-flight actions through the target lock without sharing content revisions. Ordering uses a separate scope lock. Late callbacks require current lease/generation and cannot release another account's locks. Missing work triggers an explicit workspace check; only verified membership loss removes that scope. Failed loads preserve input and do not unlock inactive work. Trash detail is always read-only.
+
+### Custom tags and Calendar display predicates (017)
+
+`WorkspaceTag` stores stable ID, workspace, trimmed name, database-lower normalized unique name, validated six-color palette key, revision and archive time. Unique names include archives. `TaskTag` has composite task/tag workspace FKs; DB guards reject foreign/archived new assignments and mutable association identity. Definitions are bounded at 200/workspace; each task accepts up to 20 unique IDs. Same-name creates serialize/reconcile under the workspace lock; receipt retries return the existing definition. Configuration rename/recolor/archive leaves task revisions/timestamps intact.
+
+Canonical task creation/update validates all tag IDs, retains existing archived associations, applies the tag-set under the task revision and emits actual ID/name-snapshot changes atomically. Omitted tagIds preserves older clients' associations. DTOs include canonical tag definitions; Calendar joins those associations without copying tags onto blocks. The additive reconciliation migration turns any prior true Important/Urgent columns into ordinary scoped tags, retaining original work revisions/timestamps, then removes both columns. Legacy boolean history is retained/readable; there is one live tag model.
+
+`project-palette.ts` extracts the exact original six colors/order; project hashing is unchanged. Accessible editor suggestions are a synchronous filter over a guarded authorized workspace response, so typing creates nothing and older network replies cannot replace newer targets/accounts. Explicit Create saves definitions; assignment requires explicit selection and task Save. Dirty definition input uses the supplemental provider with stable uncertain requests. Metadata refresh never replaces selected IDs or other work/comment/list input.
+
+Per-view account-memory tag filters use own-workspace Any/All identities. Projects retains contextual ancestry without counting it; active filtering disables sibling order. Calendar applies one consistent project/tag/text meaning to palette, blocks and agenda: task's own project/tags, project-only block's project, explicit standalone option; no inferred parent/project tag inheritance. Text matches title/description/displayed context and block labels, never comments/history. Empty/project-only blocks cannot match tags. Hidden blocks remain reserved and cannot become hit-test targets; full authorized block-editor choices remain separate from display filtering. Clear/count/incomplete notices describe this distinction.
+
+### Shared sibling order (018)
+
+`TaskOrderScope` owns one workspace/project-root or workspace/parent-child scope and the complete retained ID array, including Trash. Migration backfills creation-time/ID order without content edits. SQL checks require exact same-scope membership/context and independent revision advancement. Real creates append atomically; actual Trash/Restore advances each affected group once without changing unrelated content revisions.
+
+Move validates the full active sibling set, source/anchor, expected group revision, active ancestors and immutable workspace/project/parent. One moved-task activity event records positional changes; no sibling text revisions are bumped. Replayed receipt returns current order without repeating a move. A no-op has no revision/event. Client mouse drag uses per-scope DndContext, explicit handles/control-bar targets and pointer hit testing; root subtrees move together, child order is independent. Touch scrolling and explicit Move controls remain available; filtered/incomplete groups disable reorder.
+
+Adopted Restore policy is retained slots: active moves replace active slots only; inactive IDs keep their slots. A/B/C → Trash B → C before A stores C/B/A; Restore merges as C/B/A, preserving later active order and inactive relative placement. This is an implementation default for coordinator review, differing from the task's original suggested append fallback.
+
+### Separately planned Calendar drop preview (019)
+
+[Task 019](tasks/019-calendar-drop-preview.md) remains an unimplemented separate assignment. Combined 014–018 preserves final-drop/gesture behavior and does not add live hover previews.
 
 ### Existing ownership boundary
 
@@ -201,11 +239,15 @@ Planned [task 014 comments/history](tasks/014-comments-and-edit-history.md), aft
 
 ## Board and status invariants
 
-- Centralize backlog, todo, in_progress, blocked, and done as stable IDs, with labels and completion meaning defined once. Only done means complete.
-- All workspaces use the same five statuses initially. The combined board groups directly by status without workflow mapping.
-- Card moves change status and preserve workspace/project identity. Reordering never silently transfers ownership.
-- Project, board, list, and calendar share canonical tasks and application operations.
-- Central definitions reduce future customization cost. Workspace-specific statuses would still require deliberate schema/API evolution and data migration; do not build the editing system now.
+### Workspace configuration implemented by task 016
+
+The original five IDs remain per-workspace seeds and legacy-history labels. `WorkspaceStatus(workspaceId,id)` owns name/order/completed/revision/archive, with `WorkspaceWorkflow` holding independent revision/default. Task status is text with a composite same-workspace FK. The migration uses ALTER TYPE USING to preserve existing values/revisions/timestamps and initializes every workspace; a workspace-insert trigger creates the same five/default atomically for new workspaces.
+
+Owner-only GET/preview/apply configuration uses expected workflow revision, exact impact digest and stable actor/payload receipt. Adopted bounds: 1–50 active, 200 total, 80-character names, unique active names and an active incomplete default. Duplicate/simultaneous name swaps reject with an intermediate-rename instruction. Completion flags/default/name/order have explicit review; task completion consumers use DTO metadata, never a literal done ID after configuration.
+
+Retiring occupied definitions requires explicit active-task replacements under the same workspace lock; changed tasks revise once and record actual status label snapshots. Trash keeps its original status/member revisions. Restore responds with exact digest/required replacements, then atomically resolves those statuses and lifecycle in one work revision/event. Legacy event labels use seed fallback without history rewrite. Retired identities are retained; there is no permanent purge.
+
+Board scopes identify both workspace and status, label separate workflows and reject cross-workspace drops. New editor tasks use the destination's saved default; existing dirty status/base revision remains unchanged until explicit review. Configuration receipt replay acknowledges its original operation and returns current metadata without undoing a newer workflow. Coordinated rollout requires migrations, client generation/build, server restart and browser reload of cached five-column clients; existing literal seeded IDs remain valid only within their route workspace, unknown/retired new selections reject. This policy transition is included in AGENTS for independent review; tasks 014/015 alone do not authorize statuses.
 
 ## Scheduling and integrity
 
@@ -227,3 +269,20 @@ Planned [task 014 comments/history](tasks/014-comments-and-edit-history.md), aft
 ## SilverBullet boundary
 
 In the proposed standalone design, Kanbrik owns workspace permissions, tasks, status, and schedules. SilverBullet may hold linked reference notes. Two-way synchronization and embedded planner UI are outside the initial proposal.
+
+
+### Extension HTTP surface (014–018)
+
+| Route under `/api/workspaces/:workspaceId` | Operations |
+| --- | --- |
+| `/projects/:id/comments`, `/tasks/:id/comments` and `/:commentId` | Read/post plain text; author revision edit |
+| `/projects/:id/history`, `/tasks/:id/history` | Cursor-paginated immutable work history |
+| `/projects/:id/lists`, `/tasks/:id/lists` and `/:listId` | Read/create sections; revision rename/archive |
+| List `/:listId/items` and `/:itemId` | Stable-intent create; revision edit/check/archive |
+| `/vendors`, `/vendors/:id` | Read/create and revision rename/archive workspace choices |
+| `/workflow`, `/workflow/preview` | Member read; owner preview/apply complete retained definitions |
+| `/tags`, `/tags/:id` | Member read/create and revision rename/recolor/archive |
+| `/task-order` | Read complete active projections; expected-scope-revision move |
+| `/configuration-history` | Member read of latest 50 append-only metadata events |
+
+All routes authorize current workspace access and return no-store JSON through the established wrappers; mutations retain exact Origin, strict bodies and expected-account checks. Tag assignment/removal uses canonical task create/PATCH `tagIds`, not a second task or block-tag endpoint. Task tag-set conflicts use the task revision; metadata uses its own revision. Workflow previews are read-only but require the same owner/body/Origin checks as their confirm operation.

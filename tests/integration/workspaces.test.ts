@@ -250,7 +250,7 @@ describe("canonical projects/tasks through real HTTP and PostgreSQL", () => {
     for (const status of taskStatusIds) {
       const response = await patch(`${base()}/tasks/${child.id}`, { ...edit(revision++), status }, editor.cookie);
       expect(response.status).toBe(200); expect((await response.json()).status).toBe(status);
-      expect(taskCompleted(status)).toBe(status === "done");
+      expect(taskCompleted({completed:status==="done"})).toBe(status === "done");
     }
     expect((await (await get(`${base()}/tasks/${parent.id}`)).json()).status).toBe("todo");
     expect((await patch(`${base()}/tasks/${parent.id}`, { ...edit(), status: "done" })).status).toBe(200);
@@ -280,7 +280,8 @@ describe("canonical projects/tasks through real HTTP and PostgreSQL", () => {
       expect((await post(`${base()}/tasks`, body, owner.cookie)).status).toBe(400);
     }
     for (const values of [{ projectId: project.id }, { workspaceId: otherId }, { parentId: parent.id }, { revision: 0 }, { status: "archived" }, { revision: 1.5 }]) {
-      expect((await patch(`${base()}/tasks/${parent.id}`, { ...edit(), ...values })).status).toBe(400);
+      const latest=await(await get(`${base()}/tasks/${parent.id}`)).json();
+      expect((await patch(`${base()}/tasks/${parent.id}`, { ...edit(latest.revision), ...values })).status).toBe(400);
     }
     for (const body of [{ title: " " }, { title: "x", creatorId: owner.id }, { title: "x", description: "x".repeat(20001) }]) {
       expect((await post(`${base()}/projects`, body, owner.cookie)).status).toBe(400);

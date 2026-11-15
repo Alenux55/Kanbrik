@@ -1,4 +1,7 @@
 "use client";
+import { matchesLabels, labelsActive } from "@/lib/task-labels";
+import { TaskLabelBadges, TaskLabelFilter } from "./task-labels";
+import { statusName } from "@/lib/task-statuses";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { calendarDropTarget } from "@/lib/calendar-hit";
@@ -476,7 +479,7 @@ function CalendarScope({
                   workspaceId: workspace.id,
                   kind: "task" as const,
                   title: item.title,
-                  context: `${item.status} · ${ps.find((p) => p.id === item.projectId)?.title ?? "Standalone"}${item.parentId ? ` · Subtask of ${ts.find((t) => t.id === item.parentId)?.title}` : ""}`,
+                  context: `${statusName(item)} · ${ps.find((p) => p.id === item.projectId)?.title ?? "Standalone"}${item.parentId ? ` · Subtask of ${ts.find((t) => t.id === item.parentId)?.title}` : ""}`,
                 })),
               ];
           return {
@@ -765,10 +768,42 @@ function CalendarScope({
   }
 
   if (!scopes) return <p role="status">Loading calendar…</p>;
-  const all = scopes
+  const labelFilter = store.viewLabels.calendar,
+    labelActive = labelsActive(labelFilter);
+  const unfilteredBlocks = scopes
     .filter((scope) => visibleIds.includes(scope.workspace.id))
     .flatMap((scope) => scope.blocks);
   const work = scopes.flatMap((scope) => scope.work);
+  const search = (labelFilter.search ?? "").trim().toLowerCase(),
+    projectFilter = labelFilter.projects ?? [];
+  const displayFiltering = labelActive || !!search || !!projectFilter.length;
+  const matchesProject = (id: string | null) =>
+    !projectFilter.length || projectFilter.includes(id ?? "standalone");
+  const textMatches = (...values: (string | undefined)[]) =>
+    !search || values.some((v) => v?.toLowerCase().includes(search));
+  function matchesWork(item: Work) {
+    const task = item.kind === "task" ? (item.record as TaskRecord) : null;
+    return (
+      matchesProject(task ? task.projectId : item.id) &&
+      (!labelActive || (!!task && matchesLabels(task, labelFilter))) &&
+      textMatches(item.title, item.record.description, item.context)
+    );
+  }
+  const all = unfilteredBlocks.filter(
+    (block) =>
+      matchesProject(block.task?.projectId ?? block.projectId) &&
+      (!labelActive ||
+        (!!block.task && matchesLabels(block.task, labelFilter))) &&
+      textMatches(
+        block.label,
+        block.task?.title,
+        block.task?.description,
+        block.task?.projectTitle,
+        block.task?.parentTitle,
+        block.project?.title,
+        block.project?.description,
+      ),
+  );
   const retained = Object.values(calendarDrafts).filter(
     (draft) =>
       draft.base &&
@@ -778,7 +813,7 @@ function CalendarScope({
       ),
   );
   const selected =
-    all.find((block) => block.id === editing) ??
+    unfilteredBlocks.find((block) => block.id === editing) ??
     retained.find((draft) => draft.base?.id === editing)?.base;
   const incomplete = scopes.some((scope) => scope.failed);
   return (
@@ -808,8 +843,95 @@ function CalendarScope({
       {savingKeys.some((key) => key.startsWith("calendar:")) && (
         <p role="status">Saving Calendar change…</p>
       )}
+      <TaskLabelFilter
+        value={labelFilter}
+        onChange={(value) =>
+          store.setViewLabels((current) => ({ ...current, calendar: value }))
+        }
+      />
+      <fieldset
+        aria-label="Calendar project and text filters"
+        className="my-3 min-w-0 space-y-2 rounded border p-3"
+      >
+        <legend>Filter and search</legend>
+        <label className="block">
+          Search work and block labels
+          <input
+            className={control}
+            value={labelFilter.search ?? ""}
+            onChange={(e) =>
+              store.setViewLabels((current) => ({
+                ...current,
+                calendar: { ...current.calendar, search: e.target.value },
+              }))
+            }
+          />
+        </label>
+        <div className="flex max-h-40 flex-wrap gap-2 overflow-y-auto">
+          {[
+            ...work
+              .filter((item) => item.kind === "project")
+              .map((item) => ({
+                id: item.id,
+                title: `${item.title} (${scopes.find((s) => s.workspace.id === item.workspaceId)?.workspace.name})`,
+              })),
+            { id: "standalone", title: "Standalone work / unassigned blocks" },
+          ].map((project) => (
+            <label
+              key={project.id}
+              className="inline-flex min-h-11 max-w-full items-center gap-2 break-words"
+            >
+              <input
+                type="checkbox"
+                checked={projectFilter.includes(project.id)}
+                onChange={(e) =>
+                  store.setViewLabels((current) => ({
+                    ...current,
+                    calendar: {
+                      ...current.calendar,
+                      projects: e.target.checked
+                        ? [...projectFilter, project.id]
+                        : projectFilter.filter((id) => id !== project.id),
+                    },
+                  }))
+                }
+              />
+              {project.title}
+            </label>
+          ))}
+        </div>
+        <p>
+          Project, tag and text filters combine with AND. Text searches titles,
+          descriptions, displayed project/parent names and block labels.
+          Comments/history are excluded. Task tags apply to the task palette and
+          every task-linked block; project-only and unassigned blocks have no
+          task tags. Block editors offer all authorized active work. Hidden
+          reservations remain saved and cannot be drop targets.
+        </p>
+        <button
+          type="button"
+          className={button}
+          onClick={() =>
+            store.setViewLabels((current) => ({
+              ...current,
+              calendar: {
+                tagIds: [],
+                tagScopes: {},
+                matchAll: false,
+                projects: [],
+                search: "",
+              },
+            }))
+          }
+        >
+          Clear Calendar filters
+        </button>
+      </fieldset>
       <p className="my-3">
-        {incomplete ? "Loaded" : "Total"} blocks in range: {all.length}.
+        {displayFiltering ? "Matching" : ""} {incomplete ? "Loaded" : "Total"}{" "}
+        blocks in range: {all.length}
+        {displayFiltering ? ` of ${unfilteredBlocks.length} total` : ""}.
+        Matching work cards: {work.filter(matchesWork).length} of {work.length}.
         Overlaps allowed; intervals end exclusively.
       </p>
       <button
@@ -901,7 +1023,7 @@ function CalendarScope({
             {scopes.map((scope) => (
               <div key={scope.workspace.id}>
                 <h3>{scope.workspace.name}</h3>
-                {scope.work.map((item) => (
+                {scope.work.filter(matchesWork).map((item) => (
                   <Palette
                     key={`${item.kind}:${item.id}`}
                     item={item}
@@ -1169,7 +1291,8 @@ function CalendarScope({
                     )?.workspace.name
                   }{" "}
                   · {block.project?.title ?? block.task?.title ?? "Empty block"}{" "}
-                  {block.task?.status ?? ""}
+                  {block.task ? statusName(block.task) : ""}
+                  {block.task && <TaskLabelBadges task={block.task} />}
                 </p>
                 <button
                   className={button}
@@ -1318,6 +1441,9 @@ function Palette({ item, open }: { item: Work; open: () => void }) {
         style={{ opacity: isDragging ? 0.4 : 1 }}
       >
         {item.title} · {item.context}
+        {item.kind === "task" && (
+          <TaskLabelBadges task={item.record as TaskRecord} />
+        )}
       </button>
     </div>
   );

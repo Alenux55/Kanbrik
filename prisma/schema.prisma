@@ -24,7 +24,11 @@ model User {
   plannerPreference PlannerPreference?
   sentInvitations AccountInvitation[]
   trashOperations TrashBatch[]
+  workComments WorkComment[]
+  workActivities WorkActivity[]
   @@map("user")
+  workspaceActivity WorkspaceActivity[]
+  operationIntents WorkspaceIntent[]
 }
 
 model Session {
@@ -82,6 +86,8 @@ enum WorkspaceRole {
 }
 
 model Workspace {
+  tags WorkspaceTag[]
+  taskTags TaskTag[]
   id              String @id @default(cuid())
   name            String
   kind            WorkspaceKind
@@ -95,7 +101,17 @@ model Workspace {
   timeBlocks      TimeBlock[]
   calendarIntents CalendarCreateIntent[]
   trashBatches TrashBatch[]
+  comments WorkComment[]
+  activities WorkActivity[]
   createdAt       DateTime @default(now())
+  workLists WorkList[]
+  workItems WorkListItem[]
+  vendors WorkspaceVendor[]
+  configurationActivity WorkspaceActivity[]
+  operationIntents WorkspaceIntent[]
+  statuses WorkspaceStatus[]
+  workflow WorkspaceWorkflow?
+  taskOrders TaskOrderScope[]
 }
 
 model Membership {
@@ -109,13 +125,7 @@ model Membership {
   @@index([userId])
 }
 
-enum TaskStatus {
-  backlog
-  todo
-  in_progress
-  blocked
-  done
-}
+
 
 model BoardPreference {
   userId String @id
@@ -137,9 +147,13 @@ model Project {
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   tasks       Task[]
   timeBlocks  TimeBlock[]
+  comments WorkComment[]
+  activities WorkActivity[]
   @@unique([id, workspaceId])
   @@index([workspaceId, createdAt, id])
   @@index([workspaceId, trashBatchId])
+  workLists WorkList[]
+  taskOrders TaskOrderScope[]
 }
 
 model Task {
@@ -149,7 +163,7 @@ model Task {
   parentId    String?
   title       String
   description String @default("")
-  status      TaskStatus @default(todo)
+  status      String @default("todo")
   revision    Int @default(1)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -161,11 +175,77 @@ model Task {
   parent      Task? @relation("Subtasks", fields: [parentId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
   children    Task[] @relation("Subtasks")
   timeBlocks  TimeBlock[]
+  comments WorkComment[]
+  activities WorkActivity[]
   @@unique([id, workspaceId])
   @@index([workspaceId, createdAt, id])
   @@index([projectId, workspaceId])
   @@index([parentId, workspaceId])
   @@index([workspaceId, trashBatchId])
+  workLists WorkList[]
+  workflowStatus WorkspaceStatus @relation(fields:[workspaceId,status], references:[workspaceId,id], onDelete:NoAction)
+  tagLinks TaskTag[]
+  childOrders TaskOrderScope[] @relation("ChildOrder")
+}
+
+model ActivityBoundary {
+  id String @id
+  activatedAt DateTime @default(now()) @db.Timestamptz(3)
+}
+
+model WorkComment {
+  id String @id @default(cuid())
+  workspaceId String
+  projectId String?
+  taskId String?
+  authorId String?
+  authorName String
+  requestKey String
+  createText String
+  text String
+  revision Int @default(1)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  editedAt DateTime? @db.Timestamptz(3)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project Project? @relation(fields: [projectId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  task Task? @relation(fields: [taskId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  author User? @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  activities WorkActivity[]
+  @@unique([workspaceId, id])
+  @@unique([workspaceId, requestKey])
+  @@index([workspaceId, projectId, createdAt, id])
+  @@index([workspaceId, taskId, createdAt, id])
+}
+
+model WorkActivity {
+  id String @id @default(cuid())
+  workspaceId String
+  projectId String?
+  taskId String?
+  actorId String?
+  actorName String
+  occurredAt DateTime @default(now()) @db.Timestamptz(3)
+  eventKey String
+  action String
+  workRevision Int?
+  commentRevision Int?
+  commentId String?
+  changes Json
+  operationId String?
+  operationTitle String?
+  operationKind String?
+  cascade Boolean @default(false)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project Project? @relation(fields: [projectId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  task Task? @relation(fields: [taskId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  comment WorkComment? @relation(fields: [workspaceId, commentId], references: [workspaceId, id], onDelete: NoAction)
+  @@unique([workspaceId, eventKey])
+  @@index([workspaceId, projectId, occurredAt, id])
+  @@index([workspaceId, taskId, occurredAt, id])
+  subjectKind String?
+  subjectId String?
+  subjectRevision Int?
 }
 
 model TrashBatch {
@@ -241,4 +321,144 @@ model AccountInvitation {
   expiresAt DateTime
   consumedAt DateTime?
   @@index([inviterId, createdAt])
+}
+
+
+model WorkList {
+  id String @id @default(cuid())
+  workspaceId String
+  projectId String?
+  taskId String?
+  kind String
+  name String
+  revision Int @default(1)
+  archivedAt DateTime? @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @default(now()) @db.Timestamptz(3)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project Project? @relation(fields: [projectId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  task Task? @relation(fields: [taskId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  items WorkListItem[]
+  @@unique([workspaceId,id,kind])
+  @@unique([workspaceId,id])
+  @@index([workspaceId,projectId,createdAt,id])
+  @@index([workspaceId,taskId,createdAt,id])
+}
+model WorkListItem {
+  id String @id @default(cuid())
+  workspaceId String
+  listId String
+  kind String
+  text String
+  checked Boolean @default(false)
+  quantity Decimal? @db.Decimal(12,3)
+  vendorId String?
+  purchased Boolean @default(false)
+  revision Int @default(1)
+  archivedAt DateTime? @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @default(now()) @db.Timestamptz(3)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  list WorkList @relation(fields: [workspaceId,listId,kind], references: [workspaceId,id,kind], onDelete: Cascade)
+  vendor WorkspaceVendor? @relation(fields: [workspaceId,vendorId], references: [workspaceId,id], onDelete: NoAction)
+  @@unique([workspaceId,id])
+  @@index([workspaceId,listId,createdAt,id])
+}
+model WorkspaceVendor {
+  id String @id @default(cuid())
+  workspaceId String
+  name String
+  revision Int @default(1)
+  archivedAt DateTime? @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  items WorkListItem[]
+  @@unique([workspaceId,id])
+  @@index([workspaceId,createdAt,id])
+}
+model WorkspaceActivity {
+  id String @id @default(cuid())
+  workspaceId String
+  actorId String?
+  actorName String
+  occurredAt DateTime @default(now()) @db.Timestamptz(3)
+  action String
+  subjectId String
+  revision Int
+  changes Json
+  eventKey String
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  @@unique([workspaceId,eventKey])
+  @@index([workspaceId,occurredAt,id])
+}
+model WorkspaceIntent {
+  workspaceId String
+  id String
+  kind String
+  actorId String?
+  payload Json
+  result Json
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  @@id([workspaceId,id])
+}
+
+model WorkspaceStatus {
+ workspaceId String
+ id String
+ name String
+ position Int
+ completed Boolean @default(false)
+ revision Int @default(1)
+ archivedAt DateTime? @db.Timestamptz(3)
+ workspace Workspace @relation(fields:[workspaceId],references:[id],onDelete:Cascade)
+ tasks Task[]
+ defaults WorkspaceWorkflow[]
+ @@id([workspaceId,id])
+ @@index([workspaceId,position,id])
+}
+model WorkspaceWorkflow {
+ workspaceId String @id
+ revision Int @default(1)
+ defaultStatusId String @default("todo")
+ workspace Workspace @relation(fields:[workspaceId],references:[id],onDelete:Cascade)
+ defaultStatus WorkspaceStatus @relation(fields:[workspaceId,defaultStatusId],references:[workspaceId,id],onDelete:NoAction)
+}
+
+model TaskOrderScope {
+ workspaceId String
+ scopeKey String
+ projectId String?
+ parentId String?
+ ids String[]
+ revision Int @default(1)
+ workspace Workspace @relation(fields:[workspaceId],references:[id],onDelete:Cascade)
+ project Project? @relation(fields:[projectId,workspaceId],references:[id,workspaceId],onDelete:Cascade)
+ parent Task? @relation("ChildOrder",fields:[parentId,workspaceId],references:[id,workspaceId],onDelete:Cascade)
+ @@id([workspaceId,scopeKey])
+}
+
+model WorkspaceTag {
+ id String @id @default(cuid())
+ workspaceId String
+ name String
+ normalizedName String
+ color String
+ revision Int @default(1)
+ archivedAt DateTime? @db.Timestamptz(3)
+ workspace Workspace @relation(fields:[workspaceId],references:[id],onDelete:Cascade,onUpdate:NoAction)
+ tasks TaskTag[]
+ @@unique([workspaceId,id])
+ @@unique([workspaceId,normalizedName])
+}
+model TaskTag {
+ workspaceId String
+ taskId String
+ tagId String
+ workspace Workspace @relation(fields:[workspaceId],references:[id],onDelete:Cascade,onUpdate:NoAction)
+ task Task @relation(fields:[taskId,workspaceId],references:[id,workspaceId],onDelete:Cascade,onUpdate:NoAction)
+ tag WorkspaceTag @relation(fields:[workspaceId,tagId],references:[workspaceId,id],onDelete:NoAction,onUpdate:NoAction)
+ @@id([workspaceId,taskId,tagId])
 }

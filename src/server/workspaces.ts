@@ -6,7 +6,7 @@ import type { WorkspaceDetail, WorkspaceSummary } from "@/lib/workspace-contract
 
 export class Unauthenticated extends Error {}
 export class WorkspaceDenied extends Error {
-  constructor(public status: 403 | 404, message: string) { super(message); }
+  constructor(public status: 403 | 404 | 409, message: string) { super(message); }
 }
 
 async function actor(headers: Headers) {

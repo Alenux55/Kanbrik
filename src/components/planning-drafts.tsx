@@ -8,6 +8,7 @@ import {
   type Dispatch,
   type SetStateAction,
 } from "react";
+import { emptyLabelFilter, type LabelFilter } from "@/lib/task-labels";
 import type { TaskStatus } from "@/lib/task-statuses";
 import { usePlannerSession } from "./planner-session";
 import { emptyBoardFilters, type BoardFilters } from "@/lib/board-filters";
@@ -30,12 +31,51 @@ export type TrashRestoreDraft = {
   uncertain: boolean;
   error?: string;
   requires?: string;
+  statusResolution?: import("@/lib/trash-contracts").RestoreStatusResolution;
+  statusReplacements?: Record<string, string>;
 };
 
+export type SupplementalDraft = {
+  workspaceId: string;
+  orderScope?: string;
+  target?: EntityTarget;
+  label: string;
+  form?:
+    | "list"
+    | "item-checklist"
+    | "item-shopping"
+    | "vendor"
+    | "workflow"
+    | "order"
+    | "tag";
+  path: string;
+  method: "POST" | "PATCH";
+  values: Record<string, unknown>;
+  uncertain?: boolean;
+  error?: string;
+  conflict?: Record<string, unknown>;
+};
+export type CommentDraft = {
+  target: EntityTarget;
+  text: string;
+  requestKey: string;
+  commentId?: string;
+  revision?: number;
+  uncertain?: boolean;
+  conflict?: import("@/lib/activity-contracts").CommentRecord;
+  error?: string;
+};
+export function commentScope(target: EntityTarget) {
+  return `${target.workspaceId}/${target.kind}/${target.record!.id}/comments/`;
+}
+export function activityLock(target: EntityTarget) {
+  return `activity:${target.workspaceId}/${target.kind}/${target.record!.id}`;
+}
 export type PlanningDraft = {
   title: string;
   description: string;
   status: TaskStatus;
+  tagIds?: string[];
   revision: number;
   dirty: boolean;
   target?: EntityTarget;
@@ -44,6 +84,16 @@ export type PlanningDraft = {
   uncertain?: boolean;
 };
 type DraftStore = {
+  viewLabels: { projects: LabelFilter; calendar: LabelFilter };
+  setViewLabels: Dispatch<
+    SetStateAction<{ projects: LabelFilter; calendar: LabelFilter }>
+  >;
+  supplementalDrafts: Record<string, SupplementalDraft>;
+  setSupplementalDrafts: Dispatch<
+    SetStateAction<Record<string, SupplementalDraft>>
+  >;
+  commentDrafts: Record<string, CommentDraft>;
+  setCommentDrafts: Dispatch<SetStateAction<Record<string, CommentDraft>>>;
   trashMoves: Record<string, TrashMoveDraft>;
   setTrashMoves: Dispatch<SetStateAction<Record<string, TrashMoveDraft>>>;
   trashRestores: Record<string, TrashRestoreDraft>;
@@ -73,6 +123,16 @@ const Context = createContext<DraftStore | null>(null);
 export function PlanningDrafts({ children }: { children: React.ReactNode }) {
   const session = usePlannerSession();
   const [lease] = useState(session.capture);
+  const [viewLabels, setViewLabels] = useState({
+    projects: { ...emptyLabelFilter },
+    calendar: { ...emptyLabelFilter },
+  });
+  const [supplementalDrafts, setSupplementalDrafts] = useState<
+    Record<string, SupplementalDraft>
+  >({});
+  const [commentDrafts, setCommentDrafts] = useState<
+    Record<string, CommentDraft>
+  >({});
   const [drafts, setDrafts] = useState<Record<string, PlanningDraft>>({});
   const [trashMoves, setTrashMoves] = useState<Record<string, TrashMoveDraft>>(
     {},
@@ -91,6 +151,8 @@ export function PlanningDrafts({ children }: { children: React.ReactNode }) {
   const [saveEpoch, setSaveEpoch] = useState(0);
   const documentExitAllowed = useRef(false);
   const dirty =
+    Object.keys(supplementalDrafts).length > 0 ||
+    Object.keys(commentDrafts).length > 0 ||
     [...Object.values(drafts), ...Object.values(calendarDrafts)].some(
       (draft) => draft.dirty,
     ) ||
@@ -113,6 +175,12 @@ export function PlanningDrafts({ children }: { children: React.ReactNode }) {
         documentExitAllowed.current = true;
         inFlight.current.clear();
         setDrafts({});
+        setCommentDrafts({});
+        setSupplementalDrafts({});
+        setViewLabels({
+          projects: { ...emptyLabelFilter },
+          calendar: { ...emptyLabelFilter },
+        });
         setCalendarDrafts({});
         setTrashMoves({});
         setTrashRestores({});
@@ -129,13 +197,24 @@ export function PlanningDrafts({ children }: { children: React.ReactNode }) {
   function prepareSignOut() {
     documentExitAllowed.current = true;
     setDrafts({});
+    setCommentDrafts({});
+    setSupplementalDrafts({});
+    setViewLabels({
+      projects: { ...emptyLabelFilter },
+      calendar: { ...emptyLabelFilter },
+    });
     setCalendarDrafts({});
     setTrashMoves({});
     setTrashRestores({});
   }
   function beginSave(key: string) {
     if (!session.isCurrent(lease)) return false;
-    if (inFlight.current.has(key)) return false;
+    const targetKey = (value: string) =>
+      value.replace(/^(activity:|trash:)/, "");
+    if (
+      [...inFlight.current].some((value) => targetKey(value) === targetKey(key))
+    )
+      return false;
     inFlight.current.add(key);
     setSavingKeys([...inFlight.current]);
     return true;
@@ -151,6 +230,18 @@ export function PlanningDrafts({ children }: { children: React.ReactNode }) {
   return (
     <Context.Provider
       value={{
+        viewLabels,
+        setViewLabels: (value) => {
+          if (session.isCurrent(lease)) setViewLabels(value);
+        },
+        supplementalDrafts,
+        setSupplementalDrafts: (value) => {
+          if (session.isCurrent(lease)) setSupplementalDrafts(value);
+        },
+        commentDrafts,
+        setCommentDrafts: (value) => {
+          if (session.isCurrent(lease)) setCommentDrafts(value);
+        },
         trashMoves,
         setTrashMoves: (value) => {
           if (session.isCurrent(lease)) setTrashMoves(value);

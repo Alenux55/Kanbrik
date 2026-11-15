@@ -2,7 +2,7 @@
 import { EditorNavigationLink } from "./ui/editor-dialog";
 import { useEffect, useRef, useState } from "react";
 import type { EntityTarget } from "./entity-editor";
-import { usePlanningDrafts } from "./planning-drafts";
+import { activityLock, usePlanningDrafts } from "./planning-drafts";
 import { usePlannerSession } from "./planner-session";
 import { usePlannerContext } from "./planner-context";
 import { button } from "./ui/planner-controls";
@@ -33,7 +33,10 @@ export function TrashAction({
     lock = "trash:" + key;
   const intent = store.trashMoves[key];
   const pending = store.savingKeys.includes(lock);
-  const blocked = pending || store.savingKeys.includes(key);
+  const blocked =
+    pending ||
+    store.savingKeys.includes(key) ||
+    store.savingKeys.includes(activityLock(target));
   const path = `/api/workspaces/${target.workspaceId}/trash`;
   function discard() {
     store.setTrashMoves((current) => {
@@ -194,9 +197,9 @@ export function TrashAction({
             in Trash marker.
           </p>
           <p>
-            Unsaved drafts for affected work are retired only after the move is
-            confirmed. Already-trashed descendants keep their own restoration
-            groups.
+            Unsaved work drafts for affected work are retired only after the
+            move is confirmed. Already-trashed descendants keep their own
+            restoration groups.
           </p>
           {intent.uncertain && (
             <p role="status">

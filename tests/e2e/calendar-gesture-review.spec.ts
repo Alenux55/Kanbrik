@@ -298,12 +298,14 @@ test("an ambiguous drop retains an explicit DST review with zero schedule writes
   ).toBeVisible();
   await noDialogs(page);
   expect(writes).toBe(0);
-  await page
-    .getByRole("button", {
-      name: "Review new block draft: Repeated hour work",
-      exact: true,
-    })
-    .click();
+  const review = page.getByRole("button", {
+    name: "Review new block draft: Repeated hour work",
+    exact: true,
+  });
+  await review.focus();
+  // The pinned mouse sensor captures clicks for 50ms after drop. Activate the
+  // deliberate Review on keyup after cleanup, as in the existing Retry case.
+  await page.keyboard.press("Space", { delay: 75 });
   await expect(
     page.getByLabel("Start occurrence (repeated local time)", { exact: true }),
   ).toHaveValue("");

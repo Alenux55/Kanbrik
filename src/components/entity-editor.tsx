@@ -1,14 +1,24 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import type { ProjectRecord, TaskRecord } from "@/lib/planning-contracts";
-import { taskStatusIds, taskStatusLabels } from "@/lib/task-statuses";
+import type { WorkflowRecord } from "@/lib/workflow-contracts";
+import { statusName } from "@/lib/task-statuses";
 import { usePlannerSession } from "./planner-session";
-import { usePlanningDrafts, type PlanningDraft } from "./planning-drafts";
+import {
+  activityLock,
+  commentScope,
+  usePlanningDrafts,
+  type PlanningDraft,
+} from "./planning-drafts";
 import { usePlannerContext } from "./planner-context";
 import { EditorDialog, EditorNavigationLink } from "./ui/editor-dialog";
 import { button, control } from "./ui/planner-controls";
 import { matchesBoard } from "@/lib/board-filters";
 import { TrashAction, trashMoveKey } from "./trash-action";
+import { TaskTagEditor } from "./task-tag-editor";
+import { TaskLabelBadges } from "./task-labels";
+import { WorkListsPanel } from "./work-lists-panel";
+import { WorkActivityPanel } from "./work-activity-panel";
 export type EntityTarget = {
   kind: "projects" | "tasks";
   workspaceId: string;
@@ -28,6 +38,10 @@ export function EntityEditor({
   const [lease] = useState(session.capture);
   const context = usePlannerContext();
   const {
+    supplementalDrafts,
+    setSupplementalDrafts,
+    commentDrafts,
+    setCommentDrafts,
     drafts,
     setDrafts,
     savingKeys,
@@ -44,10 +58,20 @@ export function EntityEditor({
     "/" +
     (record?.id ??
       "new-" + (target.projectId ?? "standalone") + "-" + (parentId ?? "root"));
+  const [data, setData] = useState<{
+    projects: ProjectRecord[];
+    tasks: TaskRecord[];
+    workflow: WorkflowRecord;
+  } | null>(null);
   const initial: PlanningDraft = {
     title: record?.title ?? "",
     description: record?.description ?? "",
-    status: record && "status" in record ? record.status : "todo",
+    status:
+      record && "status" in record
+        ? record.status
+        : (data?.workflow.defaultStatusId ?? "todo"),
+    tagIds:
+      record && "tags" in record ? (record.tags?.map((t) => t.id) ?? []) : [],
     revision: record?.revision ?? 1,
     dirty: false,
     target,
@@ -57,15 +81,24 @@ export function EntityEditor({
         : (target.projectId ?? null),
   };
   const draft = drafts[key] ?? initial;
+  const hasSupplemental = Object.values(supplementalDrafts).some(
+    (d) =>
+      d.target?.workspaceId === workspaceId &&
+      d.target.kind === kind &&
+      d.target.record?.id === record?.id &&
+      (record ||
+        (d.target.projectId === target.projectId &&
+          d.target.parentId === target.parentId)),
+  );
   const moveKey = record ? trashMoveKey(target) : "";
   const pending =
-    savingKeys.includes(key) || savingKeys.includes("trash:" + moveKey);
+    savingKeys.includes("configuration:" + workspaceId) ||
+    savingKeys.includes(key) ||
+    savingKeys.includes("trash:" + moveKey) ||
+    (!!record && savingKeys.includes(activityLock(target)));
   const [unavailable, setUnavailable] = useState(false);
+  const activityAvailability = useRef(false);
   const conflict = draft.conflict;
-  const [data, setData] = useState<{
-    projects: ProjectRecord[];
-    tasks: TaskRecord[];
-  } | null>(null);
   const [error, setError] = useState("");
   const [contextError, setContextError] = useState("");
   const [contextRetry, setContextRetry] = useState(0);
@@ -77,6 +110,7 @@ export function EntityEditor({
     Promise.all([
       session.fetch(`/api/workspaces/${workspaceId}/projects`),
       session.fetch(`/api/workspaces/${workspaceId}/tasks`),
+      session.fetch(`/api/workspaces/${workspaceId}/workflow`),
     ])
       .then(async (responses) => {
         if (!active || !alive.current || !session.isCurrent(lease)) return;
@@ -91,17 +125,18 @@ export function EntityEditor({
           return;
         }
         if (responses.some((r) => !r.ok)) throw new Error();
-        const [projects, tasks] = await Promise.all(
+        const [projects, tasks, workflow] = await Promise.all(
           responses.map((r) => r.json()),
         );
         if (active && alive.current && session.isCurrent(lease)) {
-          setData({ projects, tasks });
-          setUnavailable(
-            !!record &&
-              !(kind === "projects" ? projects : tasks).some(
-                (item: ProjectRecord) => item.id === record.id,
-              ),
-          );
+          setData({ projects, tasks, workflow });
+          if (!activityAvailability.current)
+            setUnavailable(
+              !!record &&
+                !(kind === "projects" ? projects : tasks).some(
+                  (item: ProjectRecord) => item.id === record.id,
+                ),
+            );
           setContextError("");
         }
       })
@@ -133,6 +168,29 @@ export function EntityEditor({
   }
   function discardEditor() {
     discard();
+    setSupplementalDrafts((current) =>
+      Object.fromEntries(
+        Object.entries(current).filter(
+          ([, d]) =>
+            !(
+              d.target?.workspaceId === workspaceId &&
+              d.target.kind === kind &&
+              d.target.record?.id === record?.id &&
+              (record ||
+                (d.target.projectId === target.projectId &&
+                  d.target.parentId === target.parentId))
+            ),
+        ),
+      ),
+    );
+    if (record)
+      setCommentDrafts((current) =>
+        Object.fromEntries(
+          Object.entries(current).filter(
+            ([key]) => !key.startsWith(commentScope(target)),
+          ),
+        ),
+      );
     if (record)
       setTrashMoves((current) => {
         const next = { ...current };
@@ -149,7 +207,12 @@ export function EntityEditor({
       const payload = {
         title: draft.title,
         description: draft.description,
-        ...(kind === "tasks" ? { status: draft.status } : {}),
+        ...(kind === "tasks"
+          ? {
+              status: draft.status,
+              tagIds: draft.tagIds ?? [],
+            }
+          : {}),
         ...(record
           ? { revision: draft.revision }
           : kind === "tasks"
@@ -173,7 +236,17 @@ export function EntityEditor({
           window.location.pathname === "/board" &&
           !matchesBoard(result, boardFilters, context.zone);
         discard();
-        if (alive.current) close();
+        if (alive.current) {
+          if (
+            record &&
+            (hasSupplemental ||
+              Object.keys(commentDrafts).some((key) =>
+                key.startsWith(commentScope(target)),
+              ))
+          )
+            context.openEntity({ ...target, record: result });
+          else close();
+        }
         context.announce(
           `Saved ${result.title}. Check the current filters if it is outside this view.`,
         );
@@ -229,7 +302,15 @@ export function EntityEditor({
   return (
     <EditorDialog
       title={heading}
-      dirty={draft.dirty || !!trashMoves[moveKey]}
+      dirty={
+        hasSupplemental ||
+        draft.dirty ||
+        !!trashMoves[moveKey] ||
+        (!!record &&
+          Object.keys(commentDrafts).some((key) =>
+            key.startsWith(commentScope(target)),
+          ))
+      }
       pending={pending}
       discard={discardEditor}
       close={close}
@@ -276,6 +357,14 @@ export function EntityEditor({
             </select>
           </label>
         )}
+        <button
+          type="button"
+          className={button}
+          disabled={pending}
+          onClick={() => setContextRetry((value) => value + 1)}
+        >
+          Refresh work context
+        </button>
         {record && (
           <p className="text-sm">
             Saved ownership is read-only. Revision {draft.revision}.
@@ -302,7 +391,7 @@ export function EntityEditor({
           </p>
         )}
         <fieldset
-          disabled={pending || unavailable}
+          disabled={pending || unavailable || !data}
           className="min-w-0 space-y-4"
         >
           <label className="block">
@@ -327,6 +416,11 @@ export function EntityEditor({
           </label>
           {kind === "tasks" && (
             <>
+              <TaskTagEditor
+                target={target}
+                selected={draft.tagIds ?? []}
+                onChange={(tagIds) => change({ tagIds })}
+              />
               <label className="block">
                 Status
                 <select
@@ -339,11 +433,20 @@ export function EntityEditor({
                     })
                   }
                 >
-                  {taskStatusIds.map((status) => (
-                    <option key={status} value={status}>
-                      {taskStatusLabels[status]}
+                  {!data?.workflow.definitions.some(
+                    (d) => d.id === draft.status && !d.archivedAt,
+                  ) && (
+                    <option value={draft.status} disabled>
+                      Unavailable status — choose an active status
                     </option>
-                  ))}
+                  )}
+                  {data?.workflow.definitions
+                    .filter((d) => !d.archivedAt)
+                    .map((status) => (
+                      <option key={status.id} value={status.id}>
+                        {status.name}
+                      </option>
+                    ))}
                 </select>
               </label>
               {!record && target.projectId === undefined && !parentId && (
@@ -404,7 +507,12 @@ export function EntityEditor({
             <p className="whitespace-pre-wrap break-words">
               {conflict.description}
             </p>
-            {"status" in conflict && <p>{taskStatusLabels[conflict.status]}</p>}
+            {"status" in conflict && (
+              <>
+                <p>{statusName(conflict)}</p>
+                <TaskLabelBadges task={conflict} />
+              </>
+            )}
             <button
               type="button"
               className={button}
@@ -428,6 +536,23 @@ export function EntityEditor({
           </section>
         )}
       </form>
+      {record && (
+        <WorkActivityPanel
+          target={target}
+          blocked={pending || !!trashMoves[moveKey]}
+          onReadOnly={(value) => {
+            activityAvailability.current = true;
+            setUnavailable(value);
+          }}
+        />
+      )}
+      {record && (
+        <WorkListsPanel
+          readOnly={unavailable}
+          target={target}
+          blocked={pending || !!trashMoves[moveKey]}
+        />
+      )}
       {record && <TrashAction target={target} close={close} />}
     </EditorDialog>
   );

@@ -1,6 +1,6 @@
 # Working on Kanbrik
 
-Kanbrik is a project and task planner with Kanban boards and calendar time blocks. It must work on desktop and Android and include personal and shared workspaces in the first version. Saving edits requires a connection; offline editing is deferred. Initial task statuses are fixed; customizable statuses are a follow-up.
+Kanbrik is a project and task planner with Kanban boards and calendar time blocks. It must work on desktop and Android and include personal and shared workspaces in the first version. Saving edits requires a connection; offline editing is deferred. New workspaces start with the original five task statuses. Task 016 adds workspace-specific workflow configuration.
 
 ## Relevant context
 
@@ -19,7 +19,7 @@ Kanbrik is a project and task planner with Kanban boards and calendar time block
 - Support scheduling through explicit controls as well as dragging. Verify core workflows at an Android-sized viewport and with touch when available.
 - Enforce workspace membership on the server for every applicable read and write. A workspace filter is a display preference, not authorization. Do not log credentials or session secrets.
 - Projects, tasks, lists, notes, and time blocks have explicit workspace ownership. Validate that linked records belong to the same workspace. Changing a board filter or task status must not transfer data between workspaces.
-- Centralize the initial statuses and stable IDs: `backlog`, `todo`, `in_progress`, `blocked`, and `done`. Only `done` means completed. Do not add custom-status UI or a "scheduled" task status in the first version.
+- Preserve the seeded workspace-local status IDs: `backlog`, `todo`, `in_progress`, `blocked`, and `done`. Under task 016, workspace-owned definitions are authoritative for labels, order, default and completion; only seeded `done` starts completed. Never infer completion from a renamed label or a literal ID after configuration. Status changes stay within the task's workspace. Scheduling must not create an automatic "scheduled" status.
 - A failed save must remain visibly unsaved. Do not claim that local browser state provides offline editing or cross-device persistence.
 
 ## Verification and handoff

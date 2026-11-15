@@ -1,8 +1,16 @@
 "use client";
+import {
+  SiblingOrderGroup,
+  SiblingOrderRow,
+  orderRows,
+} from "./task-order-controls";
+import type { TaskOrderRecord } from "@/lib/task-order-contracts";
 import { useEffect, useRef, useState } from "react";
 import type { WorkspaceSummary } from "@/lib/workspace-contracts";
 import type { ProjectRecord, TaskRecord } from "@/lib/planning-contracts";
-import { taskStatusLabels } from "@/lib/task-statuses";
+import { matchesLabels, labelsActive } from "@/lib/task-labels";
+import { TaskLabelBadges, TaskLabelFilter } from "./task-labels";
+import { statusName } from "@/lib/task-statuses";
 import { usePlanningDrafts } from "./planning-drafts";
 import { usePlannerSession } from "./planner-session";
 import { usePlannerContext } from "./planner-context";
@@ -36,10 +44,15 @@ function WorkspacePlanning({ workspace }: { workspace: WorkspaceSummary }) {
   const context = usePlannerContext();
   const session = usePlannerSession();
   const [lease] = useState(session.capture);
-  const { saveEpoch, expansion, setExpansion } = usePlanningDrafts();
+  const { saveEpoch, expansion, setExpansion, viewLabels, setViewLabels } =
+    usePlanningDrafts();
+  const labelFilter = viewLabels.projects,
+    filtering = labelsActive(labelFilter);
+  const matches = (task: TaskRecord) => matchesLabels(task, labelFilter);
   const [data, setData] = useState<{
     projects: ProjectRecord[];
     tasks: TaskRecord[];
+    orders: TaskOrderRecord[];
   } | null>(null);
   const [error, setError] = useState("");
   const [epoch, setEpoch] = useState(0);
@@ -50,6 +63,7 @@ function WorkspacePlanning({ workspace }: { workspace: WorkspaceSummary }) {
     Promise.all([
       session.fetch(`/api/workspaces/${workspace.id}/projects`),
       session.fetch(`/api/workspaces/${workspace.id}/tasks`),
+      session.fetch(`/api/workspaces/${workspace.id}/task-order`),
     ])
       .then(async (responses) => {
         if (!active || seq !== generation.current || !session.isCurrent(lease))
@@ -60,11 +74,11 @@ function WorkspacePlanning({ workspace }: { workspace: WorkspaceSummary }) {
           return;
         }
         if (responses.some((r) => !r.ok)) throw new Error();
-        const [projects, tasks] = await Promise.all(
+        const [projects, tasks, orders] = await Promise.all(
           responses.map((r) => r.json()),
         );
         if (active && seq === generation.current && session.isCurrent(lease)) {
-          setData({ projects, tasks });
+          setData({ projects, tasks, orders });
           setError("");
         }
       })
@@ -82,7 +96,8 @@ function WorkspacePlanning({ workspace }: { workspace: WorkspaceSummary }) {
     // Workspace is immutable for this mounted context.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, lease, workspace.id, epoch, saveEpoch]);
-  const expanded = (id: string) => expansion[workspace.id + "/" + id] ?? false;
+  const expanded = (id: string) =>
+    filtering || (expansion[workspace.id + "/" + id] ?? false);
   function toggle(id: string) {
     setExpansion((current) => ({
       ...current,
@@ -90,15 +105,39 @@ function WorkspacePlanning({ workspace }: { workspace: WorkspaceSummary }) {
     }));
   }
   function tasks(projectId: string | null) {
-    const roots = data!.tasks.filter(
-      (t) => t.projectId === projectId && !t.parentId,
+    const scope = projectId
+      ? data!.orders.find((s) => s.scopeKey === "project/" + projectId)
+      : undefined;
+    const roots = orderRows(
+      data!.tasks.filter(
+        (t) =>
+          t.projectId === projectId &&
+          !t.parentId &&
+          (matches(t) ||
+            data!.tasks.some(
+              (child) => child.parentId === t.id && matches(child),
+            )),
+      ),
+      scope,
     );
     return (
-      <ul className="ml-4 space-y-1 border-l pl-3">
+      <SiblingOrderGroup
+        workspaceId={workspace.id}
+        scope={scope}
+        rows={roots}
+        filtered={filtering}
+        refresh={() => setEpoch((x) => x + 1)}
+      >
         {roots.map((task) => {
-          const children = data!.tasks.filter((t) => t.parentId === task.id);
+          const childScope = data!.orders.find(
+            (s) => s.scopeKey === "task/" + task.id,
+          );
+          const children = orderRows(
+            data!.tasks.filter((t) => t.parentId === task.id && matches(t)),
+            childScope,
+          );
           return (
-            <li key={task.id}>
+            <SiblingOrderRow key={task.id} task={task}>
               <div className="flex min-w-0 items-center gap-2 rounded border-b py-1">
                 <button
                   className={button}
@@ -109,6 +148,17 @@ function WorkspacePlanning({ workspace }: { workspace: WorkspaceSummary }) {
                   {expanded(task.id) ? "−" : "+"}
                 </button>
                 <button
+                  aria-label={task.title}
+                  title={
+                    [
+                      filtering &&
+                        !matches(task) &&
+                        "Context for matching subtasks",
+                      ...(task.tags ?? []).map((t) => t.name),
+                    ]
+                      .filter(Boolean)
+                      .join(", ") || undefined
+                  }
                   className="min-h-11 min-w-0 flex-1 break-words py-2 text-left font-medium"
                   onClick={() =>
                     context.openEntity({
@@ -119,21 +169,37 @@ function WorkspacePlanning({ workspace }: { workspace: WorkspaceSummary }) {
                   }
                 >
                   {task.title}
+                  <TaskLabelBadges task={task} />
+                  {filtering && !matches(task) && (
+                    <span className="block text-xs">
+                      Context for matching subtasks
+                    </span>
+                  )}
                 </button>
                 <span className="text-xs">
-                  {taskStatusLabels[task.status]} · {children.length} subtasks
+                  {statusName(task)} · {children.length} subtasks
                 </span>
               </div>
               {expanded(task.id) && (
                 <div>
-                  <ul className="ml-4 border-l pl-3">
+                  <SiblingOrderGroup
+                    workspaceId={workspace.id}
+                    scope={childScope}
+                    rows={children}
+                    filtered={filtering}
+                    refresh={() => setEpoch((x) => x + 1)}
+                  >
                     {children.map((child) => (
-                      <li
-                        key={child.id}
-                        className="flex items-center gap-2 border-b"
-                      >
+                      <SiblingOrderRow key={child.id} task={child}>
                         <button
-                          className="min-h-11 min-w-0 flex-1 break-words text-left"
+                          aria-label={child.title}
+                          title={
+                            (child.tags ?? [])
+                              .map((t) => t.name)
+                              .filter(Boolean)
+                              .join(", ") || undefined
+                          }
+                          className="min-h-11 w-full min-w-0 flex-1 break-words text-left"
                           onClick={() =>
                             context.openEntity({
                               kind: "tasks",
@@ -143,13 +209,12 @@ function WorkspacePlanning({ workspace }: { workspace: WorkspaceSummary }) {
                           }
                         >
                           {child.title}
+                          <TaskLabelBadges task={child} />
                         </button>
-                        <span className="text-xs">
-                          {taskStatusLabels[child.status]}
-                        </span>
-                      </li>
+                        <span className="text-xs">{statusName(child)}</span>
+                      </SiblingOrderRow>
                     ))}
-                  </ul>
+                  </SiblingOrderGroup>
                   <button
                     className={button + " my-2"}
                     onClick={() =>
@@ -165,11 +230,15 @@ function WorkspacePlanning({ workspace }: { workspace: WorkspaceSummary }) {
                   </button>
                 </div>
               )}
-            </li>
+            </SiblingOrderRow>
           );
         })}
-        {roots.length === 0 && <li className="py-3 text-sm">No tasks yet.</li>}
-      </ul>
+        {roots.length === 0 && (
+          <li className="py-3 text-sm">
+            {filtering ? "No matching tasks." : "No tasks yet."}
+          </li>
+        )}
+      </SiblingOrderGroup>
     );
   }
   return (
@@ -195,6 +264,20 @@ function WorkspacePlanning({ workspace }: { workspace: WorkspaceSummary }) {
           Refresh planning
         </button>
       </div>
+      <TaskLabelFilter
+        value={labelFilter}
+        onChange={(value) =>
+          setViewLabels((current) => ({ ...current, projects: value }))
+        }
+      />
+      {data && filtering && (
+        <p>
+          Matching tasks: {data.tasks.filter(matches).length} of{" "}
+          {data.tasks.length} total. Ancestors shown as context are not
+          additional matches. Clear filters to restore normal disclosures and
+          ordering controls.
+        </p>
+      )}
       {error && (
         <p role="alert" className="my-4">
           {error}
@@ -206,53 +289,65 @@ function WorkspacePlanning({ workspace }: { workspace: WorkspaceSummary }) {
         </p>
       ) : (
         <ul aria-label="Projects hierarchy" className="mt-5 space-y-2">
-          {data.projects.map((project) => (
-            <li key={project.id} className="rounded-lg border bg-white p-2">
-              <div className="flex min-w-0 items-center gap-2">
-                <button
-                  className={button}
-                  aria-expanded={expanded(project.id)}
-                  aria-label={`Expand project: ${project.title}`}
-                  onClick={() => toggle(project.id)}
-                >
-                  {expanded(project.id) ? "−" : "+"}
-                </button>
-                <button
-                  className="min-h-11 min-w-0 flex-1 break-words py-2 text-left font-semibold"
-                  onClick={() =>
-                    context.openEntity({
-                      kind: "projects",
-                      workspaceId: workspace.id,
-                      record: project,
-                    })
-                  }
-                >
-                  {project.title}
-                </button>
-                <span className="text-xs">
-                  {data.tasks.filter((t) => t.projectId === project.id).length}{" "}
-                  tasks
-                </span>
-              </div>
-              {expanded(project.id) && (
-                <>
-                  {tasks(project.id)}
+          {data.projects
+            .filter(
+              (project) =>
+                !filtering ||
+                data.tasks.some(
+                  (t) => t.projectId === project.id && matches(t),
+                ),
+            )
+            .map((project) => (
+              <li key={project.id} className="rounded-lg border bg-white p-2">
+                <div className="flex min-w-0 items-center gap-2">
                   <button
-                    className={button + " mt-2"}
+                    className={button}
+                    aria-expanded={expanded(project.id)}
+                    aria-label={`Expand project: ${project.title}`}
+                    onClick={() => toggle(project.id)}
+                  >
+                    {expanded(project.id) ? "−" : "+"}
+                  </button>
+                  <button
+                    className="min-h-11 min-w-0 flex-1 break-words py-2 text-left font-semibold"
                     onClick={() =>
                       context.openEntity({
-                        kind: "tasks",
+                        kind: "projects",
                         workspaceId: workspace.id,
-                        projectId: project.id,
+                        record: project,
                       })
                     }
                   >
-                    Add task to {project.title}
+                    {project.title}
                   </button>
-                </>
-              )}
-            </li>
-          ))}
+                  <span className="text-xs">
+                    {
+                      data.tasks.filter(
+                        (t) => t.projectId === project.id && matches(t),
+                      ).length
+                    }{" "}
+                    tasks
+                  </span>
+                </div>
+                {expanded(project.id) && (
+                  <>
+                    {tasks(project.id)}
+                    <button
+                      className={button + " mt-2"}
+                      onClick={() =>
+                        context.openEntity({
+                          kind: "tasks",
+                          workspaceId: workspace.id,
+                          projectId: project.id,
+                        })
+                      }
+                    >
+                      Add task to {project.title}
+                    </button>
+                  </>
+                )}
+              </li>
+            ))}
           <li className="rounded-lg border bg-white p-2">
             <div className="flex items-center gap-2">
               <button

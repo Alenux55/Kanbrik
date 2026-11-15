@@ -8,7 +8,7 @@
 - Desktop and Android support; iPhone is not an initial target.
 - Personal and shared workspaces with tasks and projects. Users can toggle which workspaces the calendar and board display.
 - Shared projects in the first version, through shared workspace membership.
-- Fixed task statuses initially; custom statuses can be considered later.
+- Workspace-specific configurable statuses (task 016), starting with the original five definitions.
 - Online-only editing initially; offline editing is deferred.
 - Host on the owner's always-online Ubuntu server. Docker is expected but unverified.
 - Password confirmation during account creation and automatic recovery links, using owner-configured SMTP.
@@ -25,7 +25,7 @@ The following names are the recommended implementation baseline.
 | blocked | Blocked | Cannot proceed because of a dependency or obstacle |
 | done | Done | Completed |
 
-All workspaces share these definitions initially. Only Done means completed. Scheduling is independent of status. Inbox captures become tasks explicitly; unprocessed notes do not automatically become Backlog cards. Archive/deletion are separate lifecycle operations.
+Each workspace starts with these definitions; only seeded Done starts completed. Task 016 makes its saved workspace completion metadata authoritative after configuration. Scheduling is independent of status. Inbox captures become tasks explicitly; unprocessed notes do not automatically become Backlog cards. Archive/deletion are separate lifecycle operations.
 
 ## Proposed defaults
 
@@ -46,7 +46,7 @@ These are recommendations, not additional user-confirmed requirements.
 ## Core behavior
 
 - A project task appears on the board without copying it. Card moves update status everywhere.
-- The combined board groups accessible tasks under the five standard columns and preserves their workspace identity.
+- The combined Board labels each workspace workflow separately; moves preserve workspace identity.
 - Filtering changes visibility, not membership/data. Clearing all selections shows an explicit empty state.
 - Scheduling does not start/complete work. Removing a block does not delete the linked task/project.
 - Due dates, planned work time, and actual time worked are distinct.
@@ -62,7 +62,7 @@ Projects selects one explicit workspace locally to that view, independent of fut
 
 ## Implemented board defaults (task 008)
 
-Board displays canonical tasks/subtasks individually under the five shared statuses, with workspace/project/parent context and independent completion. Selection is account-owned/server-saved and local to Board: first visit selects only personal, explicitly cleared selection persists empty, and same-user tabs use last-committed selection. These are bounded implementation defaults, not new sharing policy. Workspaces are still authorized for every task operation regardless of preferences. Ordering is creation-time/ID; same-column drops do not reorder. Desktop mouse dragging and explicit keyboard/touch selectors update status only. Android uses status tabs. Manual refresh, incomplete-load warnings, explicit conflict review, and retained Projects draft revisions are part of the contract; live push remains deferred; Calendar has its independent contract below.
+Task 008 initially displayed canonical tasks/subtasks under five shared statuses; task 016 now uses each workspace's saved workflow, with workspace/project/parent context and independent completion. Selection is account-owned/server-saved and local to Board: first visit selects only personal, explicitly cleared selection persists empty, and same-user tabs use last-committed selection. These are bounded implementation defaults, not new sharing policy. Workspaces are still authorized for every task operation regardless of preferences. Ordering is creation-time/ID; same-column drops do not reorder. Desktop mouse dragging and explicit keyboard/touch selectors update status only. Android keeps active columns in contained horizontal workspace groups. Manual refresh, incomplete-load warnings, explicit conflict review, and retained Projects draft revisions are part of the contract; live push remains deferred; Calendar has its independent contract below.
 
 ## Implemented Calendar defaults (task 009)
 
@@ -94,25 +94,40 @@ Implemented bounded defaults: mobile day time grid with an agenda alternative; h
 
 Further confirmed Calendar requirements: remove the separate Schedule [work] box, click the main work card to edit that project/task/subtask, drag the same card to schedule directly, and do not open a block editor on drag release. Deliberate single-click/tap/keyboard activation opens an editor. Task 013 preserves New block/work selection for non-drag scheduling and retained gesture proposals with an explicit Review action; no failure or DST ambiguity may be silently treated as saved.
 
-## Assigned follow-up: comments and edit history (014)
+## Implemented comments and edit history (014)
 
-The owner requests Comments and Edit history on projects, tasks and subtasks, with original posting and last-edited times for comments. [Task 014](tasks/014-comments-and-edit-history.md) follows the reviewed task 013 lifecycle work; it is a specification, not an implemented feature. Recommended first version: plain text, current workspace visibility, author-only comment edits, append-only server-recorded actor/time/before-and-after activity, and retention through Trash/Restore. Earlier edits cannot be reconstructed; these permission/content defaults are recommendations, not new owner-confirmed policy. Rich text, attachments, mentions, notifications and comment deletion are outside this assignment.
+The owner requested Comments and Edit history on canonical projects, tasks and subtasks, including original posting and last-edited times. [Task 014](tasks/014-comments-and-edit-history.md) implements these sections in the shared Projects/Board/Calendar editor and authorized read-only Trash detail. Independent review on 2026-11-14 requires [one editor-state correction](tasks/014-review-fixes.md) after an in-place Restore before acceptance; the feature is implemented, but that P2 remains open.
 
-## Decisions still open
+Adopted implementation defaults remain recommendations rather than additional owner-confirmed policy: plain text of 1–10,000 trimmed characters; all current workspace members can read/post; only the authenticated author with current access can edit their comment. Posting does not change a task's content revision or status. Comments retain their posted time; only actual text edits acquire an edited time. Separate comment drafts survive planner navigation in the current signed-in session and participate in Keep draft/discard and pending-close guards; failed saves remain unconfirmed. Reload/offline editing is not supported.
 
-- Final acceptance of the recommended stack; verification of Docker and existing reverse-proxy configuration.
-- Whether viewer-only access or further login methods are needed. Account invitation policy is confirmed below.
-- Whether personal scheduling of shared tasks is needed initially and its exact visibility rules.
-- Recurring chores/checklists and whether checklist items are independently schedulable tasks.
-- Longer-term overlap/availability and snapping policy (task 009 implements overlaps allowed and 15-minute pointer snapping initially); permanent purge/retention and work archive/move behavior remain undecided. Reversible deletion is assigned in task 013 above.
-- SilverBullet's role and whether linked notes are sufficient.
-- External calendars, notifications, and actual time tracking are uncommitted follow-ups.
-- Any future ability to move existing records between workspaces; task 011 preserves immutable ownership and has owner-approved zone initialization/permissions.
+Edit history records trusted actor names, UTC times and actual before/after values for work creation, title/description/status changes, comment creation/edits and correlated subtree Trash/Restore operations. Unchanged saves, reads, filters, scheduling, failed transactions and create retries add no duplicate content event. Existing work has an explicit recording-availability boundary; earlier changes and original creators are never invented. Trash retains IDs, comments, history and original timestamps; new comment changes wait for Restore. Refresh activity retrieves shared updates without replacing either draft. Rich text, attachments, mentions, notifications, comment deletion, permanent purge and work moves remain outside this assignment.
 
-## Invitation-only signup (task 012)
+## Implemented work lists (015)
 
-On 2026-11-09 the owner chose account-only email invitations, administered only by existing accounts explicitly listed in the server's `INVITATION_ADMIN_EMAILS`. Configuring that list closes public signup even if a previous preview flag remains enabled. An invited recipient creates an account through a single-use, seven-day email link and signs in to their own personal workspace. Shared access is granted separately through existing workspace management. Neither workspace ownership nor accepting an invitation grants invitation-administrator privileges. The implementation record is [012](tasks/012-account-invitations.md); independent review is pending.
+The owner simplified the feature to independent checklists and shopping lists attached to canonical work. Projects, tasks and subtasks support either/both kinds and multiple named sections. Checklist rows have text/check state; shopping rows have text, quantity, optional workspace vendor and purchased state. They do not create tasks, purchase goods, change status or schedule time.
 
-## First complete workflow
+Adopted implementation defaults, not additional confirmed policy: owners/editors have ordinary content rights; 20 sections/work and 200 items/section including archives; names 100 characters, item text 1,000; shopping quantity defaults to 1 and accepts positive values through 1,000,000 with three decimals; 200 workspace vendors including archives. Lists/items archive reversibly, separately from work Trash. An archived vendor remains readable/retainable on its existing item but cannot be newly assigned. Work, comment, list/item and vendor revisions are independent.
 
-A user signs in to a personal workspace and joins a shared one. An owner creates a shared project/task; an editor changes its status and assigns it to a block. Desktop and Android can display the personal workspace, shared workspace, or both on the board/calendar. An unrelated account cannot fetch or modify either workspace's data. Failed/conflicting saves are visible and recoverable.
+## Implemented workspace workflows (016)
+
+The owner confirmed separate workflows per workspace and adding/editing/removing statuses. Adopted defaults: only the workspace owner configures definitions; 1–50 active statuses, 200 total including retired definitions; names up to 80 characters, active names unique ignoring case. An active incomplete status is the creation default; completion is explicit metadata and may apply to multiple definitions. Existing workspaces retain their five IDs, current status semantics and UTC blocks.
+
+Owners preview exact task/completion impact before confirming. Occupied retired statuses require same-workspace replacements for active tasks. Trash retains its status until Restore explicitly resolves retired choices without rebasing batch member revisions. Retired definitions/history remain readable. Name swaps use an intermediate unused name. The combined Board shows workspace-labeled column groups and rejects cross-workspace drops.
+
+## Implemented custom tags and filters (017)
+
+The owner's revised request replaces Important/Urgent flags with arbitrary tag names, autocomplete and deliberate colors from the existing six-color project palette. Calendar additionally has project and text filters. Important/Urgent are ordinary names. Project colors retain the prior ID-based mapping.
+
+Adopted defaults: workspace-owned definitions under ordinary content rights; 60-character trimmed names unique within a workspace under PostgreSQL lower-case normalization, including archived names; 200 definitions including archives; up to 20 tags/task, none by default and no inheritance. Concurrent same-name creation reconciles to one definition; the first saved color is retained. Rename/recolor/archive has its own revision/configuration history and does not revise every tagged task. Archived associations remain readable/retainable but cannot be newly assigned. Task tag-set changes share the canonical task revision and record IDs plus name snapshots in history.
+
+Each view keeps account-bound memory-only tag filters, with explicit Any/All. Selected identities are evaluated within each task's own workspace; workspaces without selected tags are excluded while filtering. Projects keeps contextual parents/projects for matching children; context is not counted as a match. Board composes its existing filters. Calendar combines project/tag/text categories with AND, filters palette/blocks/agenda consistently and keeps unscheduled matches available. Tags apply only to task-linked blocks. Project-only/empty blocks have no tags. Text covers title/description, displayed project/parent names and block label, excluding comments/history. Clear controls and matching/total counts explain hidden saved work; editors still offer all authorized active choices. Filters never write work or schedules.
+
+## Implemented sibling order (018)
+
+The owner requested root-task order within one project and subtask order within one parent. Adopted shared server order uses ordinary content rights, separate group revisions, mouse handles and explicit Move up/down controls. New siblings append; filtered/incomplete groups cannot reorder. Standalone roots, project order, Board order, reparenting and ownership transfer are excluded.
+
+Restore policy adopted for review: retain inactive slots while reordering only active slots. For A/B/C, Trash B then move C before A stores C/B/A; Restore returns C/B/A. This preserves current active relative order and retained inactive placement. Creation/Trash/Restore advance group versions without revising unrelated work text or invalidating exact Trash member revisions. A lost-response retry acknowledges its original move without applying it over a later move.
+
+## Separately planned Calendar preview (019)
+
+[Task 019](tasks/019-calendar-drop-preview.md) assigns live destination highlighting. It is not implemented in the combined 014–018 assignment. Existing final-drop targeting/gesture recovery remain authoritative; no deployment, custom fields/templates, procurement, permanent purge or offline editing is included.

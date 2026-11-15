@@ -11,7 +11,14 @@ export const moveToTrashInput = trashTargetInput
   })
   .strict();
 export const restoreTrashInput = z
-  .object({ revision: z.number().int().min(1).max(2147483646) })
+  .object({
+    revision: z.number().int().min(1).max(2147483646),
+    statusImpactDigest: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .optional(),
+    statusReplacements: z.record(id, id).optional(),
+  })
   .strict();
 export type TrashTarget = z.infer<typeof trashTargetInput>;
 export type TrashMember = {
@@ -50,4 +57,10 @@ export type TrashDetail = TrashBatchRecord & {
     deletedAt: string | null;
     trashBatchId: string | null;
   })[];
+};
+
+export type RestoreStatusResolution = {
+  impactDigest: string;
+  requirements: { statusId: string; name: string; count: number }[];
+  choices: { id: string; name: string; completed: boolean }[];
 };
