@@ -1,6 +1,6 @@
 # 014: Restore editor availability after activity refresh
 
-Status: Original P2 independently closed on 2026-11-15 at `3287adc`, carrying the correction from `186acc9`. Both desktop and Pixel 7 same-mounted-editor and obsolete-refresh cases passed. The combined candidate remains held for separate [task 017 corrections](017-review-fixes.md); closing this P2 does not approve import. Earlier implementation evidence below remains separately attributed.
+Status: Original P2 independently closed on 2026-11-15 at `3287adc`, carrying the correction from `186acc9`, and rechecked at `2742d15`. Both desktop and Pixel 7 same-mounted-editor and obsolete-refresh cases passed. The separate [task 017 P2s](017-review-fixes.md) are now also closed and the combined import hold is lifted; see the [current handoff](../handoff.md) for scope and limits. Earlier implementation evidence below remains separately attributed.
 
 ## Outcome and inputs
 

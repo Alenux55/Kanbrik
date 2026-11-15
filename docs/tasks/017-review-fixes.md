@@ -1,6 +1,6 @@
 # 017: Preserve tags during Board recovery and migrated-tag edits
 
-Status: Both corrections implemented on 2026-11-15 above `3287adc`, preserving the coordinator's staged review documentation. Verification is recorded below; independent re-review is pending. Hold import/deployment until re-review. The original task 014 restored-editor P2 remains independently closed.
+Status: Both P2 findings independently closed on 2026-11-15 at `2742d15`, with no new actionable findings. The import hold is lifted; see the independent correction review below and the current handoff for actual checks and limits. The original task 014 restored-editor P2 remains independently closed.
 
 ## Outcome and inputs
 
@@ -104,3 +104,13 @@ The portable README equivalent is `npm run test:e2e --` with the same file/grep 
 Proposed commit message: `fix: preserve Board recovery tags and encode tag edit paths`. Both runtime fixes, regressions and updated handoff are staged together with the coordinator's preserved review documents. Owner commits/pushes and arranges independent re-review; the import/deployment hold is not lifted by implementation verification.
 
 Final cleanup: `npm run check` passed again on the final source/tests. The owned verification database and app/SMTP fixtures were stopped, and no listeners remained on verification ports including 15432/15434. All 12 source/test/documentation files are staged, including the preserved coordinator review changes; no credentials, environment files, generated output, local databases or test artifacts are staged.
+
+## Independent correction review — 2026-11-15
+
+Reviewed owner-committed `2742d15` against `3287adc`. Production changes are limited to the typed Board draft/tag-ID mapping and single-segment encoding of tag edit paths; no migration, schema, dependency, permission or scheduling change was introduced. Both original independent reproductions now succeed. The failed-before-commit Board move retains its selected tag and saves `in_progress` with the original association intact. Normal UI editing of a migration-shaped tag returns 200 and stores the requested name. The harness's old revision-1 encoded control then returns the expected 409 because the normal UI save has already advanced that tag to revision 2; this is preserved concurrency protection, not a failed correction.
+
+Independent `npm run check`, `npm run db:validate`, guarded all-14 migration status and `npm run build -- --webpack` passed. After the build completed, the full backend rerun passed **132/132 checks across 14 files**, exit 0. Original reproductions used the inspected ignored `.local/review-latest-board-tags.mjs` on owned app port 3115 with disposable-account cleanup. Saved environment values and live server/provider settings were unchanged.
+
+The independent affected browser re-review used the exact file/grep selection above and passed **29 cases / zero failures / five intentional Android mouse-only skips, 34 total, 7.5 minutes, exit 0**. All three new Board recovery cases passed; both exact migrated identities support rename/recolor/archive/restore on desktop and Pixel 7 without changing linked work. Existing Board/session/tag/history, original task 014 and two Calendar preview/DST cases also passed. These are coordinator results, separate from the implementer's identically counted run. Both P2s are closed and no new actionable finding was identified; the import hold is lifted.
+
+Earlier implementer full-browser and populated-upgrade/no-drift proofs remain separately carried evidence. No full-application browser, fresh/upgrade proof, physical Android, Ubuntu/proxy/provider or deployment result is claimed by this review. The owned database was stopped after checking its temporary 15432 port; no review app/SMTP/database listeners remain. Review changes are documentation only, staged for the owner's commit; no runtime change, commit, push or server action was performed.

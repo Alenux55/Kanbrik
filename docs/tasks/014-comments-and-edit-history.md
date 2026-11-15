@@ -1,6 +1,6 @@
 # 014: Work-item comments and edit history
 
-Status: Implemented in the combined 014–018 candidate, including the restored-editor P2 correction; independent coordinator re-review remains pending. The owner explicitly deferred intermediate review gates for this assignment. Earlier coordinator evidence below is carried separately.
+Status: Implemented in `186acc9` and included in independently accepted `2742d15` on 2026-11-15. The original restored-editor P2 and later tag P2s are closed. See [current handoff](../handoff.md) for coordinator checks, separately carried implementation evidence and limits; no deployment was performed by review.
 
 ## Outcome
 

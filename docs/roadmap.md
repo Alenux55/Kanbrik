@@ -4,7 +4,7 @@ Tasks 001–009 implement the foundation, accounts/recovery, personal/shared acc
 
 The reviewed planner baseline is `75f678e`: [011 review corrections](tasks/011-review-fixes.md), independently re-reviewed without actionable findings and preserving reviewed task 012 invitations. Both original P2 findings are closed. The implementer's full browser run passed 69 cases with one intentional skip; the coordinator separately passed 94 backend checks and 17 focused browser cases with one intentional skip. Task [011 completion](tasks/011-implementation.md) and [012's review record](tasks/012-account-invitations.md) preserve their separate evidence and limits. UTC instants remain authoritative; server location is irrelevant.
 
-Current fully approved baseline remains `0af0865`. The owner committed combined tasks **014–018** as `186acc9` and Calendar preview/predicate follow-up **019** as `3287adc`. Independent review on 2026-11-15 closed the original task 014 restored-editor P2 but found two tag defects: Board recovery can clear task tags, and migrated tag IDs cannot be edited through the UI. **Both [017 review corrections](tasks/017-review-fixes.md) are now implemented; hold import/deployment until independent re-review.** Task 019 is implemented; its bounded preview checks found no actionable preview issue. Current coordinator evidence and separately carried implementer full-suite/upgrade evidence are in [handoff](handoff.md).
+Current independently accepted candidate is **`2742d15`**, including combined tasks **014–018** at `186acc9`, Calendar preview/predicate follow-up **019** at `3287adc`, and both [017 review corrections](tasks/017-review-fixes.md). Re-review on 2026-11-15 closed both tag P2s without new actionable findings; the original task 014 P2 remains closed. **The import hold is lifted.** Coordinator checks passed 132 backend checks and 29 affected browser cases with five intentional skips, plus lint/types/schema/migration status/build. Earlier full-suite and fresh/populated-upgrade proofs remain separately carried evidence; see [handoff](handoff.md) for scope and remaining physical-device/server limits. Import/deployment remains owner-operated.
 
 | Phase | Outcome | Evidence required for completion |
 | --- | --- | --- |
@@ -26,12 +26,12 @@ Current fully approved baseline remains `0af0865`. The owner committed combined 
 
 ## Implementation handoffs
 
-- [014 review correction](tasks/014-review-fixes.md): independently closed original restored-editor P2 on desktop and Pixel 7, with retained original draft revisions; combined import remains held for task 017.
-- [015: checklists and shopping lists](tasks/015-custom-work-lists.md): implemented independent work-attached sections/items, vendors, archive, activity and draft integration; pending combined review.
-- [016: configurable workspace statuses](tasks/016-workspace-statuses.md): implemented owner configuration, completion/default metadata, workspace-labeled Board and explicit retirement/Restore resolution; pending combined review.
-- [017: custom colored tags and filters](tasks/017-important-urgent-filters.md): implemented with [both tag corrections](tasks/017-review-fixes.md); independent re-review required before import.
-- [018: sibling ordering](tasks/018-project-task-ordering.md): implemented shared root-within-project/child-within-parent order, explicit controls, retained slots/receipts and full-scope guards; pending combined review.
-- [019: live Calendar drop preview](tasks/019-calendar-drop-preview.md): committed as `3287adc`, including task 017 predicate consistency. Bounded independent preview review found no actionable preview issue; combined import held for task 017 corrections.
+- [014 review correction](tasks/014-review-fixes.md): original restored-editor P2 independently closed on desktop and Pixel 7, with retained original draft revisions.
+- [015: checklists and shopping lists](tasks/015-custom-work-lists.md): implemented and included in accepted `2742d15`; independent sections/items, vendors, archive, activity and drafts.
+- [016: configurable workspace statuses](tasks/016-workspace-statuses.md): implemented and included in accepted `2742d15`; owner configuration, completion/default metadata, grouped Board and retirement/Restore resolution.
+- [017: custom colored tags and filters](tasks/017-important-urgent-filters.md): implemented; [both tag P2 corrections](tasks/017-review-fixes.md) independently closed at `2742d15`.
+- [018: sibling ordering](tasks/018-project-task-ordering.md): implemented and included in accepted `2742d15`; shared same-scope order, explicit controls, retained slots/receipts and full-scope guards.
+- [019: live Calendar drop preview](tasks/019-calendar-drop-preview.md): committed as `3287adc` and included in accepted `2742d15`; bounded independent preview checks found no actionable preview issue.
 
 - [013: mobile planner and Trash](tasks/013-mobile-planner-and-trash.md): committed as `e4f7bfb`, corrected at `0af0865` and independently re-reviewed with its navigation P2 closed. Separate verification/operating limits are in the [correction record](tasks/013-review-fixes.md). No deployment performed.
 

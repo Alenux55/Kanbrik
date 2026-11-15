@@ -1,6 +1,6 @@
 # 015: Basic checklists and shopping lists on work items
 
-Status: Implemented and verified in the combined 014–018 candidate on 2026-11-14; independent coordinator review pending. The owner explicitly deferred intermediate review gates for this combined assignment.
+Status: Implemented in the combined `186acc9` candidate and included in independently accepted `2742d15` on 2026-11-15 after the tag corrections. See [current handoff](../handoff.md) for coordinator checks, separately carried full-suite/upgrade evidence and limits. No deployment was performed by review.
 
 ## Outcome
 

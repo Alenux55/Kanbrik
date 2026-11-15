@@ -1,6 +1,6 @@
 # 017: Custom colored tags and cross-view task filters
 
-Status: Implemented in `186acc9` with a Calendar predicate follow-up in `3287adc`. Independent review on 2026-11-15 found two P2 tag integration defects: failed Board-move recovery clears associations, and migrated tag IDs cannot be edited through the UI. Both [corrections](017-review-fixes.md) are implemented above `3287adc`; hold import until independent re-review. Passing implementation checks do not independently close these findings.
+Status: Implemented in `186acc9` with Calendar predicate follow-up `3287adc`; both tag P2s independently closed at `2742d15` on 2026-11-15. No new actionable finding was identified and the import hold is lifted. See [correction review](017-review-fixes.md) and [current handoff](../handoff.md) for coordinator checks, carried evidence and limits.
 
 ## Outcome and inputs
 
@@ -88,4 +88,4 @@ The owner requested the revised tag/filter handoff together with task 019. Arbit
 
 ## Tag review corrections — 2026-11-15
 
-The two P2 findings at `3287adc` are corrected in [017 review corrections](017-review-fixes.md): Board retained proposals preserve canonical tag IDs, including archives, and metadata edit paths encode migration-shaped identities as single segments. Revisions still require explicit conflict review. No tag identity, migration, reference or history was rewritten. Independent re-review remains pending; the correction record separates current checks from earlier carried results.
+The two P2 findings at `3287adc` are corrected in [017 review corrections](017-review-fixes.md): Board retained proposals preserve canonical tag IDs, including archives, and metadata edit paths encode migration-shaped identities as single segments. Revisions still require explicit conflict review. No tag identity, migration, reference or history was rewritten. Independent re-review passed at `2742d15` with both findings closed; the correction record separates coordinator checks from earlier carried results.
