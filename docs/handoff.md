@@ -1,6 +1,18 @@
-# Coordinator handoff — 2026-11-14
+# Coordinator handoff — 2026-11-15
 
-## Current state
+## Current follow-up — 2026-11-15
+
+The owner assigned the revised task 017 handoff and task 019. The arbitrary-tag/autocomplete/palette and Calendar project/text-filter implementation is already committed in `186acc9`. This follow-up adds live Calendar drop feedback above that commit and fixes status-only display context incorrectly matching palette text search. Shared predicates now keep palette, blocks/agenda and live/release targeting consistent. Independent review remains pending; implementation evidence is not approval.
+
+Live feedback shares release eligibility, viewport hit testing and one-elapsed-hour timing. It labels full dates/offsets/viewing zone, preserves empty-block assignment intervals, clips honestly, and requires explicit DST Review when needed. Occupied/foreign/retained/pending targets cannot display a valid-save cue. The noninteractive session-gated layer owns no network write, draft or save lock; generation/context/session cleanup prevents obsolete feedback. Native browser resize cancels the existing mouse gesture; a fresh drag uses the new geometry. Explicit mobile scheduling remains available. No API/schema/dependency or scheduling-policy change was introduced.
+
+Final follow-up verification passed lint/types, Webpack build, all 14 applied test migrations with none pending, **131/131 backend/unit checks across 14 files** and **49 affected browser cases / zero failures / nine intentional Android mouse-only skips, 58 total, 13.2 minutes, exit 0**. The selection covers all six new desktop preview cases and existing Calendar, overflow, tag/filter, session, touch and history/Trash regressions on desktop and Pixel 7 emulation. Fresh hover screenshots were inspected. No current full-application browser rerun or physical Android/Ubuntu/proxy/provider check is claimed.
+
+Current verification and limits are in [task 019](tasks/019-calendar-drop-preview.md#completion-record--2026-11-15) and the [task 017 follow-up](tasks/017-important-urgent-filters.md#follow-up-review-with-task-019--2026-11-15). The earlier 128 backend / 135 browser results below belong to `186acc9` and remain carried evidence. No commit, push, deployment or server/provider action was performed by this follow-up.
+
+Final cleanup: lint/types passed again after browser verification. The owned PostgreSQL cluster and app/SMTP fixtures were stopped; no verification listeners remain. All 16 follow-up files are staged, excluding credentials, generated output and local artifacts. Proposed commit message: `feat: add live Calendar drop previews and align text filters`. The owner commits/pushes and arranges coordinator review.
+
+## Prior 014–018 candidate state
 
 The owner explicitly assigned **014–018 together** and chose **“Implement all five, then return them for coordinator review.”** Intermediate independent-review gates are deferred for this assignment, not passed. The last independently approved runtime baseline remains `0af0865`; prior staged task 014/coordinator documentation was preserved. No commit, push, production/server/provider action or task 019 implementation occurred.
 
@@ -169,19 +181,19 @@ Original transfer baseline: `6a1e5b0`. Task 005 is committed as `0929f9a`; the f
 | `e4f7bfb` | Mobile planner, Calendar gestures and workspace Trash; independent review requires one recovery-navigation P2 correction |
 | `0af0865` | Work-editor Trash navigation correction; independently re-reviewed and original P2 closed |
 
-The last accepted baseline is `0af0865`, preserving tasks 001–013. The combined 014–018 candidate above it includes the task 014 P2 correction and the latest task 017 tag specification; independent review of this candidate remains pending. Preserve all existing staged changes; do not automatically commit, push or deploy. Credentials, generated files, local databases and test artifacts do not belong in the staged diff.
+The last independently accepted baseline remains `0af0865`, preserving tasks 001–013. The owner committed the combined 014–018 candidate as `186acc9`; its independent review is still pending. Current uncommitted task 017/019 follow-up changes are based on that commit. Preserve owner changes; do not automatically commit, push or deploy. Credentials, generated files, local databases and test artifacts do not belong in the staged diff.
 
 ## Next coordinator action
 
-Independently review the combined staged 014–018 candidate, including the original mounted-editor P2 reproduction, schema/upgrade preservation, current membership/account/Origin checks, list/tag relationships, workflow retirement/Trash status resolution, own-workspace filters and complete sibling-order/Restore policy. Review actual changes above `0af0865`, preserving carried coordinator documentation. Intermediate review gates were explicitly deferred by the owner; do not mistake implementation evidence for approval.
+Independently review the combined 014–018 candidate committed as `186acc9`, including the original mounted-editor P2 reproduction, schema/upgrade preservation, current membership/account/Origin checks, list/tag relationships, workflow retirement/Trash status resolution, own-workspace filters and complete sibling-order/Restore policy. Review actual changes above `0af0865`, preserving carried coordinator documentation. Intermediate review gates were explicitly deferred by the owner; do not mistake implementation evidence for approval.
 
-Use each assigned task's completion record and final verification below. Task 017 now means arbitrary tags and Calendar project/text search, not Important/Urgent booleans. Tag associations share the canonical task revision; definitions have their own revisions. Earlier flag values are migrated into the single tag model. Task 019 is a separately staged specification; do not infer its implementation or deploy this candidate automatically. The owner commits/pushes/deploys after review.
+Use each assigned task's completion record and final verification below. Task 017 now means arbitrary tags and Calendar project/text search, not Important/Urgent booleans. Tag associations share the canonical task revision; definitions have their own revisions. Earlier flag values are migrated into the single tag model. Also review the staged task 017/019 follow-up above `186acc9`: live/release agreement, exact intervals/assignment, clipping/DST labels, hidden/foreign targets, zero hover writes and stale session/filter/range cleanup. The owner commits/pushes and arranges deployment separately after review.
 
 Owner-operated deployment remains separate: follow README migrations/build/restart instructions after pulling; preserve the server's ignored `.env` and existing SMTP/HTTPS configuration. This review did not inspect or change the live Ubuntu instance.
 
 Provider/deployment, work deletion/archive/moves and identity/membership policy remain outside historical task 009; block removal was its expressly scoped lifecycle operation. Task 013 now assigns reversible work deletion separately; work moves, permanent purge and changes to identity/membership policy remain out of scope.
 
-## Combined verification record
+## Prior 014–018 combined verification record (carried)
 
 Final candidate commands: Prisma generate/validate, `npm run check`, `npm run build -- --webpack`, guarded local `integration` and `browser` wrappers corresponding to README `npm test`/`npm run test:e2e`. Final build/check passed without lint warnings. Backend 128/128 across 13 files passed in 25.64 seconds. Fresh 14 migrations and populated upgrade/development row-preservation/no-drift checks passed. Focused tag browser 6/6 passed both profiles in 1.5 minutes; earlier list/workflow/order/regression runs remain separate evidence in the task records.
 
@@ -191,4 +203,4 @@ Earlier failed/interrupted attempts and corrections are preserved in the task re
 
 Final cleanup/checks: `npm run check` passed again without warnings after final test-only fixture corrections; Prisma schema validation passed again. The owned portable PostgreSQL cluster was stopped, and checks found no remaining listeners on app/HTTP/SMTP/verification database fixture ports. Saved environment files and the owner's Ubuntu server/provider settings remain untouched. The development database was largely empty; the separate populated-upgrade proof supplies the substantive preservation evidence. Interrupted fixtures may leave generated rows in the ignored disposable test database; no broad cleanup/reset was used.
 
-All changes are staged, including preserved prior coordinator documentation/specifications. Proposed commit message: `feat: add work activity, lists, workflows, tags and ordering`. The owner commits/pushes and arranges independent review; task 019 remains a separate specification.
+The prior candidate was staged with proposed commit message `feat: add work activity, lists, workflows, tags and ordering`; the owner subsequently committed it as `186acc9`. These earlier checks do not establish independent approval or verify the current task 019 follow-up. Current staged work and checks are described at the top of this handoff and in task 019.

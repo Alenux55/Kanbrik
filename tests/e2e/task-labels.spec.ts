@@ -229,6 +229,15 @@ test("Scoped custom tag filters compose across views without hiding child contex
       exact: false,
     }),
   ).toBeVisible();
+  await search.fill("To do");
+  await expect(
+    page.getByText("Matching Total blocks in range: 0 of 7 total", {
+      exact: false,
+    }),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Edit task: / })).toHaveCount(
+    0,
+  );
   await search.fill("Label reservation 5");
   await expect(
     page.getByText("Matching Total blocks in range: 1 of 7 total", {

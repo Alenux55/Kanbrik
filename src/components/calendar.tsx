@@ -1,10 +1,22 @@
 "use client";
-import { matchesLabels, labelsActive } from "@/lib/task-labels";
+import {
+  matchesCalendarWork,
+  matchesCalendarBlock,
+} from "@/lib/calendar-filters";
+import { labelsActive } from "@/lib/task-labels";
 import { TaskLabelBadges, TaskLabelFilter } from "./task-labels";
 import { statusName } from "@/lib/task-statuses";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { calendarDropTarget } from "@/lib/calendar-hit";
+import {
+  calendarWorkDrop,
+  calendarDropTiming,
+  type Point,
+} from "@/lib/calendar-drop";
+import {
+  useCalendarDropPreview,
+  CalendarDropPreview,
+} from "./calendar-drop-preview";
 import Link from "next/link";
 import { usePlannerContext } from "./planner-context";
 import { BlockEditor } from "./block-editor";
@@ -24,7 +36,7 @@ import {
 } from "@dnd-kit/core";
 import { usePlannerSession } from "./planner-session";
 import { usePlanningDrafts } from "./planning-drafts";
-import { calendarRange, wallOptions } from "@/lib/calendar-time";
+import { calendarRange } from "@/lib/calendar-time";
 import { blockDraft, type CalendarDraft } from "@/lib/calendar-draft";
 import type { BlockRecord } from "@/lib/calendar-contracts";
 import type { ProjectRecord, TaskRecord } from "@/lib/planning-contracts";
@@ -47,6 +59,7 @@ export type Work = {
   kind: "project" | "task";
   title: string;
   context: string;
+  searchContext: string[];
   record: ProjectRecord | TaskRecord;
 };
 type Scope = {
@@ -384,14 +397,48 @@ function CalendarScope({
   const [notice, setNotice] = useState("");
   const [dragged, setDragged] = useState<Work | null>(null);
   const root = useRef<HTMLDivElement>(null);
-  const pointer = useRef<{ x: number; y: number } | null>(null);
-  useEffect(() => {
-    const track = (event: MouseEvent) => {
-      pointer.current = { x: event.clientX, y: event.clientY };
-    };
-    document.addEventListener("mousemove", track, { passive: true });
-    return () => document.removeEventListener("mousemove", track);
-  }, []);
+  const dropFeedback = useCalendarDropPreview({
+    root,
+    session,
+    lease,
+    context: scopes,
+    filter: store.viewLabels.calendar,
+    resolve: resolveDrop,
+  });
+  function resolveDrop(sourceId: string, point: Point) {
+    if (!root.current || !scopes) return null;
+    const filter = store.viewLabels.calendar;
+    const item = scopes
+      .flatMap((s) => s.work)
+      .find((w) => `${w.kind}:${w.id}` === sourceId);
+    const scope =
+      item && scopes.find((s) => s.workspace.id === item.workspaceId);
+    if (!item || !scope || scope.failed || scope.pickerFailed) return null;
+    if (!matchesCalendarWork(item, filter)) return null;
+    const blocks = scopes
+      .filter((s) => visibleIds.includes(s.workspace.id))
+      .flatMap((s) => s.blocks)
+      .filter((block) => matchesCalendarBlock(block, filter));
+    return calendarWorkDrop({
+      root: root.current,
+      point,
+      sourceId,
+      workspaceId: item.workspaceId,
+      workspaceName:
+        scope.workspace.name +
+        (visibleIds.includes(item.workspaceId)
+          ? ""
+          : " (hidden by workspace selection)"),
+      zone,
+      blocks,
+      newBlocked:
+        !!calendarDrafts[`${item.workspaceId}/blocks/new`]?.dirty ||
+        savingKeys.includes(`calendar:${item.workspaceId}/blocks/new`),
+      blockBlocked: (block) =>
+        !!calendarDrafts[`${block.workspaceId}/blocks/${block.id}`]?.dirty ||
+        savingKeys.includes(`calendar:${block.id}`),
+    });
+  }
   const suppressClick = useRef(false);
   const gestureActive = useRef(false);
   const alive = useRef(true);
@@ -472,6 +519,7 @@ function CalendarScope({
                   kind: "project" as const,
                   title: item.title,
                   context: "Project",
+                  searchContext: [],
                 })),
                 ...ts.map((item) => ({
                   record: item,
@@ -480,6 +528,10 @@ function CalendarScope({
                   kind: "task" as const,
                   title: item.title,
                   context: `${statusName(item)} · ${ps.find((p) => p.id === item.projectId)?.title ?? "Standalone"}${item.parentId ? ` · Subtask of ${ts.find((t) => t.id === item.parentId)?.title}` : ""}`,
+                  searchContext: [
+                    ps.find((p) => p.id === item.projectId)?.title ?? "",
+                    ts.find((t) => t.id === item.parentId)?.title ?? "",
+                  ],
                 })),
               ];
           return {
@@ -661,19 +713,11 @@ function CalendarScope({
       );
       return;
     }
-    const options = wallOptions(wall, zone);
-    const first = options[0] ? DateTime.fromISO(options[0].iso) : null;
-    const end = first?.plus({ minutes: 60 }).setZone(zone);
+    const timing = calendarDropTiming(wall, zone);
     const draft: CalendarDraft = {
       label: item?.title ?? "Time block",
       zone,
-      start: wall,
-      end: end?.toFormat("yyyy-MM-dd'T'HH:mm") ?? wall,
-      startChoice: options.length === 1 ? options[0].iso : "",
-      endChoice:
-        options.length === 1 && end!.getPossibleOffsets().length === 1
-          ? end!.toISO()!
-          : "",
+      ...timing,
       assignment: item ? `${item.kind}:${item.id}` : "",
       revision: 1,
       requestKey: crypto.randomUUID(),
@@ -681,7 +725,7 @@ function CalendarScope({
       dirty: true,
     };
     setCalendarDrafts((current) => ({ ...current, [key]: draft }));
-    if (!autoSave || options.length !== 1 || !draft.endChoice) {
+    if (!autoSave || !draft.startChoice || !draft.endChoice) {
       if (autoSave)
         setError(
           "Confirm valid local times and explicit repeated-time occurrences before saving.",
@@ -777,32 +821,9 @@ function CalendarScope({
   const search = (labelFilter.search ?? "").trim().toLowerCase(),
     projectFilter = labelFilter.projects ?? [];
   const displayFiltering = labelActive || !!search || !!projectFilter.length;
-  const matchesProject = (id: string | null) =>
-    !projectFilter.length || projectFilter.includes(id ?? "standalone");
-  const textMatches = (...values: (string | undefined)[]) =>
-    !search || values.some((v) => v?.toLowerCase().includes(search));
-  function matchesWork(item: Work) {
-    const task = item.kind === "task" ? (item.record as TaskRecord) : null;
-    return (
-      matchesProject(task ? task.projectId : item.id) &&
-      (!labelActive || (!!task && matchesLabels(task, labelFilter))) &&
-      textMatches(item.title, item.record.description, item.context)
-    );
-  }
-  const all = unfilteredBlocks.filter(
-    (block) =>
-      matchesProject(block.task?.projectId ?? block.projectId) &&
-      (!labelActive ||
-        (!!block.task && matchesLabels(block.task, labelFilter))) &&
-      textMatches(
-        block.label,
-        block.task?.title,
-        block.task?.description,
-        block.task?.projectTitle,
-        block.task?.parentTitle,
-        block.project?.title,
-        block.project?.description,
-      ),
+  const matchesWork = (item: Work) => matchesCalendarWork(item, labelFilter);
+  const all = unfilteredBlocks.filter((block) =>
+    matchesCalendarBlock(block, labelFilter),
   );
   const retained = Object.values(calendarDrafts).filter(
     (draft) =>
@@ -948,12 +969,13 @@ function CalendarScope({
         sensors={sensors}
         autoScroll={false}
         onDragStart={({ active, activatorEvent }) => {
-          if (activatorEvent instanceof MouseEvent) {
-            pointer.current = {
-              x: activatorEvent.clientX,
-              y: activatorEvent.clientY,
-            };
-          }
+          dropFeedback.controller.start(
+            String(active.id),
+            activatorEvent instanceof MouseEvent
+              ? { x: activatorEvent.clientX, y: activatorEvent.clientY }
+              : { x: 0, y: 0 },
+          );
+          canceledGesture.current = false;
           suppressClick.current = true;
           gestureActive.current = true;
           setDragged(
@@ -962,49 +984,29 @@ function CalendarScope({
           );
         }}
         onDragCancel={() => {
+          dropFeedback.controller.cancel();
           setDragged(null);
           gestureActive.current = false;
           setNotice("Gesture canceled. No change was saved.");
         }}
-        onDragEnd={({ active }) => {
+        onDragEnd={() => {
+          const candidate = dropFeedback.controller.finish(dropFeedback.scene);
           setDragged(null);
           gestureActive.current = false;
-          if (
-            !alive.current ||
-            !session.isCurrent(lease) ||
-            session.getSnapshot().phase !== "ready" ||
-            document.querySelector("dialog[open]")
-          )
+          if (!candidate || canceledGesture.current) return;
+          if (candidate.kind === "unavailable") {
+            setError(candidate.message!);
             return;
+          }
           const item = work.find(
-            (value) => value.kind + ":" + value.id === active.id,
+            (value) => `${value.kind}:${value.id}` === candidate.sourceId,
           );
-          if (!item || !pointer.current || !root.current) return;
-          // dnd-kit deltas include scroll adjustments. DOM hit testing needs the
-          // actual viewport cursor, especially across differently scrolled panes.
-          const hit = calendarDropTarget(
-            root.current,
-            pointer.current.x,
-            pointer.current.y,
-          );
-          if (!hit) return;
-          if ("wall" in hit) {
-            openNew(item, hit.wall, true);
+          if (!item) return;
+          if (candidate.kind === "blank") {
+            openNew(item, candidate.wall!, true);
             return;
           }
-          const block = all.find((value) => value.id === hit.blockId);
-          if (!block) return;
-          if (
-            item.workspaceId !== block.workspaceId ||
-            block.projectId ||
-            block.taskId
-          ) {
-            setError(
-              "No assignment saved. Use an empty block in the same workspace, or explicitly replace its assignment in the form.",
-            );
-            return;
-          }
-          void gesture(block, {
+          void gesture(candidate.block!, {
             assignment: {
               projectId: item.kind === "project" ? item.id : null,
               taskId: item.kind === "task" ? item.id : null,
@@ -1318,6 +1320,7 @@ function CalendarScope({
           document.querySelector<HTMLElement>("[data-session-state]")!,
         )}
       </DndContext>
+      <CalendarDropPreview controller={dropFeedback.controller} />
       {Object.entries(calendarDrafts)
         .filter(
           ([key, draft]) =>
@@ -1457,7 +1460,7 @@ function BlockTarget({
   title: string;
   surface: string;
 }) {
-  const { setNodeRef, isOver } = useDroppable({
+  const { setNodeRef } = useDroppable({
     id: surface + ":" + block.id,
     data: { blockId: block.id },
   });
@@ -1465,10 +1468,7 @@ function BlockTarget({
     <div
       ref={setNodeRef}
       data-block-id={block.id}
-      className={
-        "min-h-10 break-words font-semibold " +
-        (isOver ? "bg-amber-200 text-black" : "")
-      }
+      className="min-h-10 break-words font-semibold"
     >
       {title}
     </div>

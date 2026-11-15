@@ -1,6 +1,6 @@
 # 019: Restore live Calendar drop-slot feedback
 
-Status: Ready as a bounded Calendar correction specification on 2026-11-14; not implemented. The owner reports that task dragging used to highlight its destination slot and no longer does. Current source review confirms no live blank-slot preview in the inspected Calendar implementation; it does not establish when/how the earlier behavior changed. Respect the current task 014 correction/re-review gate and preserve all staged/in-progress work. This correction does not require task 017 custom tags to be implemented first and can be prioritized separately.
+Status: Implemented on 2026-11-15 above owner-committed `186acc9`, explicitly assigned alongside review of updated task 017. Verification results are recorded below. Intermediate prerequisite review is not claimed approved; independent review remains pending.
 
 ## Outcome and inputs
 
@@ -10,7 +10,7 @@ Read AGENTS.md, README, product/architecture, the coordinator handoff, reviewed 
 
 ## Source findings and scope
 
-- `calendarDropTarget()` currently resolves rendered foreground events or snapped blank time at `onDragEnd`. Pointer tracking only updates a ref, so no blank-slot candidate is rendered during movement. Existing `BlockTarget` dnd-kit `isOver` feedback applies to block elements and is not a one-hour blank-time preview. Do not claim this proves a particular regression commit.
+- Initial source inspection found that `calendarDropTarget()` resolved rendered foreground events or snapped blank time at `onDragEnd`. Pointer tracking updated only a ref, so no blank-slot candidate was rendered during movement. Existing `BlockTarget` dnd-kit `isOver` feedback applied to block elements rather than a one-hour blank-time preview. Do not claim this proves a particular regression commit.
 - Compute a live candidate using the same viewport-pointer hit testing and scheduling eligibility as the final drop. For blank time, preview the actual snapped one-hour interval in the source work's workspace; for an existing empty same-workspace block, highlight that block and preserve its interval. Pointer/scroll coordinates and column clipping must agree with the final handler, not use drag deltas that drift across scrolled panes.
 - Preview must update during movement and relevant Calendar scrolling/resizing/view/range/filter changes. Keep it clipped/positioned within the Calendar's visible grid; if an interval extends outside the visible grid/day, show an honest clipped shape and explicit start/end/date rather than inventing a shorter scheduled duration.
 - Occupied/foreign foreground events are not blank slots. An invalid destination receives no misleading valid highlight; a clear unavailable cue is acceptable. Preserve the existing explicit replacement rules and permitted overlap behavior. A task whose workspace is not currently eligible, inactive/trashed work or failed picker/session scope must not gain eligibility merely because a preview is drawn.
@@ -31,3 +31,31 @@ Read AGENTS.md, README, product/architecture, the coordinator handoff, reviewed 
 ## Completion and boundaries
 
 Keep this fix separate from custom tags, unrelated Calendar redesign, recurrence, new touch dragging, status changes, ownership transfers and scheduling-policy changes. Document actual reproduction/checks/results and remaining physical-device/server limits here and in the main handoff. Stage only task-owned changes and provide a commit message; owner commits/pushes. Independent review is required. No deployment/provider action or claimed implementation by this planning update.
+
+## Completion record — 2026-11-15
+
+Implemented above `186acc9`, which the owner committed during this work. The existing revised task 017 tags/autocomplete/palette and Calendar filters were preserved. A shared display predicate now serves palette, blocks/agenda and live/release eligibility. Review corrected status-only display context matching palette search: search uses title/description and explicit project/parent names, consistent with block search; status text remains visible without becoming a search field.
+
+Task 019 introduces a presentation-only, generation-guarded controller and fixed noninteractive preview inside the session gate. Hover/release share viewport hit testing, eligibility and one-elapsed-hour timing. Empty same-workspace blocks retain their original interval; occupied/foreign/retained/pending targets show unavailable feedback. Known DST endpoints follow actual wall-time rows; clipped/cross-day shapes label full dates/offsets/zone. Ambiguous/missing times retain explicit Review after release. No automatic editor, library, API/schema change, hover request, save lock or draft was added. Authorized source work outside the selected workspace display retains existing scheduling behavior, explicitly labeled hidden by workspace selection.
+
+An active-drag animation frame recomputes stationary-pointer scroll/layout changes without rerendering FullCalendar. Context/filter/session changes and lifecycle cleanup invalidate stale generations. Native window resize intentionally cancels the pinned mouse sensor; a fresh drag uses resized geometry. Actual held-pointer tests measure palette/document bounds, inspect the element under the pointer, compare final saved intervals, and verify zero hover/cancel writes and subsequent deliberate editor activation. Fresh week and clipped cross-day screenshots were inspected; the caption sits outside the target boundary.
+
+### Final verification
+
+- Post-crash `npm run check` passed (lint and generated Next/TypeScript types).
+- `npm run build -- --webpack` passed on the final application source.
+- Guarded test migrations found all 14 applied, none pending. No schema change or new preservation proof was needed; earlier fresh/populated-upgrade/no-drift evidence remains carried, not rerun.
+- Full guarded `integration` command (README `npm test`, process-only local URL adaptation): **131/131 tests across 14 files**, 39.19 seconds, exit 0. This includes three new timing/filter/controller cases; their separate post-crash focused run also passed.
+- Final affected integrated browser run: **49 passed / zero failures / nine intentional Android mouse-only skips, 58 total, 13.2 minutes, exit 0**. Command: `npm run test:e2e -- calendar-drop-preview.spec.ts calendar-gesture-review.spec.ts calendar.spec.ts 011-overflow.spec.ts task-labels.spec.ts dialog-history.spec.ts mobile-surfaces.spec.ts trash-navigation.spec.ts` through the guarded process-only wrapper. All six new held-pointer cases passed on desktop; six preview cases plus three existing mouse-only cases intentionally skip Android. Existing cases verify actual touch scrolling, explicit Calendar/DST controls, account changes, uncertainty/conflicts and Trash/history recovery on both profiles. This is the affected integration selection, not a rerun of every application browser test.
+
+### Attempts and recovery
+
+Earlier focused attempts exposed fixture issues: an immediate post-drag click inside the pinned sensor's 50 ms capture window, a zero-size wrapper visibility assertion, a synthetic Refresh click captured during a held drag, and an expectation that contradicted native resize cancellation. Fixtures now use deliberate keyboard activation, the visible fixed layer, actual view changes, and cancellation followed by a fresh resized drag. One signup timed out across a 10.5-hour execution pause. The final isolated six-case desktop run passed **6/6 in 1.5 minutes** before the later text-scope refinement. These earlier attempts are separate from final integrated evidence.
+
+An integrated run was interrupted by the owner's computer crash after six passes. PostgreSQL's normal crash recovery completed with data preserved; no reset, PID-file deletion or recovery shortcut was used. The guarded cluster was restarted on loopback 15432 with process-only test URL overrides because Windows reserves saved port 55432. Saved environment files and server/provider settings were unchanged. Interrupted fixtures may leave generated data in the ignored disposable test database; no broad cleanup/reset was used.
+
+### Limits and review
+
+The earlier full 014–018 browser result (135 passed / three intentional skips, 138 total) belongs to `186acc9`; it is carried evidence, not a new full-suite run. Current verification uses Chromium desktop and Pixel 7 touch emulation, not physical Android. No Ubuntu/proxy/TLS/Mailcow/real SMTP delivery, container runtime, fresh dependency installation/audit or default Turbopack verification is claimed for this follow-up. Existing explicit mobile scheduling is retained; no touch-only dragging was added. Independent review of both the combined candidate and this follow-up remains pending. Owner commits/pushes; no deployment was performed.
+
+Final cleanup: `npm run check` passed again after the browser run. The owned portable PostgreSQL cluster and app/SMTP fixtures were stopped; no listeners remained on the verification ports. All 16 follow-up source/test/documentation files are staged for owner commit. No environment, local database, generated output or test artifact is staged. Proposed commit message: `feat: add live Calendar drop previews and align text filters`.

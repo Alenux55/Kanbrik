@@ -31,7 +31,7 @@ Current independently reviewed baseline is `0af0865`, with task 013's Trash navi
 - [016: configurable workspace statuses](tasks/016-workspace-statuses.md): implemented owner configuration, completion/default metadata, workspace-labeled Board and explicit retirement/Restore resolution; pending combined review.
 - [017: custom colored tags and filters](tasks/017-important-urgent-filters.md): latest revised specification implemented, replacing earlier flags with arbitrary tags/autocomplete/palette colors and three-view filters plus Calendar project/text search; pending combined review.
 - [018: sibling ordering](tasks/018-project-task-ordering.md): implemented shared root-within-project/child-within-parent order, explicit controls, retained slots/receipts and full-scope guards; pending combined review.
-- [019: live Calendar drop preview](tasks/019-calendar-drop-preview.md): separate specification only; not implemented in 014–018.
+- [019: live Calendar drop preview](tasks/019-calendar-drop-preview.md): implemented above `186acc9`, with shared hover/release targeting, clipped time labels, DST review and stale-feedback cleanup; task 017 text-filter consistency correction included. Independent review pending.
 
 - [013: mobile planner and Trash](tasks/013-mobile-planner-and-trash.md): committed as `e4f7bfb`, corrected at `0af0865` and independently re-reviewed with its navigation P2 closed. Separate verification/operating limits are in the [correction record](tasks/013-review-fixes.md). No deployment performed.
 

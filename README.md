@@ -352,4 +352,19 @@ npm test -- tests/integration/activity.test.ts tests/integration/work-lists.test
 npm run test:e2e -- activity.spec.ts work-lists.spec.ts workflow.spec.ts task-labels.spec.ts task-order.spec.ts
 ```
 
-Lists HTTP fixtures additionally use **3117**, workflows/tags/order use **3118**. Leave all earlier app/SMTP test ports free. Run the complete `npm test` and `npm run test:e2e` after integration. Current Windows verification uses the existing portable PostgreSQL cluster on loopback **15432** because Windows reserves this checkout's saved **55432** port; ignored process-only wrappers supply guarded test URLs without changing saved `.env` files. This workaround is local evidence, not a new Ubuntu port requirement. Physical Android, Ubuntu/proxy/TLS/Mailcow and real provider delivery remain separate checks. Live Calendar drop preview is task 019 and is not included.
+Lists HTTP fixtures additionally use **3117**, workflows/tags/order use **3118**. Leave all earlier app/SMTP test ports free. Run the complete `npm test` and `npm run test:e2e` after integration. Current Windows verification uses the existing portable PostgreSQL cluster on loopback **15432** because Windows reserves this checkout's saved **55432** port; ignored process-only wrappers supply guarded test URLs without changing saved `.env` files. This workaround is local evidence, not a new Ubuntu port requirement. Physical Android, Ubuntu/proxy/TLS/Mailcow and real provider delivery remain separate checks.
+
+### Live Calendar drop feedback (019)
+
+Drag a project/task/subtask from Calendar's work palette over a visible day/week grid. A boundary and label show the proposed one-hour interval, dates, offsets, viewing zone and source workspace before release. An empty block in the same workspace previews assignment to its original interval. Occupied/foreign blocks and retained or pending intents show **Unavailable**. Hover saves nothing; a normal release schedules directly without opening an editor. Repeated or missing local times retain the explicit **Review** flow. A clipped shape still labels the full interval, including a next-day endpoint.
+
+Scrolling with the pointer held recomputes the target. Escape, release and invalidated filters/range/work/session clear feedback. Resizing the browser cancels the current mouse drag; begin a fresh drag afterward. The preview does not change workspace ownership or filtering; authorized work from an unselected workspace is labeled hidden by workspace selection. Calendar text search matches titles/descriptions, project/parent names and block labels; status-only context is excluded. Touch scrolling and **New block** remain the mobile scheduling controls.
+
+Focused checks after a successful build and guarded test migrations:
+
+```powershell
+npm test -- tests/unit/calendar-drop.test.ts
+npm run test:e2e -- calendar-drop-preview.spec.ts calendar-gesture-review.spec.ts calendar.spec.ts 011-overflow.spec.ts task-labels.spec.ts dialog-history.spec.ts mobile-surfaces.spec.ts trash-navigation.spec.ts
+```
+
+The new held-mouse preview cases intentionally skip Android emulation; the selected existing cases retain touch scrolling, explicit scheduling, DST and history coverage. See the task 019 completion record for actual results and carried earlier full-suite evidence. Independent review is pending; these changes do not deploy or configure your server.

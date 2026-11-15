@@ -16,8 +16,14 @@ export function calendarDropTarget(
   const column = [
     ...root.querySelectorAll<HTMLElement>(".fc-timegrid-col[data-date]"),
   ].find((el) => {
-    const r = el.getBoundingClientRect();
-    return x >= r.left && x < r.right;
+    const r = visibleCalendarRect(el);
+    return (
+      !!r &&
+      x >= r.left &&
+      x < r.left + r.width &&
+      y >= r.top &&
+      y < r.top + r.height
+    );
   });
   if (!column) return null;
   const clip = column
@@ -50,4 +56,32 @@ export function calendarDropTarget(
       ":" +
       String(total % 60).padStart(2, "0"),
   };
+}
+
+// Intersect every scroll/clip ancestor, including narrow week-view overflow.
+export function visibleCalendarRect(element: HTMLElement) {
+  let { left, top, right, bottom } = element.getBoundingClientRect();
+  left = Math.max(0, left);
+  top = Math.max(0, top);
+  right = Math.min(document.documentElement.clientWidth, right);
+  bottom = Math.min(document.documentElement.clientHeight, bottom);
+  for (
+    let parent = element.parentElement;
+    parent;
+    parent = parent.parentElement
+  ) {
+    const style = getComputedStyle(parent),
+      r = parent.getBoundingClientRect();
+    if (/auto|scroll|hidden|clip/.test(style.overflowX)) {
+      left = Math.max(left, r.left);
+      right = Math.min(right, r.right);
+    }
+    if (/auto|scroll|hidden|clip/.test(style.overflowY)) {
+      top = Math.max(top, r.top);
+      bottom = Math.min(bottom, r.bottom);
+    }
+  }
+  return right > left && bottom > top
+    ? { left, top, width: right - left, height: bottom - top }
+    : null;
 }
