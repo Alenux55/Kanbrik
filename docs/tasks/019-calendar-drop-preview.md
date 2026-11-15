@@ -1,6 +1,6 @@
 # 019: Restore live Calendar drop-slot feedback
 
-Status: Implemented on 2026-11-15 above owner-committed `186acc9`, explicitly assigned alongside review of updated task 017. Verification results are recorded below. Intermediate prerequisite review is not claimed approved; independent review remains pending.
+Status: Implemented in owner-committed `3287adc` above `186acc9`. Independent Calendar preview review on 2026-11-15 found no actionable preview defect in the inspected source, four focused desktop gesture cases and fresh screenshots. The combined candidate is held for separate [task 017 corrections](017-review-fixes.md); this bounded result does not approve import. Separate implementation and review evidence follow below.
 
 ## Outcome and inputs
 
@@ -59,3 +59,9 @@ An integrated run was interrupted by the owner's computer crash after six passes
 The earlier full 014–018 browser result (135 passed / three intentional skips, 138 total) belongs to `186acc9`; it is carried evidence, not a new full-suite run. Current verification uses Chromium desktop and Pixel 7 touch emulation, not physical Android. No Ubuntu/proxy/TLS/Mailcow/real SMTP delivery, container runtime, fresh dependency installation/audit or default Turbopack verification is claimed for this follow-up. Existing explicit mobile scheduling is retained; no touch-only dragging was added. Independent review of both the combined candidate and this follow-up remains pending. Owner commits/pushes; no deployment was performed.
 
 Final cleanup: `npm run check` passed again after the browser run. The owned portable PostgreSQL cluster and app/SMTP fixtures were stopped; no listeners remained on the verification ports. All 16 follow-up source/test/documentation files are staged for owner commit. No environment, local database, generated output or test artifact is staged. Proposed commit message: `feat: add live Calendar drop previews and align text filters`.
+
+## Independent review — 2026-11-15
+
+Reviewed committed `3287adc`, including shared hit testing/preview/release timing, context/session invalidation and display predicates. Lint/types, schema validation, all-14 migration status, Webpack build and **131/131 backend checks** passed independently. Four held-pointer desktop cases passed: blank slots/scroll/saved interval, existing empty versus occupied/foreign blocks, filter/range/session invalidation and clipped cross-day/DST review. Their four Android skips are intentional; the broader feature selection passed **28 cases with four skips, 32 total, 7.0m**, including Android explicit controls in the selected workflow scenarios. Fresh week and clipped preview screenshots were inspected. No actionable preview defect was found in this bounded review; this does not rerun the implementer's full affected Calendar/touch/history selection or all six preview cases.
+
+The combined candidate remains held before import for two independently reproduced [task 017 tag defects](017-review-fixes.md). Neither is a defect in the preview layer. The original task 014 restored-editor P2 passed independent re-review. See [current handoff](../handoff.md) for exact evidence, carried migration/full-suite limits and the next assignment; no runtime fix or deployment was performed by this review.

@@ -647,6 +647,81 @@ describe("workspace workflows, labels and sibling ordering", () => {
       },
     ]);
   });
+  it("edits migration-shaped tag IDs as single encoded segments without changing linked work or bypassing scope checks", async () => {
+    const definitions = await Promise.all(
+      ["important", "urgent"].map((name) =>
+        db.workspaceTag.create({
+          data: {
+            id: `legacy-${name}/${ws}`,
+            workspaceId: ws,
+            name: `Imported ${name}`,
+            normalizedName: `imported ${name}`,
+            color: "amber",
+          },
+        }),
+      ),
+    );
+    const task = await create(`/api/workspaces/${ws}/tasks`, {
+      title: "Migrated identity holder",
+      tagIds: definitions.map((tag) => tag.id),
+    });
+    const original = await db.task.findUniqueOrThrow({
+      where: { id: task.id },
+    });
+    const events = await db.workActivity.findMany({
+      where: { taskId: task.id },
+    });
+    for (const definition of definitions) {
+      const encodedId = encodeURIComponent(definition.id);
+      const path = `/api/workspaces/${ws}/tags/${encodedId}`;
+      const payload = {
+        name: definition.name + " renamed",
+        color: "sky",
+        archived: false,
+        revision: 1,
+      };
+      expect((await request(path, "PATCH", payload, outsider)).status).toBe(
+        404,
+      );
+      expect(
+        (
+          await request(
+            `/api/workspaces/${personal}/tags/${encodedId}`,
+            "PATCH",
+            payload,
+          )
+        ).status,
+      ).toBe(404);
+      for (let revision = 1; revision <= 3; revision++) {
+        const result = await request(
+          path,
+          "PATCH",
+          { ...payload, revision, archived: revision === 2 },
+          editor,
+        );
+        expect(result.status).toBe(200);
+        expect((await result.json()).tag).toMatchObject({
+          id: definition.id,
+          workspaceId: ws,
+          name: payload.name,
+          color: "sky",
+          revision: revision + 1,
+        });
+      }
+      expect((await request(path, "PATCH", payload)).status).toBe(409);
+    }
+    expect(await db.task.findUniqueOrThrow({ where: { id: task.id } })).toEqual(
+      original,
+    );
+    expect(
+      await db.workActivity.findMany({ where: { taskId: task.id } }),
+    ).toEqual(events);
+    expect(
+      (await db.taskTag.findMany({ where: { taskId: task.id } }))
+        .map((tag) => tag.tagId)
+        .sort(),
+    ).toEqual(definitions.map((tag) => tag.id).sort());
+  });
   it("reconciles normalized concurrent definitions, receipts, all palette colors, archives and foreign identity guards", async () => {
     const name = "Arbitrary " + randomUUID(),
       key = randomUUID(),

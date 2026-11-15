@@ -4,7 +4,7 @@ Tasks 001–009 implement the foundation, accounts/recovery, personal/shared acc
 
 The reviewed planner baseline is `75f678e`: [011 review corrections](tasks/011-review-fixes.md), independently re-reviewed without actionable findings and preserving reviewed task 012 invitations. Both original P2 findings are closed. The implementer's full browser run passed 69 cases with one intentional skip; the coordinator separately passed 94 backend checks and 17 focused browser cases with one intentional skip. Task [011 completion](tasks/011-implementation.md) and [012's review record](tasks/012-account-invitations.md) preserve their separate evidence and limits. UTC instants remain authoritative; server location is irrelevant.
 
-Current independently reviewed baseline is `0af0865`, with task 013's Trash navigation P2 closed. The owner assigned tasks **014–018 as one candidate** and explicitly deferred intermediate independent review until all five are implemented. That candidate includes the restored-editor correction, work lists/vendors, workspace workflows, revised arbitrary tags/Calendar search and sibling ordering. Implementation verification passed (128 backend checks; 135 browser passes and three intentional skips; schema/build/migration preservation checks). Final evidence is in [handoff](handoff.md); independent review remains pending. Task 019 is separately specified and unimplemented.
+Current fully approved baseline remains `0af0865`. The owner committed combined tasks **014–018** as `186acc9` and Calendar preview/predicate follow-up **019** as `3287adc`. Independent review on 2026-11-15 closed the original task 014 restored-editor P2 but found two tag defects: Board recovery can clear task tags, and migrated tag IDs cannot be edited through the UI. **Both [017 review corrections](tasks/017-review-fixes.md) are now implemented; hold import/deployment until independent re-review.** Task 019 is implemented; its bounded preview checks found no actionable preview issue. Current coordinator evidence and separately carried implementer full-suite/upgrade evidence are in [handoff](handoff.md).
 
 | Phase | Outcome | Evidence required for completion |
 | --- | --- | --- |
@@ -26,12 +26,12 @@ Current independently reviewed baseline is `0af0865`, with task 013's Trash navi
 
 ## Implementation handoffs
 
-- [014 review correction](tasks/014-review-fixes.md): implemented bidirectional restored-editor availability with retained original draft revisions; pending combined independent re-review.
+- [014 review correction](tasks/014-review-fixes.md): independently closed original restored-editor P2 on desktop and Pixel 7, with retained original draft revisions; combined import remains held for task 017.
 - [015: checklists and shopping lists](tasks/015-custom-work-lists.md): implemented independent work-attached sections/items, vendors, archive, activity and draft integration; pending combined review.
 - [016: configurable workspace statuses](tasks/016-workspace-statuses.md): implemented owner configuration, completion/default metadata, workspace-labeled Board and explicit retirement/Restore resolution; pending combined review.
-- [017: custom colored tags and filters](tasks/017-important-urgent-filters.md): latest revised specification implemented, replacing earlier flags with arbitrary tags/autocomplete/palette colors and three-view filters plus Calendar project/text search; pending combined review.
+- [017: custom colored tags and filters](tasks/017-important-urgent-filters.md): implemented with [both tag corrections](tasks/017-review-fixes.md); independent re-review required before import.
 - [018: sibling ordering](tasks/018-project-task-ordering.md): implemented shared root-within-project/child-within-parent order, explicit controls, retained slots/receipts and full-scope guards; pending combined review.
-- [019: live Calendar drop preview](tasks/019-calendar-drop-preview.md): implemented above `186acc9`, with shared hover/release targeting, clipped time labels, DST review and stale-feedback cleanup; task 017 text-filter consistency correction included. Independent review pending.
+- [019: live Calendar drop preview](tasks/019-calendar-drop-preview.md): committed as `3287adc`, including task 017 predicate consistency. Bounded independent preview review found no actionable preview issue; combined import held for task 017 corrections.
 
 - [013: mobile planner and Trash](tasks/013-mobile-planner-and-trash.md): committed as `e4f7bfb`, corrected at `0af0865` and independently re-reviewed with its navigation P2 closed. Separate verification/operating limits are in the [correction record](tasks/013-review-fixes.md). No deployment performed.
 

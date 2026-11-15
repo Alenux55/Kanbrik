@@ -1,6 +1,6 @@
 # 017: Custom colored tags and cross-view task filters
 
-Status: Implemented and verified in the combined 014–018 candidate on 2026-11-14; independent coordinator review pending. The owner explicitly deferred intermediate review gates for this combined assignment.
+Status: Implemented in `186acc9` with a Calendar predicate follow-up in `3287adc`. Independent review on 2026-11-15 found two P2 tag integration defects: failed Board-move recovery clears associations, and migrated tag IDs cannot be edited through the UI. Both [corrections](017-review-fixes.md) are implemented above `3287adc`; hold import until independent re-review. Passing implementation checks do not independently close these findings.
 
 ## Outcome and inputs
 
@@ -85,3 +85,7 @@ Final cleanup: the owned portable PostgreSQL verification cluster and applicatio
 ## Follow-up review with task 019 — 2026-11-15
 
 The owner requested the revised tag/filter handoff together with task 019. Arbitrary tags, normalized workspace identities, palette selection and project/text filters were already implemented in owner-committed `186acc9`. This follow-up shares the Calendar work/block predicate with live/release drop targeting so a display-hidden block cannot become an assignment target. Review also found that the palette's composed display context let status-only text match even though the documented/block text scope excluded statuses. Search now uses explicit project/parent names alongside title/description; status context remains display-only. Unit and browser regressions cover the documented scope and zero unintended writes. Follow-up verification passed lint/types, Webpack build, **131/131 backend/unit checks (14 files)** and **49 affected browser cases / nine intentional Android mouse-only skips (58 total, 13.2 minutes, exit 0)**. This includes the updated tag/filter cases on desktop and Pixel 7 and the six desktop preview cases. Prior 135 browser results above are carried evidence for `186acc9`, not a new run of the full suite. See task 019 for exact commands, attempts and remaining physical-device/server limits. Independent review remains pending.
+
+## Tag review corrections — 2026-11-15
+
+The two P2 findings at `3287adc` are corrected in [017 review corrections](017-review-fixes.md): Board retained proposals preserve canonical tag IDs, including archives, and metadata edit paths encode migration-shaped identities as single segments. Revisions still require explicit conflict review. No tag identity, migration, reference or history was rewritten. Independent re-review remains pending; the correction record separates current checks from earlier carried results.

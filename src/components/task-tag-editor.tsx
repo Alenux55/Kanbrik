@@ -81,7 +81,7 @@ export function TaskTagEditor({
         target,
         label: tag ? `tag ${tag.name}` : "new tag",
         form: "tag",
-        path: `/api/workspaces/${target.workspaceId}/tags${tag ? `/${tag.id}` : ""}`,
+        path: `/api/workspaces/${target.workspaceId}/tags${tag ? `/${encodeURIComponent(tag.id)}` : ""}`,
         method: tag ? "PATCH" : "POST",
         values: tag
           ? {

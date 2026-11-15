@@ -12,7 +12,7 @@ import {
 } from "@dnd-kit/core";
 import { TaskLabelBadges, TaskLabelFilter } from "./task-labels";
 import { usePlannerSession } from "./planner-session";
-import { usePlanningDrafts } from "./planning-drafts";
+import { usePlanningDrafts, type PlanningDraft } from "./planning-drafts";
 import { usePlannerContext } from "./planner-context";
 import { EditorDialog } from "./ui/editor-dialog";
 import { button, control } from "./ui/planner-controls";
@@ -482,12 +482,12 @@ function SelectedBoard({
       workspaceId: task.workspaceId,
       record: task,
     };
-    const proposed = {
+    const proposed: PlanningDraft = {
       projectId: task.projectId,
       title: task.title,
       description: task.description,
       status,
-      tags: task.tags,
+      tagIds: (task.tags ?? []).map((tag) => tag.id),
       revision: task.revision,
       dirty: true,
       target,
