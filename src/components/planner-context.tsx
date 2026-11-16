@@ -9,22 +9,26 @@ import { usePlannerSession } from "./planner-session";
 import { EntityEditor, type EntityTarget } from "./entity-editor";
 import { usePlanningDrafts } from "./planning-drafts";
 import { control, button } from "./ui/planner-controls";
+import type { Appearance } from "@/lib/settings-contracts";
 export type PlannerPreferences = {
   workspaces: WorkspaceSummary[];
   defaultWorkspaceId: string;
   timeZone: string | null;
+  appearance: Appearance;
 };
 type Value = PlannerPreferences & {
   zone: string;
   save: (input: {
     defaultWorkspaceId?: string;
     timeZone?: string;
+    appearance?: Appearance;
   }) => Promise<boolean>;
   refresh: () => void;
   pending: boolean;
   error: string;
   announce: (message: string) => void;
   openEntity: (target: EntityTarget) => void;
+  tagReview: { key: string; workspaceId: string } | null;
   revoke: (id: string) => void;
 };
 const Context = createContext<Value | null>(null);
@@ -38,7 +42,17 @@ export function PlannerContext({
   const session = usePlannerSession();
   const [lease] = useState(session.capture);
   const path = usePathname();
+  const [tagReview, setTagReview] = useState<Value["tagReview"]>(null);
   const [prefs, setPrefs] = useState(initial);
+  useEffect(() => {
+    const apply = () => {
+      document.documentElement.dataset.appearance = session.isCurrent(lease)
+        ? prefs.appearance
+        : "system";
+    };
+    apply();
+    return session.subscribe(apply);
+  }, [session, lease, prefs.appearance]);
   const [detected, setDetected] = useState("UTC");
   const [pending, setPending] = useState(false);
   const busy = useRef(false);
@@ -92,6 +106,7 @@ export function PlannerContext({
   async function save(input: {
     defaultWorkspaceId?: string;
     timeZone?: string;
+    appearance?: Appearance;
   }) {
     if (busy.current) return false;
     busy.current = true;
@@ -122,6 +137,7 @@ export function PlannerContext({
   }
   function revoke(id: string) {
     if (!session.isCurrent(lease)) return;
+    setTagReview((current) => (current?.workspaceId === id ? null : current));
     setPrefs((current) => ({
       ...current,
       workspaces: current.workspaces.filter((w) => w.id !== id),
@@ -177,6 +193,7 @@ export function PlannerContext({
         error,
         announce: setNotice,
         openEntity: setTarget,
+        tagReview,
         revoke,
       }}
     >
@@ -302,15 +319,36 @@ export function PlannerContext({
             Retained list and configuration drafts
           </h2>
           <p>
-            Changes are not confirmed saved. Restore inactive work before
-            changing it.
+            Changes are not confirmed saved. Restore removed work before editing
+            its content; workspace tag definitions remain independent.
           </p>
           {Object.entries(supplementalDrafts)
             .filter(([, d]) =>
               prefs.workspaces.some((w) => w.id === d.workspaceId),
             )
             .map(([key, d]) =>
-              d.form === "order" ? (
+              d.form === "tag" ? (
+                <Link
+                  key={key}
+                  className="block min-h-11 underline"
+                  href={`/settings?workspaceId=${encodeURIComponent(d.workspaceId)}&draft=${encodeURIComponent(key)}#workspace-tags`}
+                  onClick={(event) => {
+                    if (
+                      path !== "/settings" ||
+                      event.metaKey ||
+                      event.ctrlKey ||
+                      event.shiftKey ||
+                      event.altKey
+                    )
+                      return;
+                    event.preventDefault();
+                    if (session.isCurrent(lease))
+                      setTagReview({ key, workspaceId: d.workspaceId });
+                  }}
+                >
+                  Review retained input: {d.label}
+                </Link>
+              ) : d.form === "order" ? (
                 <button
                   key={key}
                   type="button"

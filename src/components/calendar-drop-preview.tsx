@@ -107,12 +107,12 @@ export function CalendarDropPreview({
           zIndex: 30,
           pointerEvents: "none",
           boxSizing: "border-box",
-          border: `3px ${preview.review ? "dashed" : "solid"} ${unavailable ? "#991b1b" : preview.review ? "#92400e" : "#0f766e"}`,
+          border: `3px ${preview.review ? "dashed" : "solid"} ${unavailable ? "var(--error-text)" : preview.review ? "var(--warning-text)" : "var(--focus)"}`,
           background: unavailable
-            ? "rgb(254 226 226 / .35)"
+            ? "var(--preview-unavailable)"
             : preview.review
-              ? "rgb(254 243 199 / .5)"
-              : "rgb(204 251 241 / .55)",
+              ? "var(--preview-review)"
+              : "var(--preview-valid)",
         }}
       />
       <div

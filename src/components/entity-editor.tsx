@@ -473,7 +473,7 @@ export function EntityEditor({
             </>
           )}
           <button
-            className={button + " bg-teal-900 text-white"}
+            className={button + " bg-action text-on-action"}
             disabled={pending || !!conflict || !data}
           >
             {pending ? "Saving…" : record ? "Save changes" : heading}

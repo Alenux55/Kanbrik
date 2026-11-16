@@ -608,7 +608,7 @@ test("calendar overlays retain uncertain create/delete intents, dirty input and 
   ).toBeVisible();
   await page
     .getByRole("navigation")
-    .getByRole("link", { name: "User settings", exact: true })
+    .getByRole("link", { name: "Settings", exact: true })
     .click();
   await page
     .getByLabel("Preferred time zone", { exact: true })

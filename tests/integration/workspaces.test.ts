@@ -787,6 +787,123 @@ describe("planner and workspace settings", () => {
   expect(await (await request("/api/board/preferences")).json()).toMatchObject({workspaceIds:[personalId]});
   const fresh=await (await post("/api/workspaces",{name:"New zone default"},owner.cookie)).json();sharedIds.push(fresh.id);expect(fresh.timeZone).toBe("Europe/London");
  });
+  it("persists account appearance with isolated partial writes, strict identity checks and matching read-only HTML", async () => {
+    const before = await (await request("/api/planner/preferences")).json();
+    const other = await (
+      await request("/api/planner/preferences", "GET", undefined, editor.cookie)
+    ).json();
+    for (const appearance of ["dark", "light", "system"]) {
+      const result = await request("/api/planner/preferences", "PATCH", {
+        appearance,
+      });
+      expect(result.status).toBe(200);
+      expect(await result.json()).toMatchObject({
+        appearance,
+        defaultWorkspaceId: before.defaultWorkspaceId,
+        timeZone: before.timeZone,
+      });
+    }
+    expect(
+      await (
+        await request(
+          "/api/planner/preferences",
+          "GET",
+          undefined,
+          editor.cookie,
+        )
+      ).json(),
+    ).toEqual(other);
+    const writes = await Promise.all([
+      request("/api/planner/preferences", "PATCH", { appearance: "dark" }),
+      request("/api/planner/preferences", "PATCH", {
+        timeZone: "Pacific/Auckland",
+      }),
+    ]);
+    expect(writes.map((r) => r.status)).toEqual([200, 200]);
+    expect(
+      await (await request("/api/planner/preferences")).json(),
+    ).toMatchObject({
+      appearance: "dark",
+      timeZone: "Pacific/Auckland",
+      defaultWorkspaceId: before.defaultWorkspaceId,
+    });
+    expect(
+      (
+        await request("/api/planner/preferences", "PATCH", {
+          appearance: "invalid",
+        })
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await request("/api/planner/preferences", "PATCH", {
+          appearance: "light",
+          userId: editor.id,
+        })
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await request(
+          "/api/planner/preferences",
+          "PATCH",
+          { appearance: "light" },
+          owner.cookie,
+          { origin: "https://untrusted.invalid" },
+        )
+      ).status,
+    ).toBe(403);
+    expect(
+      (
+        await request(
+          "/api/planner/preferences",
+          "PATCH",
+          { appearance: "light" },
+          owner.cookie,
+          { [expectedAccountHeader]: editor.id },
+        )
+      ).status,
+    ).toBe(412);
+    expect(
+      (
+        await request(
+          "/api/planner/preferences",
+          "PATCH",
+          { appearance: "light" },
+          "",
+        )
+      ).status,
+    ).toBe(401);
+    const strangerWorkspace = (await bootstrap(stranger.cookie)).id;
+    expect(
+      (
+        await request("/api/planner/preferences", "PATCH", {
+          appearance: "light",
+          defaultWorkspaceId: strangerWorkspace,
+        })
+      ).status,
+    ).toBe(404);
+    expect(
+      await (await request("/api/planner/preferences")).json(),
+    ).toMatchObject({
+      appearance: "dark",
+      defaultWorkspaceId: before.defaultWorkspaceId,
+    });
+    expect(await (await request("/settings")).text()).toContain(
+      'data-appearance="dark"',
+    );
+    expect(
+      await (await request("/sign-in", "GET", undefined, "")).text(),
+    ).toContain('data-appearance="system"');
+    if (before.timeZone)
+      expect(
+        (
+          await request("/api/planner/preferences", "PATCH", {
+            timeZone: before.timeZone,
+          })
+        ).status,
+      ).toBe(200);
+  });
  it("allows members to read, restricts zone changes to owners and detects concurrent settings writes", async () => {
   const path=`/api/workspaces/${workspaceId}/settings`;
   expect(await (await request(path)).json()).toEqual({timeZone:"UTC",settingsRevision:1});

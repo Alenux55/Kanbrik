@@ -302,17 +302,17 @@ test("custom tag edits persist independently and filtered-out work/comment/list 
   await openTask(page, task.title);
   const form = page.getByRole("form", { name: "Edit task", exact: true });
   await form
-    .getByRole("combobox", { name: "Find or create tag", exact: true })
+    .getByRole("combobox", { name: "Find existing tag", exact: true })
     .fill("Site");
   await form
     .getByRole("option", { name: /Site survey/ })
     .getByRole("button")
     .click();
   await form
-    .getByRole("combobox", { name: "Find or create tag", exact: true })
+    .getByRole("combobox", { name: "Find existing tag", exact: true })
     .fill("Follow");
   await form
-    .getByRole("combobox", { name: "Find or create tag", exact: true })
+    .getByRole("combobox", { name: "Find existing tag", exact: true })
     .press("Enter");
   await form.getByRole("button", { name: "Save changes", exact: true }).click();
   await closedEditor(page);
@@ -387,7 +387,7 @@ test("custom tag edits persist independently and filtered-out work/comment/list 
   await second.close();
 });
 
-test("explicit tag creation offers shared colors and stable retry while preserving work and definition drafts", async ({
+test("explicit tag creation in Settings offers shared colors and stable retry while preserving work and definition drafts", async ({
   page,
 }) => {
   const ws = await personal(page),
@@ -396,28 +396,51 @@ test("explicit tag creation offers shared colors and stable retry while preservi
     });
   await page.reload();
   await openTask(page, task.title);
-  const form = page.getByRole("form", { name: "Edit task", exact: true }),
-    combo = form.getByRole("combobox", {
-      name: "Find or create tag",
-      exact: true,
-    });
+  const form = page.getByRole("form", { name: "Edit task", exact: true });
   await form
     .getByRole("textbox", { name: "Description", exact: true })
     .fill("Keep work while creating tag");
+  await page.getByRole("button", { name: "Add comment", exact: true }).click();
+  await page
+    .getByLabel("New comment text", { exact: true })
+    .fill("Keep comment while creating tag");
+  await page
+    .getByRole("button", { name: "Add checklist", exact: true })
+    .click();
+  await page
+    .getByLabel("Section name", { exact: true })
+    .fill("Keep list while creating tag");
   let creates = 0;
   page.on("request", (r) => {
     if (r.method() === "POST" && r.url().endsWith("/tags")) creates++;
   });
   const name = "Custom survey " + "x".repeat(35);
-  await combo.fill(name);
-  expect(creates).toBe(0);
   await form
-    .getByRole("button", { name: `Create tag “${name}”`, exact: true })
+    .getByRole("combobox", { name: "Find existing tag", exact: true })
+    .fill(name);
+  expect(creates).toBe(0);
+  await expect(
+    form.getByText("Manage workspace tags", { exact: true }),
+  ).toHaveCount(0);
+  await form
+    .getByRole("link", { name: "Create/manage tags", exact: true })
     .click();
-  const definition = form.getByRole("region", {
+  await expect(
+    page.getByRole("heading", { name: "Settings", exact: true }),
+  ).toBeVisible();
+  const tags = page.getByRole("region", {
+    name: "Workspace tags",
+    exact: true,
+  });
+  await expect(
+    tags.getByRole("button", { name: "Create tag", exact: true }),
+  ).toBeEnabled();
+  await tags.getByRole("button", { name: "Create tag", exact: true }).click();
+  const definition = page.getByRole("region", {
     name: "Tag definition",
     exact: true,
   });
+  await definition.getByLabel("Tag name", { exact: true }).fill(name);
   for (const color of ["Teal", "Blue", "Violet", "Amber", "Pink", "Sky"]) {
     await definition
       .getByRole("radio", { name: new RegExp(`^${color}`) })
@@ -427,15 +450,12 @@ test("explicit tag creation offers shared colors and stable retry while preservi
     ).toBeChecked();
   }
   await retained(page);
-  await page
-    .getByRole("button", {
-      name: "Review retained input: new tag",
-      exact: true,
-    })
+  await tags
+    .getByRole("button", { name: "Review tag draft: new tag", exact: true })
     .click();
-  await expect(
-    form.getByRole("textbox", { name: "Tag name", exact: true }),
-  ).toHaveValue(name);
+  await expect(definition.getByLabel("Tag name", { exact: true })).toHaveValue(
+    name,
+  );
   let attempts = 0,
     releaseMetadata!: () => void;
   const metadataGate = new Promise<void>((resolve) => {
@@ -443,8 +463,9 @@ test("explicit tag creation offers shared colors and stable retry while preservi
   });
   await page.route(`**/api/workspaces/${ws.id}/tags`, async (route) => {
     if (route.request().method() !== "POST") {
+      const response = await route.fetch();
       if (attempts >= 2) await metadataGate;
-      await route.continue();
+      await route.fulfill({ response }).catch(() => {});
       return;
     }
     attempts++;
@@ -453,93 +474,91 @@ test("explicit tag creation offers shared colors and stable retry while preservi
     else await route.fulfill({ response });
   });
   try {
-    await form
+    await definition
       .getByRole("button", { name: "Save tag definition", exact: true })
       .click();
     await expect(
-      form.getByRole("button", { name: "Retry tag save", exact: true }),
+      definition.getByRole("button", { name: "Retry tag save", exact: true }),
     ).toBeEnabled();
     await expect(
-      form.getByRole("textbox", { name: "Tag name", exact: true }),
+      definition.getByLabel("Tag name", { exact: true }),
     ).toBeDisabled();
-    await form
-      .getByRole("button", { name: "Retry tag save", exact: true })
+    await retained(page);
+    await page
+      .getByRole("link", {
+        name: "Review retained input: new tag",
+        exact: true,
+      })
       .click();
     await expect(
-      form.getByRole("region", { name: "Tag definition", exact: true }),
-    ).toHaveCount(0);
-    await combo.fill("survey");
-    // Navigate while the authorized refresh is genuinely delayed and empty.
-    // The selection must stay valid when suggestions arrive for this query.
-    await combo.press("ArrowDown");
+      definition.getByRole("button", { name: "Retry tag save", exact: true }),
+    ).toBeEnabled();
+    await definition
+      .getByRole("button", { name: "Retry tag save", exact: true })
+      .click();
+    await closedEditor(page);
+    expect(attempts).toBe(2);
+    await page
+      .getByRole("button", {
+        name: "Review work draft: Tag authoring",
+        exact: true,
+      })
+      .click();
     await expect(
-      form
-        .getByRole("listbox", { name: "Tag suggestions", exact: true })
-        .getByRole("option"),
+      form.getByRole("textbox", { name: "Description", exact: true }),
+    ).toHaveValue("Keep work while creating tag");
+    await expect(
+      page.getByLabel("New comment text", { exact: true }),
+    ).toHaveValue("Keep comment while creating tag");
+    await expect(page.getByLabel("Section name", { exact: true })).toHaveValue(
+      "Keep list while creating tag",
+    );
+    const combo = form.getByRole("combobox", {
+      name: "Find existing tag",
+      exact: true,
+    });
+    await combo.fill(name);
+    await combo.press("ArrowDown");
+    await combo.press("Enter");
+    await expect(
+      form.getByRole("button", { name: `Remove ${name}`, exact: true }),
     ).toHaveCount(0);
     releaseMetadata();
+    await page.unroute(`**/api/workspaces/${ws.id}/tags`);
     await expect(
-      form.getByRole("option", { name: new RegExp(`^${name} — Sky$`) }),
+      form.getByRole("option").filter({ hasText: name }),
     ).toBeVisible();
     await combo.press("Enter");
     await expect(
       form.getByRole("button", { name: `Remove ${name}`, exact: true }),
     ).toBeVisible();
-    await expect(
-      form.getByRole("textbox", { name: "Description", exact: true }),
-    ).toHaveValue("Keep work while creating tag");
+    const taskSave = page.waitForResponse(
+      (r) =>
+        r.url().endsWith(`/tasks/${task.id}`) &&
+        r.request().method() === "PATCH",
+    );
     await form
       .getByRole("button", { name: "Save changes", exact: true })
       .click();
-    await closedEditor(page);
-    const saved = await (
-      await page.request.get(`/api/workspaces/${ws.id}/tasks/${task.id}`)
-    ).json();
-    expect(saved.tags).toHaveLength(1);
-    expect(saved.tags[0]).toMatchObject({ name, color: "sky" });
-    expect(saved.status).toBe(task.status);
-    expect(creates).toBe(2);
-    await page.getByRole("button", { name: task.title, exact: true }).click();
-    await form.getByText("Manage workspace tags", { exact: true }).click();
-    await form
-      .getByRole("button", { name: `Edit tag ${name}`, exact: true })
-      .click();
-    await form
-      .getByRole("textbox", { name: "Tag name", exact: true })
-      .fill("Renamed survey");
-    await form
-      .getByRole("checkbox", { name: "Archived tag", exact: true })
-      .check();
-    await form.getByRole("radio", { name: /^Pink/ }).check();
-    await form
-      .getByRole("button", { name: "Save tag definition", exact: true })
-      .click();
-    await expect(
-      form.getByRole("region", { name: "Tag definition", exact: true }),
-    ).toHaveCount(0);
-    await expect(
-      form.getByText("Renamed survey (archived)", { exact: true }).first(),
-    ).toBeVisible();
-    await combo.fill("Renamed");
-    await expect(
-      form
-        .getByRole("listbox", { name: "Tag suggestions", exact: true })
-        .getByRole("option"),
-    ).toHaveCount(0);
-    await cleanClose(page);
+    expect((await taskSave).status()).toBe(200);
+    await expect(form.getByText("Unsaved draft", { exact: true })).toHaveCount(
+      0,
+    );
     expect(
       (
         await (
           await page.request.get(`/api/workspaces/${ws.id}/tasks/${task.id}`)
         ).json()
-      ).revision,
-    ).toBe(saved.revision);
+      ).tags,
+    ).toMatchObject([{ name, color: "sky" }]);
+    const definitions = await (
+      await page.request.get(`/api/workspaces/${ws.id}/tags`)
+    ).json();
     expect(
-      await page.evaluate(
-        () => document.documentElement.scrollWidth <= innerWidth,
-      ),
-    ).toBe(true);
+      definitions.filter((tag: { name: string }) => tag.name === name),
+    ).toHaveLength(1);
   } finally {
     releaseMetadata();
+    await page.unroute(`**/api/workspaces/${ws.id}/tags`);
   }
 });

@@ -308,6 +308,7 @@ model PlannerPreference {
   userId String @id
   defaultWorkspaceId String?
   timeZone String?
+  appearance String @default("system")
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 

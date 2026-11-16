@@ -26,6 +26,11 @@ Current independently accepted candidate is **`2742d15`**, including combined ta
 
 ## Implementation handoffs
 
+- [020: Settings and appearance](tasks/020-settings-and-appearance.md): implemented candidate above `9e41324`; unified Settings, centralized tags, original-intent recovery and account Light/Dark/System with additive migration 15. Verified with 133 backend/unit checks, full 156-pass/12-intentional-skip browser run and fresh/populated migration proofs; independent review pending before 021.
+- [021: used-tag removal/export](tasks/021-tag-removal-and-usage-export.md): planned after 020; confirmed detach/archive with warning, downloadable usage, history and safe Trash-compatible revisions. Independent data-contract review required.
+- [022: compact planner filters](tasks/022-compact-planner-filters.md): planned shared dropdown/search/Advanced layout; existing own-workspace tag semantics, Projects order guards and multiple completed-status support. Can be prioritized independently of 021.
+- [023: Calendar scope/presentation](tasks/023-calendar-presentation-and-workspace-scope.md): planned after 022; selected-workspace-only palette, Follow creation default, project colors, inline preview and optional Agenda. Preserve explicit touch/keyboard scheduling and DST/save guards.
+
 - [014 review correction](tasks/014-review-fixes.md): original restored-editor P2 independently closed on desktop and Pixel 7, with retained original draft revisions.
 - [015: checklists and shopping lists](tasks/015-custom-work-lists.md): implemented and included in accepted `2742d15`; independent sections/items, vendors, archive, activity and drafts.
 - [016: configurable workspace statuses](tasks/016-workspace-statuses.md): implemented and included in accepted `2742d15`; owner configuration, completion/default metadata, grouped Board and retirement/Restore resolution.
@@ -35,7 +40,7 @@ Current independently accepted candidate is **`2742d15`**, including combined ta
 
 - [013: mobile planner and Trash](tasks/013-mobile-planner-and-trash.md): committed as `e4f7bfb`, corrected at `0af0865` and independently re-reviewed with its navigation P2 closed. Separate verification/operating limits are in the [correction record](tasks/013-review-fixes.md). No deployment performed.
 
-- [014: comments and edit history](tasks/014-comments-and-edit-history.md): included in the combined candidate above `0af0865`, together with the [restored-editor correction](tasks/014-review-fixes.md). Prior coordinator evidence remains separate; combined independent review is pending under the owner's explicit assignment.
+- [014: comments and edit history](tasks/014-comments-and-edit-history.md): included in accepted `2742d15`, together with the independently closed [restored-editor correction](tasks/014-review-fixes.md). Coordinator checks and carried implementation evidence remain separately attributed.
 
 - [012: account invitations](tasks/012-account-invitations.md): implemented at `1d93128` and independently reviewed without new actionable findings; administrator allowlist and expiring email links grant account signup only. The original invitation review used focused account checks on desktop/Android; latest integrated verification and independent correction re-review are in the task 011 correction record.
 

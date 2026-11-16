@@ -246,7 +246,7 @@ for (const failure of ["503", "conflict", "lost response"] as const) {
             .getByRole("textbox", { name: "Description", exact: true })
             .fill("Collaborator text");
           await form
-            .getByRole("combobox", { name: "Find or create tag", exact: true })
+            .getByRole("combobox", { name: "Find existing tag", exact: true })
             .fill("Collaborator");
           await form
             .getByRole("option")
@@ -349,8 +349,16 @@ test("migration-shaped Important and Urgent identities support normal tag editin
   });
   await page.reload();
   await openTask(page, task.title);
-  const panel = page.getByRole("region", { name: "Task tags", exact: true });
-  await panel.getByText("Manage workspace tags", { exact: true }).click();
+  await page
+    .getByRole("link", { name: "Create/manage tags", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Settings", exact: true }),
+  ).toBeVisible();
+  const panel = page.getByRole("region", {
+    name: "Workspace tags",
+    exact: true,
+  });
   for (const tag of tags) {
     for (const step of ["rename", "archive", "restore"] as const) {
       const name = step === "rename" ? tag.name : `Imported ${tag.name}`;
@@ -393,14 +401,14 @@ test("migration-shaped Important and Urgent identities support normal tag editin
         where: { id: tag.id },
       });
       expect(!!saved.archivedAt).toBe(step === "archive");
-      const badge = panel
-        .getByRole("button", {
-          name: `Remove Imported ${tag.name}`,
-          exact: true,
-        })
-        .locator("..");
-      if (step === "archive") await expect(badge).toContainText("(archived)");
-      else await expect(badge).not.toContainText("(archived)");
+      const row = panel
+        .getByRole("list", { name: "Tag definitions", exact: true })
+        .getByRole("listitem")
+        .filter({ hasText: `Imported ${tag.name}` });
+      if (step === "archive")
+        await expect(row).toContainText("Archived (assignments retained)");
+      else await expect(row).toContainText("Active");
+      await closedEditor(page);
       expect(
         await testDB.task.findUniqueOrThrow({ where: { id: task.id } }),
       ).toEqual(original);
@@ -414,11 +422,7 @@ test("migration-shaped Important and Urgent identities support normal tag editin
       .map((t) => t.tagId)
       .sort(),
   ).toEqual(tags.map((t) => t.id).sort());
-  await selected(
-    page,
-    tags.map((t) => `Imported ${t.name}`),
-  );
-  await page.reload();
+  await page.goto("/projects");
   await openTask(page, task.title);
   await selected(
     page,

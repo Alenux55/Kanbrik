@@ -5,7 +5,7 @@ import { authClient } from "@/lib/auth-client";
 import { announceSessionChange } from "@/lib/session-signal";
 
 const inputClass = "mt-2 block min-h-12 w-full rounded-lg border border-neutral-400 bg-white px-3 focus-visible:outline-2 focus-visible:outline-teal-700";
-const buttonClass = "min-h-12 rounded-lg bg-teal-900 px-5 py-3 text-white disabled:opacity-60";
+const buttonClass = "min-h-12 rounded-lg bg-action px-5 py-3 text-on-action disabled:opacity-60";
 
 export function ForgotPassword({ enabled }: { enabled: boolean }) {
   const [pending, setPending] = useState(false);

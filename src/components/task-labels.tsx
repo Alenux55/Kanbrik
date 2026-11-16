@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import type { LabelFilter } from "@/lib/task-labels";
 import { emptyLabelFilter } from "@/lib/task-labels";
 import type { TagRecord } from "@/lib/tag-contracts";
-import { tagColor } from "@/lib/project-palette";
+import { tagColor, themedTint } from "@/lib/project-palette";
 import { usePlannerSession } from "./planner-session";
 import { usePlannerContext } from "./planner-context";
 import { usePlanningDrafts } from "./planning-drafts";
@@ -15,7 +15,7 @@ export function TaskLabelBadges({ task }: { task: { tags?: TagRecord[] } }) {
         <span
           key={tag.id}
           className="max-w-full break-words rounded border border-neutral-500 px-1 text-xs text-neutral-950"
-          style={{ backgroundColor: tagColor(tag.color) }}
+          style={{ backgroundColor: themedTint(tagColor(tag.color)) }}
         >
           {tag.name}
           {tag.archivedAt ? " (archived)" : ""}
@@ -109,7 +109,7 @@ export function TaskLabelFilter({
                 }
               />
               <span
-                style={{ backgroundColor: tagColor(tag.color) }}
+                style={{ backgroundColor: themedTint(tagColor(tag.color)) }}
                 className="rounded px-1 text-neutral-950"
               >
                 {tag.name}

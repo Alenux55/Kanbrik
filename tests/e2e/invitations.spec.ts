@@ -57,7 +57,7 @@ test("administrator emails an account-only invitation while public signup stays 
   const spaces = await page.evaluate(async () => (await fetch("/api/workspaces")).json());
   expect(spaces).toHaveLength(1); expect(spaces[0].kind).toBe("personal");
   await page.goto(origin + "/settings");
-  await expect(page.getByRole("heading", { name: "User settings", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Settings", exact: true })).toBeVisible();
   await expect(page.getByRole("region", { name: "Account invitations", exact: true })).toHaveCount(0);
   const denied = await page.evaluate(async () => (await fetch("/api/invitations")).status);
   expect(denied).toBe(403);

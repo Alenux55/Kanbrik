@@ -13,6 +13,7 @@ import {
   WorkspaceDenied,
 } from "./workspaces";
 import { PlanningConflict } from "./planning";
+import { appearanceInput } from "@/lib/settings-contracts";
 export async function plannerPreferences(headers: Headers) {
   const session = await verifiedSession(headers);
   if (!session) throw new Unauthenticated();
@@ -26,6 +27,7 @@ export async function plannerPreferences(headers: Headers) {
       workspaces.find((item) => item.id === saved?.defaultWorkspaceId)?.id ??
       workspaces.find((item) => item.kind === "personal")!.id,
     timeZone: saved?.timeZone ?? null,
+    appearance: appearanceInput.parse(saved?.appearance ?? "system"),
   };
 }
 export async function savePlannerPreferences(

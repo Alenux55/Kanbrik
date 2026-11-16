@@ -10,3 +10,9 @@ export type PaletteKey = (typeof projectPalette)[number]["key"];
 export function tagColor(key: string) {
   return projectPalette.find((c) => c.key === key)?.color ?? "#f5f5f5";
 }
+// Presentation only: palette keys, project hashing and stored colors stay stable.
+export function themedTint(color: string) {
+  const key =
+    projectPalette.find((item) => item.color === color)?.key ?? "neutral";
+  return `var(--tint-${key}, ${color})`;
+}

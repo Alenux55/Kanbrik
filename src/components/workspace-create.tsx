@@ -36,7 +36,7 @@ export function WorkspaceCreate() {
       <label className="block">Workspace name<input required maxLength={100} value={name} onChange={event => setName(event.target.value)} disabled={pending} className="mt-2 block min-h-12 w-full rounded-lg border border-neutral-400 px-3 focus-visible:outline-2 focus-visible:outline-teal-700" /></label>
       <label className="block">Initial workspace time zone<input className="mt-2 block min-h-12 w-full rounded border px-3" value={zone ?? context.zone} disabled={pending} onChange={e => setZone(e.target.value)} /></label>
       {error && <p role="alert" className="text-red-800">{error}</p>}
-      <button disabled={pending || !name.trim() || !validZone(zone ?? context.zone)} className="min-h-12 rounded-lg bg-teal-900 px-5 py-3 text-white disabled:opacity-60">{pending ? "Saving…" : "Create shared workspace"}</button>
+      <button disabled={pending || !name.trim() || !validZone(zone ?? context.zone)} className="min-h-12 rounded-lg bg-action px-5 py-3 text-on-action disabled:opacity-60">{pending ? "Saving…" : "Create shared workspace"}</button>
     </form>
   </section>;
 }

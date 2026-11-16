@@ -16,7 +16,7 @@ export function Navigation() {
         ...sections,
         { slug: "trash", label: "Trash" },
         { slug: "workspaces", label: "Workspaces" },
-        { slug: "settings", label: "User settings" },
+        { slug: "settings", label: "Settings" },
       ].map((section) => {
         const active =
           pathname === `/${section.slug}` ||
@@ -29,7 +29,7 @@ export function Navigation() {
             className={cn(
               "flex min-h-12 shrink-0 items-center whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-neutral-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700",
               active
-                ? "bg-teal-900 text-white hover:bg-teal-800"
+                ? "bg-action text-on-action hover:bg-action-hover"
                 : "text-neutral-700",
             )}
           >

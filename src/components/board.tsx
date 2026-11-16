@@ -10,6 +10,7 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
+import { themedTint } from "@/lib/project-palette";
 import { TaskLabelBadges, TaskLabelFilter } from "./task-labels";
 import { usePlannerSession } from "./planner-session";
 import { usePlanningDrafts, type PlanningDraft } from "./planning-drafts";
@@ -750,7 +751,9 @@ function SelectedBoard({
               <div
                 data-drag-preview
                 className="max-w-[min(16rem,80vw)] rounded border p-3 shadow-lg [overflow-wrap:anywhere]"
-                style={{ background: projectColor(dragged.projectId) }}
+                style={{
+                  background: themedTint(projectColor(dragged.projectId)),
+                }}
               >
                 {dragged.title}
               </div>
@@ -835,7 +838,7 @@ function Card({
         disabled={pending}
         className="block min-h-14 w-full min-w-0 rounded-lg border border-neutral-300 p-3 text-left text-neutral-950 shadow-sm"
         style={{
-          background: projectColor(task.projectId),
+          background: themedTint(projectColor(task.projectId)),
           opacity: isDragging ? 0.4 : 1,
         }}
       >

@@ -78,7 +78,7 @@ export function WorkspaceMembers({ initial }: { initial: WorkspaceDetail }) {
         <h2 className="text-xl font-semibold">Add existing account</h2>
         <p className="text-sm leading-6 text-neutral-600">Access is granted immediately as editor. No invitation or email is sent. Development account emails are unverified; this does not verify anyone’s identity.</p>
         <label className="block">Account email<input type="email" required maxLength={254} value={email} onChange={event => setEmail(event.target.value)} disabled={pending} className="mt-2 block min-h-12 w-full rounded-lg border border-neutral-400 px-3 focus-visible:outline-2 focus-visible:outline-teal-700" /></label>
-        <button disabled={pending} className="min-h-12 rounded-lg bg-teal-900 px-5 py-3 text-white disabled:opacity-60">{pending ? "Saving…" : "Add existing account"}</button>
+        <button disabled={pending} className="min-h-12 rounded-lg bg-action px-5 py-3 text-on-action disabled:opacity-60">{pending ? "Saving…" : "Add existing account"}</button>
       </form> : <div className="mt-8"><p className="mb-3 text-sm text-neutral-600">Leaving ends your access to this shared workspace. Your account and personal workspace stay intact.</p><button onClick={() => run({ suffix: "/leave", method: "POST", body: {}, leave: true })} disabled={pending} className="min-h-12 rounded-lg border border-neutral-400 px-4 disabled:opacity-60">Leave workspace</button></div>}
     </>}
   </section>;
