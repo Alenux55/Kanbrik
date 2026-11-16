@@ -270,6 +270,7 @@ model TrashBatch {
 
 model CalendarPreference {
   userId String @id
+  mode String @default("follow")
   workspaceIds String[]
   timeZone String
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)

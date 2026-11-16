@@ -637,6 +637,9 @@ test("a collaborator's Trash does not revoke workspace access or erase unrelated
     await page.getByRole("link", { name: "Calendar", exact: true }).click();
     await page.getByRole("button", { name: /^Advanced/ }).click();
     await page
+      .getByRole("radio", { name: "Selected workspaces", exact: true })
+      .check();
+    await page
       .getByRole("checkbox", { name: "Peer Trash (shared)", exact: true })
       .check();
     await page

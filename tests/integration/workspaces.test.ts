@@ -653,6 +653,59 @@ describe("calendar time blocks through authorized HTTP and PostgreSQL", () => {
     for (const extra of [{ userId: b.id }, { timeZone: "Invalid/zone" }]) expect((await request("/api/calendar/preferences", "PUT", { workspaceIds: [], timeZone: "UTC", ...extra })).status).toBe(400);
     expect((await (await request("/api/calendar/preferences", "GET", undefined, outsider.cookie)).json()).timeZone).toBeNull();
   });
+
+  it("follows the authorized creation default only until an explicit legacy or custom selection is saved", async () => {
+    const actor = await account(), personal = await bootstrap(actor.cookie);
+    await post(`/api/workspaces/${workspaceId}/members`, { email: actor.email }, a.cookie);
+    const prefs = () => request("/api/calendar/preferences", "GET", undefined, actor.cookie);
+    expect(await (await prefs()).json()).toMatchObject({ mode: "follow", workspaceIds: [personal.id] });
+    expect(await db.calendarPreference.findUnique({ where: { userId: actor.id } })).toBeNull();
+    expect((await request("/api/planner/preferences", "PATCH", { defaultWorkspaceId: workspaceId }, actor.cookie)).status).toBe(200);
+    expect(await (await prefs()).json()).toMatchObject({ mode: "follow", workspaceIds: [workspaceId] });
+    expect((await request("/api/calendar/preferences", "PUT", { workspaceIds: [] }, actor.cookie)).status).toBe(200);
+    await request("/api/planner/preferences", "PATCH", { defaultWorkspaceId: personal.id }, actor.cookie);
+    expect(await (await prefs()).json()).toMatchObject({ mode: "custom", workspaceIds: [] });
+    expect((await request("/api/calendar/preferences", "PUT", { mode: "follow" }, actor.cookie)).status).toBe(200);
+    expect(await (await prefs()).json()).toMatchObject({ mode: "follow", workspaceIds: [personal.id] });
+    const login = await post("/api/auth/sign-in/email", { email: actor.email, password: actor.password });
+    const cookie = login.headers.getSetCookie().map(value => value.split(";")[0]).join("; ");
+    expect(await (await request("/api/calendar/preferences", "GET", undefined, cookie)).json()).toMatchObject({ mode: "follow", workspaceIds: [personal.id] });
+    expect((await request("/api/calendar/preferences", "PUT", { mode: "follow", workspaceIds: [workspaceId] }, actor.cookie)).status).toBe(400);
+    expect((await request("/api/calendar/preferences", "PUT", { mode: "custom", workspaceIds: [personalId] }, actor.cookie)).status).toBe(404);
+    const foreignOrigin = await fetch(origin + "/api/calendar/preferences", { method: "PUT", headers: { cookie: actor.cookie, origin: "https://foreign.invalid", "content-type": "application/json" }, body: JSON.stringify({ mode: "follow" }) });
+    expect(foreignOrigin.status).toBe(403);
+  });
+  it("prunes revoked custom IDs without widening empty scope and falls back to personal when following a revoked default", async () => {
+    const actor = await account(), personal = await bootstrap(actor.cookie);
+    const add = () => post(`/api/workspaces/${workspaceId}/members`, { email: actor.email }, a.cookie);
+    async function remove() { const member = await db.membership.findUniqueOrThrow({ where: { workspaceId_userId: { workspaceId, userId: actor.id } } }); expect((await request(`/api/workspaces/${workspaceId}/members/${member.id}`, "DELETE", {}, a.cookie)).status).toBe(200); }
+    await add(); await request("/api/planner/preferences", "PATCH", { defaultWorkspaceId: workspaceId }, actor.cookie);
+    await request("/api/calendar/preferences", "PUT", { mode: "custom", workspaceIds: [workspaceId] }, actor.cookie);
+    await remove();
+    expect(await (await request("/api/calendar/preferences", "GET", undefined, actor.cookie)).json()).toMatchObject({ mode: "custom", workspaceIds: [] });
+    await add(); await request("/api/calendar/preferences", "PUT", { mode: "follow" }, actor.cookie); await remove();
+    expect(await (await request("/api/calendar/preferences", "GET", undefined, actor.cookie)).json()).toMatchObject({ mode: "follow", workspaceIds: [personal.id] });
+  });
+  it("rechecks custom selection membership after waiting for a removal lock", async () => {
+    const actor = await account(); await bootstrap(actor.cookie);
+    await post(`/api/workspaces/${workspaceId}/members`, { email: actor.email }, a.cookie);
+    let release!: () => void, ready!: (pid: number) => void;
+    const gate = new Promise<void>(resolve => { release = resolve; }), locked = new Promise<number>(resolve => { ready = resolve; });
+    const removal = db.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM "Workspace" WHERE id = ${workspaceId} FOR UPDATE`;
+      await tx.membership.delete({ where: { workspaceId_userId: { workspaceId, userId: actor.id } } });
+      const [row] = await tx.$queryRaw<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`; ready(row.pid); await gate;
+    }, { timeout: 15000 });
+    const pid = await locked;
+    const pending = request("/api/calendar/preferences", "PUT", { mode: "custom", workspaceIds: [workspaceId] }, actor.cookie);
+    try {
+      let blocked = false;
+      for (let i = 0; i < 100; i++) { const [row] = await db.$queryRaw<{ blocked: boolean }[]>`SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE ${pid} = ANY(pg_blocking_pids(pid))) AS blocked`; if (row.blocked) { blocked = true; break; } await new Promise(resolve => setTimeout(resolve, 20)); }
+      expect(blocked).toBe(true);
+    } finally { release(); await removal; }
+    expect((await pending).status).toBe(404);
+    expect(await db.calendarPreference.findUnique({ where: { userId: actor.id } })).toBeNull();
+  });
   it("creates once for concurrent retries and never reuses a changed or deleted intent", async () => {
     const intent = body();
     const responses = await Promise.all([request(path(), "POST", intent), request(path(), "POST", intent)]);

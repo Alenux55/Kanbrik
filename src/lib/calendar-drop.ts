@@ -2,6 +2,7 @@ import { DateTime } from "luxon";
 import { wallOptions } from "./calendar-time";
 import { calendarDropTarget, visibleCalendarRect } from "./calendar-hit";
 import type { BlockRecord } from "./calendar-contracts";
+import { blockProjectId } from "./calendar-presentation";
 export type Point = { x: number; y: number };
 export type PreviewRect = {
   left: number;
@@ -37,6 +38,10 @@ export type DropCandidate = {
   label: string;
   rect: PreviewRect;
   clipped: boolean;
+  title?: string;
+  workTitle?: string;
+  projectId?: string | null;
+  zone?: string;
 };
 export function calendarWorkDrop({
   root,
@@ -48,6 +53,8 @@ export function calendarWorkDrop({
   blocks,
   newBlocked,
   blockBlocked,
+  workTitle = "Time block",
+  projectId = null,
 }: {
   root: HTMLElement;
   point: Point;
@@ -58,6 +65,8 @@ export function calendarWorkDrop({
   blocks: BlockRecord[];
   newBlocked: boolean;
   blockBlocked: (block: BlockRecord) => boolean;
+  workTitle?: string;
+  projectId?: string | null;
 }): DropCandidate | null {
   const hit = calendarDropTarget(root, point.x, point.y);
   if (!hit) return null;
@@ -97,6 +106,10 @@ export function calendarWorkDrop({
         : `Assign empty block · ${workspaceName} · ${interval(block.startAt, block.endAt, zone)}`,
       rect,
       clipped: rect.height < frame.getBoundingClientRect().height - 1,
+      title: block.label,
+      workTitle,
+      projectId: message ? blockProjectId(block) : projectId,
+      zone,
     };
   }
   const [date, time] = hit.wall.split("T"),
@@ -163,6 +176,10 @@ export function calendarWorkDrop({
       : label,
     rect,
     clipped: bottom > col.top + col.height + 1 || top < col.top - 1,
+    title: workTitle,
+    workTitle,
+    projectId,
+    zone,
   };
 }
 function interval(start: string, end: string, zone: string) {

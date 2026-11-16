@@ -56,7 +56,9 @@ test("Calendar exposes a date/time grid on every width and preserves an explicit
   await page.setViewportSize({ width: 390, height: 844 });
   if (isMobile) {
     await event.tap();
-    await expect(page.getByLabel("Block label", { exact: true })).toHaveValue("Visible reservation");
+    await expect(page.getByLabel("Block label", { exact: true })).toHaveValue(
+      "Visible reservation",
+    );
     await cleanClose(page);
   }
   await expect(page.getByLabel("View", { exact: true })).toHaveValue("day");
@@ -93,6 +95,9 @@ test("Calendar exposes a date/time grid on every width and preserves an explicit
   await cleanClose(page);
   expect(scheduleWrites).toBe(0);
   await page.getByLabel("Date", { exact: true }).fill("2030-07-01");
+  await expect(page.locator(".fc-event")).toHaveCount(0);
+  await page.getByLabel("View", { exact: true }).selectOption("agenda");
+  await expect(page.locator(".fc")).toHaveCount(0);
   await expect(
     page.getByText(
       "No blocks in this range. Use New block to choose work and time.",

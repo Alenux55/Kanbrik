@@ -5,6 +5,7 @@ import {
   useSyncExternalStore,
   type RefObject,
 } from "react";
+import { CalendarEventLabel } from "./calendar-event-label";
 import { createPortal } from "react-dom";
 import {
   CalendarDropController,
@@ -68,16 +69,8 @@ export function CalendarDropPreview({
     controller.getServerSnapshot,
   );
   if (!preview) return null;
-  const unavailable = preview.kind === "unavailable",
-    viewportWidth = document.documentElement.clientWidth,
-    viewportHeight = document.documentElement.clientHeight;
-  const { rect } = preview,
-    labelWidth = Math.min(430, viewportWidth - 16),
-    left = Math.max(8, Math.min(rect.left, viewportWidth - labelWidth - 8)),
-    above = rect.top >= 130,
-    top = above
-      ? rect.top - 8
-      : Math.max(8, Math.min(rect.top + rect.height + 8, viewportHeight - 130));
+  const unavailable = preview.kind === "unavailable";
+  const { rect } = preview;
   return createPortal(
     <div
       data-calendar-drop-preview
@@ -88,7 +81,7 @@ export function CalendarDropPreview({
       data-review-required={preview.review}
       data-clipped={preview.clipped}
       role="status"
-      aria-label="Calendar drop preview"
+      aria-label={"Calendar drop preview · " + preview.label}
       style={{
         position: "fixed",
         inset: 0,
@@ -108,36 +101,51 @@ export function CalendarDropPreview({
           pointerEvents: "none",
           boxSizing: "border-box",
           border: `3px ${preview.review ? "dashed" : "solid"} ${unavailable ? "var(--error-text)" : preview.review ? "var(--warning-text)" : "var(--focus)"}`,
-          background: unavailable
-            ? "var(--preview-unavailable)"
-            : preview.review
-              ? "var(--preview-review)"
-              : "var(--preview-valid)",
-        }}
-      />
-      <div
-        data-calendar-drop-caption
-        style={{
-          position: "fixed",
-          left,
-          top,
-          transform: above ? "translateY(-100%)" : undefined,
-          width: labelWidth,
-          maxHeight: above ? rect.top - 16 : viewportHeight - top - 8,
-          zIndex: 1100,
-          pointerEvents: "none",
           overflow: "hidden",
         }}
-        className="break-words rounded border-2 border-neutral-800 bg-white p-2 text-sm font-semibold text-neutral-950 shadow"
       >
-        {preview.label}
-        {preview.clipped && (
-          <span className="block">
-            Highlight clipped; full interval shown above.
-          </span>
-        )}
+        <div data-calendar-drop-caption className="h-full overflow-hidden">
+          <CalendarEventLabel
+            title={preview.title ?? "Time block"}
+            work={preview.workTitle}
+            start={preview.start}
+            end={preview.end}
+            zone={preview.zone ?? "UTC"}
+            projectId={preview.projectId ?? null}
+            review={preview.review}
+            unavailable={unavailable}
+          />
+        </div>
       </div>
+      <span className="sr-only">
+        {preview.label}
+        {preview.clipped
+          ? " · Highlight clipped; full interval available in this description."
+          : ""}
+      </span>
     </div>,
     document.querySelector<HTMLElement>("[data-session-state]")!,
+  );
+}
+
+export function CalendarDragTitle({
+  controller,
+  title,
+}: {
+  controller: CalendarDropController;
+  title: string;
+}) {
+  const preview = useSyncExternalStore(
+    controller.subscribe,
+    controller.getSnapshot,
+    controller.getServerSnapshot,
+  );
+  return preview ? null : (
+    <div
+      data-drag-preview
+      className="max-w-[min(12rem,80vw)] truncate rounded border bg-white px-2 py-1 text-sm shadow"
+    >
+      {title}
+    </div>
   );
 }

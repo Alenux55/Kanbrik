@@ -18,8 +18,13 @@ import {
 import {
   useCalendarDropPreview,
   CalendarDropPreview,
+  CalendarDragTitle,
 } from "./calendar-drop-preview";
 import Link from "next/link";
+import { CalendarEventLabel } from "./calendar-event-label";
+import { blockProjectId, eventText } from "@/lib/calendar-presentation";
+import { projectColor } from "@/lib/board-filters";
+import { themedTint } from "@/lib/project-palette";
 import { usePlannerContext } from "./planner-context";
 import { BlockEditor } from "./block-editor";
 import FullCalendar from "@fullcalendar/react";
@@ -51,6 +56,7 @@ const button =
 const control =
   "mt-1 block min-h-12 w-full min-w-0 rounded border border-neutral-400 bg-white px-3";
 type Pref = {
+  mode: "follow" | "custom";
   workspaces: WorkspaceSummary[];
   workspaceIds: string[];
   timeZone: string | null;
@@ -80,6 +86,7 @@ export function CalendarPlanner() {
   const store = usePlanningDrafts();
   const [filterHost, setFilterHost] = useState<HTMLDivElement | null>(null);
   const [panel, setPanel] = useState(false);
+  const [mode, setMode] = useState<"follow" | "custom">("follow");
   const [matchAll, setMatchAll] = useState(false);
   const [prefs, setPrefs] = useState<Pref | null>(null);
   const [ids, setIds] = useState<string[]>([]);
@@ -100,6 +107,7 @@ export function CalendarPlanner() {
         const result: Pref = await response.json();
         if (!active || !session.isCurrent(lease)) return;
         setPrefs(result);
+        setMode(result.mode);
         setIds(result.workspaceIds);
         const initialZone =
           result.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -125,7 +133,11 @@ export function CalendarPlanner() {
     };
     // Preference reload preserves date; display zone comes only from account settings.
   }, [session, lease, preferenceRetry]);
-  async function apply(selected = ids, tagsAll = matchAll) {
+  async function apply(
+    selected = ids,
+    tagsAll = matchAll,
+    selectedMode = mode,
+  ) {
     if (busy.current) return;
     busy.current = true;
     setPending(true);
@@ -134,13 +146,17 @@ export function CalendarPlanner() {
       const response = await session.fetch("/api/calendar/preferences", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ workspaceIds: selected }),
+        body: JSON.stringify({
+          mode: selectedMode,
+          workspaceIds: selectedMode === "follow" ? [] : selected,
+        }),
       });
       if (!response.ok) throw new Error();
       const saved = await response.json();
       if (session.isCurrent(lease)) {
         setPrefs((current) => current && { ...current, ...saved });
         setIds(saved.workspaceIds);
+        setMode(saved.mode);
         store.setViewLabels((current) => ({
           ...current,
           calendar: { ...current.calendar, matchAll: tagsAll },
@@ -173,11 +189,21 @@ export function CalendarPlanner() {
       "Workspace access ended. Its calendar content and drafts were removed.",
     );
   }
+  const visibleIds = !prefs
+    ? []
+    : prefs.mode === "follow"
+      ? [context.defaultWorkspaceId]
+      : prefs.workspaceIds.filter((id) =>
+          context.workspaces.some((workspace) => workspace.id === id),
+        );
   const dirty =
+    panel &&
     prefs &&
-    (ids.length !== prefs.workspaceIds.length ||
-      ids.some((id) => !prefs.workspaceIds.includes(id)));
-  const range = day ? calendarRange(day, context.zone, view === "week") : null;
+    (mode !== prefs.mode ||
+      (mode === "custom" &&
+        (ids.length !== prefs.workspaceIds.length ||
+          ids.some((id) => !prefs.workspaceIds.includes(id)))));
+  const range = day ? calendarRange(day, context.zone, view !== "day") : null;
   return (
     <section className="min-w-0 [overflow-wrap:anywhere]">
       <h1 className="text-4xl font-semibold">Calendar</h1>
@@ -216,7 +242,8 @@ export function CalendarPlanner() {
               dirty={false}
               pending={pending}
               close={() => {
-                setIds(prefs.workspaceIds);
+                setIds(visibleIds);
+                setMode(prefs.mode);
                 setError("");
                 setPanel(false);
               }}
@@ -231,26 +258,47 @@ export function CalendarPlanner() {
                 }}
               >
                 <fieldset disabled={pending} className="space-y-3">
-                  <legend>Calendar workspaces (independent of Board)</legend>
-                  {prefs.workspaces.map((w) => (
-                    <label
-                      key={w.id}
-                      className="flex min-h-11 items-center gap-2"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={ids.includes(w.id)}
-                        onChange={(event) =>
-                          setIds((current) =>
-                            event.target.checked
-                              ? [...current, w.id]
-                              : current.filter((id) => id !== w.id),
-                          )
-                        }
-                      />
-                      {w.name} ({w.kind})
-                    </label>
-                  ))}
+                  <legend>Calendar scope (independent of Board)</legend>
+                  <label className="flex min-h-11 items-center gap-2">
+                    <input
+                      type="radio"
+                      name="calendar-scope"
+                      value="follow"
+                      checked={mode === "follow"}
+                      onChange={() => setMode("follow")}
+                    />
+                    Follow creation workspace
+                  </label>
+                  <label className="flex min-h-11 items-center gap-2">
+                    <input
+                      type="radio"
+                      name="calendar-scope"
+                      value="custom"
+                      checked={mode === "custom"}
+                      onChange={() => setMode("custom")}
+                    />
+                    Selected workspaces
+                  </label>
+                  {mode === "custom" &&
+                    context.workspaces.map((w) => (
+                      <label
+                        key={w.id}
+                        className="flex min-h-11 items-center gap-2"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={ids.includes(w.id)}
+                          onChange={(event) =>
+                            setIds((current) =>
+                              event.target.checked
+                                ? [...current, w.id]
+                                : current.filter((id) => id !== w.id),
+                            )
+                          }
+                        />
+                        {w.name} ({w.kind})
+                      </label>
+                    ))}
                   <TagMatchControl value={matchAll} change={setMatchAll} />
                   <button className={button}>
                     {pending ? "Saving…" : "Apply filters"}
@@ -265,22 +313,18 @@ export function CalendarPlanner() {
               User settings
             </Link>
           </p>
-          {!prefs.workspaceIds.includes(context.defaultWorkspaceId) && (
-            <p className="my-3 rounded border p-3">
-              Creation workspace is outside the Calendar selection.{" "}
-              <button
-                className={button}
-                onClick={() =>
-                  void apply(
-                    [...prefs.workspaceIds, context.defaultWorkspaceId],
-                    store.viewLabels.calendar.matchAll,
-                  )
-                }
-              >
-                Show creation workspace
-              </button>
-            </p>
-          )}
+          <p className="my-2 text-sm">
+            {prefs.mode === "follow"
+              ? "Following creation workspace"
+              : "Selected workspaces"}{" "}
+            ·{" "}
+            {visibleIds.length
+              ? context.workspaces
+                  .filter((w) => visibleIds.includes(w.id))
+                  .map((w) => w.name)
+                  .join(", ")
+              : "None"}
+          </p>
           <div ref={setFilterHost} />
           {
             <>
@@ -314,7 +358,7 @@ export function CalendarPlanner() {
                         direction
                           ? DateTime.fromISO(day)
                               .plus(
-                                view === "week"
+                                view !== "day"
                                   ? { weeks: direction }
                                   : { days: direction },
                               )
@@ -340,16 +384,12 @@ export function CalendarPlanner() {
                   >
                     <option value="week">Week grid</option>
                     <option value="day">Day grid</option>
+                    <option value="agenda">Agenda (week)</option>
                   </select>
                 </label>
               </div>
               <p className="my-4">
-                Selected:{" "}
-                {prefs.workspaces
-                  .filter((w) => prefs.workspaceIds.includes(w.id))
-                  .map((w) => w.name)
-                  .join(", ") || "None"}
-                . Range:{" "}
+                Range:{" "}
                 {range &&
                   `${display(range.start, context.zone)} – ${display(range.end, context.zone)}`}
               </p>
@@ -358,9 +398,9 @@ export function CalendarPlanner() {
           <>
             {range && (
               <CalendarScope
-                key={`${preferenceRetry}:${prefs.workspaceIds.join(",")}:${context.zone}:${day}:${view}`}
-                workspaces={prefs.workspaces}
-                visibleIds={prefs.workspaceIds}
+                key={`${preferenceRetry}:${visibleIds.join(",")}:${context.zone}:${day}:${view}`}
+                workspaces={context.workspaces}
+                visibleIds={visibleIds}
                 zone={context.zone}
                 day={day}
                 view={view}
@@ -370,7 +410,8 @@ export function CalendarPlanner() {
                 revoked={revoked}
                 filterHost={filterHost}
                 advanced={() => {
-                  setIds(prefs.workspaceIds);
+                  setIds(visibleIds);
+                  setMode(prefs.mode);
                   setMatchAll(store.viewLabels.calendar.matchAll);
                   setPanel(true);
                 }}
@@ -446,7 +487,11 @@ function CalendarScope({
     const scope =
       item && scopes.find((s) => s.workspace.id === item.workspaceId);
     if (!item || !scope || scope.failed || scope.pickerFailed) return null;
-    if (!matchesCalendarWork(item, filter)) return null;
+    if (
+      !visibleIds.includes(item.workspaceId) ||
+      !matchesCalendarWork(item, filter)
+    )
+      return null;
     const blocks = scopes
       .filter((s) => visibleIds.includes(s.workspace.id))
       .flatMap((s) => s.blocks)
@@ -456,11 +501,12 @@ function CalendarScope({
       point,
       sourceId,
       workspaceId: item.workspaceId,
-      workspaceName:
-        scope.workspace.name +
-        (visibleIds.includes(item.workspaceId)
-          ? ""
-          : " (hidden by workspace selection)"),
+      workspaceName: scope.workspace.name,
+      workTitle: item.title,
+      projectId:
+        item.kind === "project"
+          ? item.id
+          : (item.record as TaskRecord).projectId,
       zone,
       blocks,
       newBlocked:
@@ -850,6 +896,9 @@ function CalendarScope({
     .filter((scope) => visibleIds.includes(scope.workspace.id))
     .flatMap((scope) => scope.blocks);
   const work = scopes.flatMap((scope) => scope.work);
+  const paletteWork = work.filter((item) =>
+    visibleIds.includes(item.workspaceId),
+  );
   const search = (labelFilter.search ?? "").trim().toLowerCase(),
     projectFilter = labelFilter.projects ?? [];
   const displayFiltering = labelActive || !!search || !!projectFilter.length;
@@ -945,8 +994,8 @@ function CalendarScope({
         {displayFiltering ? "Matching" : ""} {incomplete ? "Loaded" : "Total"}{" "}
         blocks in range: {all.length}
         {displayFiltering ? ` of ${unfilteredBlocks.length} total` : ""}.
-        Matching work cards: {work.filter(matchesWork).length} of {work.length}.
-        Overlaps allowed; intervals end exclusively.
+        Matching work cards: {paletteWork.filter(matchesWork).length} of{" "}
+        {paletteWork.length}. Overlaps allowed; intervals end exclusively.
       </p>
       <button
         type="button"
@@ -1015,299 +1064,350 @@ function CalendarScope({
             <h2 className="font-semibold">
               Work cards: edit, or drag onto the grid to schedule
             </h2>
-            {scopes.map((scope) => (
-              <div key={scope.workspace.id}>
-                <h3>{scope.workspace.name}</h3>
-                {scope.work.filter(matchesWork).map((item) => (
-                  <Palette
-                    key={`${item.kind}:${item.id}`}
-                    item={item}
-                    open={() => {
-                      if (
-                        !suppressClick.current &&
-                        session.getSnapshot().phase === "ready"
-                      )
-                        context.openEntity({
-                          kind: item.kind === "project" ? "projects" : "tasks",
-                          workspaceId: item.workspaceId,
-                          record: item.record,
-                        });
-                    }}
-                  />
-                ))}
-              </div>
-            ))}
+            {scopes
+              .filter((scope) => visibleIds.includes(scope.workspace.id))
+              .map((scope) => (
+                <div key={scope.workspace.id}>
+                  <h3>{scope.workspace.name}</h3>
+                  {scope.work.filter(matchesWork).map((item) => (
+                    <Palette
+                      key={`${item.kind}:${item.id}`}
+                      item={item}
+                      open={() => {
+                        if (
+                          !suppressClick.current &&
+                          session.getSnapshot().phase === "ready"
+                        )
+                          context.openEntity({
+                            kind:
+                              item.kind === "project" ? "projects" : "tasks",
+                            workspaceId: item.workspaceId,
+                            record: item.record,
+                          });
+                      }}
+                    />
+                  ))}
+                </div>
+              ))}
           </div>
           <div className="order-1 min-w-0 overflow-x-auto overscroll-x-contain lg:order-none">
-            <div
-              className={
-                view === "week" ? "min-w-[42rem] lg:min-w-0" : "min-w-0"
-              }
-            >
-              <FullCalendar
-                key={`${day}:${view}:${zone}`}
-                plugins={[timeGrid, interaction, luxonPlugin]}
-                initialView={view === "week" ? "timeGridWeek" : "timeGridDay"}
-                initialDate={day}
-                firstDay={1}
-                timeZone={zone}
-                fixedMirrorParent={document.querySelector<HTMLElement>(
-                  "[data-session-state]",
-                )!}
-                dateClick={(info) => {
-                  if (
-                    !suppressClick.current &&
-                    session.getSnapshot().phase === "ready"
-                  )
-                    openNew(
-                      undefined,
-                      DateTime.fromJSDate(info.date)
-                        .setZone(zone)
-                        .toFormat("yyyy-MM-dd'T'HH:mm"),
-                    );
-                }}
-                eventDidMount={(info) => {
-                  info.el.dataset.calendarBlockId = info.event.id;
-                }}
-                headerToolbar={false}
-                allDaySlot={false}
-                height="max(380px, min(70vh, 650px))"
-                eventLongPressDelay={600000}
-                slotMinTime="00:00:00"
-                scrollTime="09:00:00"
-                snapDuration="00:15:00"
-                editable
-                eventDragStop={() => {
-                  gestureActive.current = false;
-                  if (canceledGesture.current)
-                    setNotice("Gesture canceled. No change was saved.");
-                }}
-                eventResizeStop={() => {
-                  gestureActive.current = false;
-                  if (canceledGesture.current)
-                    setNotice("Gesture canceled. No change was saved.");
-                }}
-                eventDragStart={() => {
-                  canceledGesture.current = false;
-                  gestureActive.current = true;
-                  suppressClick.current = true;
-                }}
-                eventResizeStart={() => {
-                  canceledGesture.current = false;
-                  gestureActive.current = true;
-                  suppressClick.current = true;
-                }}
-                eventDragMinDistance={8}
-                eventDurationEditable
-                eventResizableFromStart
-                events={all.map((block) => ({
-                  id: block.id,
-                  title: block.label,
-                  start: block.startAt,
-                  end: block.endAt,
-                  editable:
-                    !savingKeys.includes(`calendar:${block.id}`) &&
-                    !calendarDrafts[`${block.workspaceId}/blocks/${block.id}`]
-                      ?.dirty,
-                }))}
-                eventContent={(info) => {
-                  const block = all.find((value) => value.id === info.event.id);
-                  if (!block) return null;
-                  return (
-                    <BlockTarget
-                      block={block}
-                      surface="grid"
-                      title={`${info.timeText} ${block.label} · ${scopes.find((scope) => scope.workspace.id === block.workspaceId)?.workspace.name} · ${block.workInTrash ? "Work in Trash · " : ""}${block.project?.title ?? block.task?.title ?? "Empty block"}`}
-                    />
-                  );
-                }}
-                eventClick={(info) => {
-                  if (
-                    !suppressClick.current &&
-                    session.getSnapshot().phase === "ready" &&
-                    !savingKeys.includes(`calendar:${info.event.id}`)
-                  )
-                    setEditing(info.event.id);
-                }}
-                eventDrop={(info) => {
-                  if (
-                    canceledGesture.current ||
-                    !alive.current ||
-                    session.getSnapshot().phase !== "ready" ||
-                    document.querySelector("dialog[open]")
-                  ) {
-                    info.revert();
-                    return;
-                  }
-                  const block = all.find((value) => value.id === info.event.id);
-                  if (!block) {
-                    info.revert();
-                    return;
-                  }
-                  const start = DateTime.fromJSDate(info.event.start!).setZone(
-                    zone,
-                  );
-                  const end = start.plus({
-                    milliseconds:
-                      Date.parse(block.endAt) - Date.parse(block.startAt),
-                  });
-                  info.revert();
-                  if (start.toMillis() === Date.parse(block.startAt)) return;
-                  if (
-                    start.getPossibleOffsets().length > 1 ||
-                    end.getPossibleOffsets().length > 1
-                  ) {
-                    retainGesture(
-                      block,
-                      {
-                        schedule: {
-                          startAt: start.toISO()!,
-                          endAt: end.toISO()!,
-                          timeZone: zone,
-                        },
-                      },
-                      undefined,
-                      true,
-                    );
-                    setError(
-                      "Ambiguous pointer time. Confirm occurrences explicitly in the editing form.",
-                    );
-                    return;
-                  }
-                  void gesture(block, {
-                    schedule: {
-                      startAt: start.toISO()!,
-                      endAt: end.toISO()!,
-                      timeZone: zone,
-                    },
-                  });
-                }}
-                eventResize={(info) => {
-                  if (
-                    canceledGesture.current ||
-                    !alive.current ||
-                    session.getSnapshot().phase !== "ready" ||
-                    document.querySelector("dialog[open]")
-                  ) {
-                    info.revert();
-                    return;
-                  }
-                  const block = all.find((value) => value.id === info.event.id);
-                  if (!block) {
-                    info.revert();
-                    return;
-                  }
-                  const start = DateTime.fromJSDate(info.event.start!).setZone(
-                      zone,
-                    ),
-                    end = DateTime.fromJSDate(info.event.end!).setZone(zone);
-                  info.revert();
-                  if (
-                    start.toMillis() === Date.parse(block.startAt) &&
-                    end.toMillis() === Date.parse(block.endAt)
-                  )
-                    return;
-                  if (
-                    start.getPossibleOffsets().length > 1 ||
-                    end.getPossibleOffsets().length > 1
-                  ) {
-                    retainGesture(
-                      block,
-                      {
-                        schedule: {
-                          startAt: start.toISO()!,
-                          endAt: end.toISO()!,
-                          timeZone: zone,
-                        },
-                      },
-                      undefined,
-                      true,
-                    );
-                    setError(
-                      "Ambiguous boundary. Confirm in the editing form.",
-                    );
-                    return;
-                  }
-                  void gesture(block, {
-                    schedule: {
-                      startAt: start.toISO()!,
-                      endAt: end.toISO()!,
-                      timeZone: zone,
-                    },
-                  });
-                }}
-              />
-            </div>
-          </div>
-        </div>
-        <details open className="mt-6">
-          <summary className="min-h-11 cursor-pointer text-xl font-semibold">
-            Agenda and explicit controls
-          </summary>
-          {!all.length && (
-            <p className="my-4">
-              No blocks in this range. Use New block to choose work and time.
-            </p>
-          )}
-          {all
-            .sort((a, b) => a.startAt.localeCompare(b.startAt))
-            .map((block) => (
-              <div
-                key={block.id}
-                className="my-3 min-w-0 rounded border bg-white p-4"
-              >
-                {block.workInTrash && (
-                  <p className="my-2 font-semibold">
-                    Work in Trash ·{" "}
-                    <Link
-                      className="underline"
-                      href={`/trash?workspaceId=${encodeURIComponent(block.workspaceId)}`}
-                    >
-                      Review workspace Trash / Restore
-                    </Link>
+            {view === "agenda" ? (
+              <section aria-label="Agenda" className="space-y-2">
+                <h2 className="text-xl font-semibold">Agenda</h2>
+                {!all.length && (
+                  <p className="my-3">
+                    {incomplete
+                      ? "Schedule incomplete. Refresh calendar to retry."
+                      : displayFiltering
+                        ? "No matching blocks. Clear filters to show available reservations."
+                        : "No blocks in this range. Use New block to choose work and time."}
                   </p>
                 )}
-                <BlockTarget
-                  block={block}
-                  surface="agenda"
-                  title={block.label}
+                {[...all]
+                  .sort((a, b) => a.startAt.localeCompare(b.startAt))
+                  .map((block) => (
+                    <div
+                      key={block.id}
+                      className="min-w-0 rounded border p-2"
+                      style={{
+                        backgroundColor: themedTint(
+                          projectColor(blockProjectId(block)),
+                        ),
+                      }}
+                    >
+                      {block.workInTrash && (
+                        <p className="mb-1 text-sm">
+                          Work in Trash ·{" "}
+                          <Link
+                            className="underline"
+                            href={`/trash?workspaceId=${encodeURIComponent(block.workspaceId)}`}
+                          >
+                            Review workspace Trash / Restore
+                          </Link>
+                        </p>
+                      )}
+                      <div className="flex min-w-0 items-center gap-2">
+                        <div className="min-w-0 flex-1">
+                          <BlockTarget
+                            block={block}
+                            surface="agenda"
+                            zone={zone}
+                            title={block.label}
+                          />
+                          <p className="break-words text-xs">
+                            {DateTime.fromISO(block.startAt)
+                              .setZone(zone)
+                              .toFormat("ccc d LLL")}
+                            {" · "}
+                            {
+                              scopes.find(
+                                (scope) =>
+                                  scope.workspace.id === block.workspaceId,
+                              )?.workspace.name
+                            }
+                            {block.task ? " · " + statusName(block.task) : ""}
+                          </p>
+                        </div>
+                        <button
+                          className={button}
+                          aria-label={"Edit block: " + block.label}
+                          aria-describedby={"calendar-block-agenda-" + block.id}
+                          disabled={savingKeys.includes(`calendar:${block.id}`)}
+                          onClick={() => setEditing(block.id)}
+                        >
+                          Edit
+                        </button>
+                      </div>
+                      {!!block.task?.tags?.length && (
+                        <TaskLabelBadges task={block.task} />
+                      )}
+                    </div>
+                  ))}
+              </section>
+            ) : (
+              <div
+                className={
+                  view === "week" ? "min-w-[42rem] lg:min-w-0" : "min-w-0"
+                }
+              >
+                <FullCalendar
+                  key={`${day}:${view}:${zone}`}
+                  plugins={[timeGrid, interaction, luxonPlugin]}
+                  initialView={view === "week" ? "timeGridWeek" : "timeGridDay"}
+                  initialDate={day}
+                  firstDay={1}
+                  timeZone={zone}
+                  fixedMirrorParent={document.querySelector<HTMLElement>(
+                    "[data-session-state]",
+                  )!}
+                  dateClick={(info) => {
+                    if (
+                      !suppressClick.current &&
+                      session.getSnapshot().phase === "ready"
+                    )
+                      openNew(
+                        undefined,
+                        DateTime.fromJSDate(info.date)
+                          .setZone(zone)
+                          .toFormat("yyyy-MM-dd'T'HH:mm"),
+                      );
+                  }}
+                  eventDidMount={(info) => {
+                    info.el.dataset.calendarBlockId = info.event.id;
+                    info.el.tabIndex = 0;
+                    info.el.setAttribute("role", "button");
+                    const block = all.find(
+                      (value) => value.id === info.event.id,
+                    );
+                    info.el.setAttribute(
+                      "aria-label",
+                      "Edit block: " + (block?.label ?? info.event.title),
+                    );
+                    info.el.setAttribute(
+                      "aria-describedby",
+                      "calendar-block-grid-" + info.event.id,
+                    );
+                    info.el.addEventListener("keydown", (event) => {
+                      if (
+                        (event.key === "Enter" || event.key === " ") &&
+                        !gestureActive.current
+                      ) {
+                        event.preventDefault();
+                        info.el.click();
+                      }
+                    });
+                  }}
+                  headerToolbar={false}
+                  allDaySlot={false}
+                  height="max(380px, min(70vh, 650px))"
+                  eventLongPressDelay={600000}
+                  slotMinTime="00:00:00"
+                  scrollTime="09:00:00"
+                  snapDuration="00:15:00"
+                  editable
+                  eventDragStop={() => {
+                    gestureActive.current = false;
+                    if (canceledGesture.current)
+                      setNotice("Gesture canceled. No change was saved.");
+                  }}
+                  eventResizeStop={() => {
+                    gestureActive.current = false;
+                    if (canceledGesture.current)
+                      setNotice("Gesture canceled. No change was saved.");
+                  }}
+                  eventDragStart={() => {
+                    canceledGesture.current = false;
+                    gestureActive.current = true;
+                    suppressClick.current = true;
+                  }}
+                  eventResizeStart={() => {
+                    canceledGesture.current = false;
+                    gestureActive.current = true;
+                    suppressClick.current = true;
+                  }}
+                  eventDragMinDistance={8}
+                  eventDurationEditable
+                  eventResizableFromStart
+                  events={all.map((block) => ({
+                    id: block.id,
+                    title: block.label,
+                    start: block.startAt,
+                    end: block.endAt,
+                    backgroundColor: themedTint(
+                      projectColor(blockProjectId(block)),
+                    ),
+                    borderColor: "var(--border)",
+                    textColor: "var(--foreground)",
+                    editable:
+                      !savingKeys.includes(`calendar:${block.id}`) &&
+                      !calendarDrafts[`${block.workspaceId}/blocks/${block.id}`]
+                        ?.dirty,
+                  }))}
+                  eventContent={(info) => {
+                    const block = all.find(
+                      (value) => value.id === info.event.id,
+                    );
+                    if (!block) return null;
+                    return (
+                      <BlockTarget
+                        block={block}
+                        surface="grid"
+                        zone={zone}
+                        title={`${info.timeText} ${block.label} · ${scopes.find((scope) => scope.workspace.id === block.workspaceId)?.workspace.name} · ${block.workInTrash ? "Work in Trash · " : ""}${block.project?.title ?? block.task?.title ?? "Empty block"}`}
+                      />
+                    );
+                  }}
+                  eventClick={(info) => {
+                    if (
+                      !suppressClick.current &&
+                      session.getSnapshot().phase === "ready" &&
+                      !savingKeys.includes(`calendar:${info.event.id}`)
+                    )
+                      setEditing(info.event.id);
+                  }}
+                  eventDrop={(info) => {
+                    if (
+                      canceledGesture.current ||
+                      !alive.current ||
+                      session.getSnapshot().phase !== "ready" ||
+                      document.querySelector("dialog[open]")
+                    ) {
+                      info.revert();
+                      return;
+                    }
+                    const block = all.find(
+                      (value) => value.id === info.event.id,
+                    );
+                    if (!block) {
+                      info.revert();
+                      return;
+                    }
+                    const start = DateTime.fromJSDate(
+                      info.event.start!,
+                    ).setZone(zone);
+                    const end = start.plus({
+                      milliseconds:
+                        Date.parse(block.endAt) - Date.parse(block.startAt),
+                    });
+                    info.revert();
+                    if (start.toMillis() === Date.parse(block.startAt)) return;
+                    if (
+                      start.getPossibleOffsets().length > 1 ||
+                      end.getPossibleOffsets().length > 1
+                    ) {
+                      retainGesture(
+                        block,
+                        {
+                          schedule: {
+                            startAt: start.toISO()!,
+                            endAt: end.toISO()!,
+                            timeZone: zone,
+                          },
+                        },
+                        undefined,
+                        true,
+                      );
+                      setError(
+                        "Ambiguous pointer time. Confirm occurrences explicitly in the editing form.",
+                      );
+                      return;
+                    }
+                    void gesture(block, {
+                      schedule: {
+                        startAt: start.toISO()!,
+                        endAt: end.toISO()!,
+                        timeZone: zone,
+                      },
+                    });
+                  }}
+                  eventResize={(info) => {
+                    if (
+                      canceledGesture.current ||
+                      !alive.current ||
+                      session.getSnapshot().phase !== "ready" ||
+                      document.querySelector("dialog[open]")
+                    ) {
+                      info.revert();
+                      return;
+                    }
+                    const block = all.find(
+                      (value) => value.id === info.event.id,
+                    );
+                    if (!block) {
+                      info.revert();
+                      return;
+                    }
+                    const start = DateTime.fromJSDate(
+                        info.event.start!,
+                      ).setZone(zone),
+                      end = DateTime.fromJSDate(info.event.end!).setZone(zone);
+                    info.revert();
+                    if (
+                      start.toMillis() === Date.parse(block.startAt) &&
+                      end.toMillis() === Date.parse(block.endAt)
+                    )
+                      return;
+                    if (
+                      start.getPossibleOffsets().length > 1 ||
+                      end.getPossibleOffsets().length > 1
+                    ) {
+                      retainGesture(
+                        block,
+                        {
+                          schedule: {
+                            startAt: start.toISO()!,
+                            endAt: end.toISO()!,
+                            timeZone: zone,
+                          },
+                        },
+                        undefined,
+                        true,
+                      );
+                      setError(
+                        "Ambiguous boundary. Confirm in the editing form.",
+                      );
+                      return;
+                    }
+                    void gesture(block, {
+                      schedule: {
+                        startAt: start.toISO()!,
+                        endAt: end.toISO()!,
+                        timeZone: zone,
+                      },
+                    });
+                  }}
                 />
-                <p className="break-words">
-                  {display(block.startAt, zone)} – {display(block.endAt, zone)}{" "}
-                  ·{" "}
-                  {(Date.parse(block.endAt) - Date.parse(block.startAt)) /
-                    3600000}{" "}
-                  elapsed hours
-                </p>
-                <p className="break-words">
-                  {
-                    scopes.find(
-                      (scope) => scope.workspace.id === block.workspaceId,
-                    )?.workspace.name
-                  }{" "}
-                  · {block.project?.title ?? block.task?.title ?? "Empty block"}{" "}
-                  {block.task ? statusName(block.task) : ""}
-                  {block.task && <TaskLabelBadges task={block.task} />}
-                </p>
-                <button
-                  className={button}
-                  disabled={savingKeys.includes(`calendar:${block.id}`)}
-                  onClick={() => setEditing(block.id)}
-                >
-                  Edit block: {block.label}
-                </button>
               </div>
-            ))}
-        </details>
+            )}
+          </div>
+        </div>
         {createPortal(
           <DragOverlay dropAnimation={null}>
             {dragged && (
-              <div
-                data-drag-preview
-                className="max-w-[min(16rem,80vw)] rounded border bg-white p-3 shadow-lg [overflow-wrap:anywhere]"
-              >
-                {dragged.title} · {dragged.context}
-              </div>
+              <CalendarDragTitle
+                controller={dropFeedback.controller}
+                title={dragged.title}
+              />
             )}
           </DragOverlay>,
           document.querySelector<HTMLElement>("[data-session-state]")!,
@@ -1391,7 +1491,11 @@ function CalendarScope({
           }
           onSaved={(record) => {
             saved(record);
-            setNotice("Saved time block.");
+            setNotice(
+              !("deleted" in record) && visibleIds.includes(record.workspaceId)
+                ? "Saved time block."
+                : "Saved outside Calendar scope. Use Advanced to change visibility.",
+            );
           }}
           lost={lost}
           close={() => setEditing(null)}
@@ -1426,7 +1530,18 @@ function Palette({ item, open }: { item: Work; open: () => void }) {
     id: item.kind + ":" + item.id,
   });
   return (
-    <div className="my-2 min-w-0 rounded border bg-white p-2">
+    <div
+      className="my-2 min-w-0 rounded border p-2"
+      style={{
+        backgroundColor: themedTint(
+          projectColor(
+            item.kind === "project"
+              ? item.id
+              : (item.record as TaskRecord).projectId,
+          ),
+        ),
+      }}
+    >
       <button
         ref={setNodeRef}
         onClick={open}
@@ -1448,22 +1563,51 @@ function BlockTarget({
   block,
   title,
   surface,
+  zone,
 }: {
   block: BlockRecord;
   title: string;
   surface: string;
+  zone: string;
 }) {
   const { setNodeRef } = useDroppable({
     id: surface + ":" + block.id,
     data: { blockId: block.id },
   });
+  const node = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    node.current
+      ?.closest(".fc-event")
+      ?.setAttribute("aria-label", "Edit block: " + block.label);
+  }, [block.label]);
   return (
     <div
-      ref={setNodeRef}
+      ref={(element) => {
+        node.current = element;
+        setNodeRef(element);
+      }}
       data-block-id={block.id}
-      className="min-h-10 break-words font-semibold"
+      id={`calendar-block-${surface}-${block.id}`}
+      className="h-full min-h-0 overflow-hidden font-semibold"
+      aria-label={
+        eventText(
+          block.label,
+          `${block.workInTrash ? "Work in Trash · " : ""}${block.project?.title ?? block.task?.title ?? "Empty block"}`,
+          block.startAt,
+          block.endAt,
+          zone,
+        ).accessible
+      }
+      title={title}
     >
-      {title}
+      <CalendarEventLabel
+        title={block.label}
+        work={`${block.workInTrash ? "Work in Trash · " : ""}${block.project?.title ?? block.task?.title ?? "Empty block"}`}
+        start={block.startAt}
+        end={block.endAt}
+        zone={zone}
+        projectId={blockProjectId(block)}
+      />
     </div>
   );
 }

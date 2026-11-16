@@ -164,6 +164,9 @@ test("calendar distinguishes collaborator-deleted blocks from revoked access wit
     await open(page);
     await page.getByRole("button", { name: /^Advanced/ }).click();
     await page
+      .getByRole("radio", { name: "Selected workspaces", exact: true })
+      .check();
+    await page
       .getByRole("checkbox", {
         name: "Calendar deletion race (shared)",
         exact: true,
@@ -176,12 +179,16 @@ test("calendar distinguishes collaborator-deleted blocks from revoked access wit
     await expect(
       page.getByRole("button", { name: "New block", exact: true }),
     ).toBeVisible();
-    await page
-      .getByRole("button", {
-        name: "Edit block: Other saved block",
-        exact: true,
-      })
-      .click();
+    // Overlapping grid events can occlude a center tap. Agenda supplies the
+    // explicit touch path; desktop uses the grid's native keyboard activation.
+    if (isMobile)
+      await page.getByLabel("View", { exact: true }).selectOption("agenda");
+    const otherButton = page.getByRole("button", {
+      name: "Edit block: Other saved block",
+      exact: true,
+    });
+    if (isMobile) await otherButton.tap();
+    else await otherButton.press("Enter");
     await page
       .getByRole("form", {
         name: "Edit time block Other saved block",
@@ -307,6 +314,9 @@ test("calendar distinguishes collaborator-deleted blocks from revoked access wit
       ),
     ).toBeVisible();
     await page.getByRole("button", { name: /^Advanced/ }).click();
+    await page
+      .getByRole("radio", { name: "Selected workspaces", exact: true })
+      .check();
     await expect(
       page.getByRole("checkbox", {
         name: "Calendar deletion race (shared)",
@@ -342,12 +352,14 @@ test("calendar ignores an obsolete workspace-access recheck after a missing-bloc
   const target = await provisionBlock(page, personal.id, "Old target");
   await provisionBlock(page, personal.id, "Current saved block");
   await open(page);
-  await page
-    .getByRole("button", {
-      name: "Edit block: Current saved block",
-      exact: true,
-    })
-    .click();
+  if (isMobile)
+    await page.getByLabel("View", { exact: true }).selectOption("agenda");
+  const currentButton = page.getByRole("button", {
+    name: "Edit block: Current saved block",
+    exact: true,
+  });
+  if (isMobile) await currentButton.tap();
+  else await currentButton.press("Enter");
   await page
     .getByRole("form", {
       name: "Edit time block Current saved block",
@@ -784,6 +796,9 @@ test("work drops distinguish original-block assignment, foreground rejection and
   await open(page);
   await page.getByRole("button", { name: /^Advanced/ }).click();
   await page
+    .getByRole("radio", { name: "Selected workspaces", exact: true })
+    .check();
+  await page
     .getByRole("checkbox", { name: "Foreign scheduling (shared)", exact: true })
     .check();
   await page
@@ -950,6 +965,9 @@ test("calendar marks failed scopes and pickers incomplete and ignores obsolete r
   await open(page);
   await page.getByRole("button", { name: /^Advanced/ }).click();
   await page
+    .getByRole("radio", { name: "Selected workspaces", exact: true })
+    .check();
+  await page
     .getByRole("checkbox", {
       name: "Incomplete calendar (shared)",
       exact: true,
@@ -1079,6 +1097,9 @@ test("calendar isolates pending saves across cookie account switches, failed che
     await open(page);
     await page.getByRole("button", { name: /^Advanced/ }).click();
     await page
+      .getByRole("radio", { name: "Selected workspaces", exact: true })
+      .check();
+    await page
       .getByRole("checkbox", { name: "Session calendar (shared)", exact: true })
       .check();
     await page
@@ -1142,6 +1163,9 @@ test("calendar isolates pending saves across cookie account switches, failed che
     ).toBeVisible();
     await open(page);
     await page.getByRole("button", { name: /^Advanced/ }).click();
+    await page
+      .getByRole("radio", { name: "Selected workspaces", exact: true })
+      .check();
     await expect(
       page.getByRole("checkbox", {
         name: "Session calendar (shared)",
@@ -1237,6 +1261,9 @@ test("calendar isolates pending saves across cookie account switches, failed che
       .getByRole("button", { name: "Refresh calendar", exact: true })
       .click();
     await page.getByRole("button", { name: /^Advanced/ }).click();
+    await page
+      .getByRole("radio", { name: "Selected workspaces", exact: true })
+      .check();
     await expect(
       page.getByRole("checkbox", {
         name: "Session calendar (shared)",

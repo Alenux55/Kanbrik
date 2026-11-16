@@ -366,6 +366,14 @@ test("Calendar Advanced cancels and retries independently of basic filters and B
   });
   expect(
     (
+      await page.request.put("/api/calendar/preferences", {
+        headers: { origin },
+        data: { workspaceIds: [ws.id] },
+      })
+    ).status(),
+  ).toBe(200);
+  expect(
+    (
       await page.request.patch("/api/planner/preferences", {
         headers: { origin },
         data: { defaultWorkspaceId: shared.id },
@@ -394,9 +402,9 @@ test("Calendar Advanced cancels and retries independently of basic filters and B
     (await (await page.request.get("/api/calendar/preferences")).json())
       .workspaceIds,
   ).toEqual([ws.id]);
-  await page
-    .getByRole("button", { name: "Show creation workspace", exact: true })
-    .click();
+  await expect(
+    page.getByRole("button", { name: "Show creation workspace", exact: true }),
+  ).toHaveCount(0);
   await advanced(page).click();
   await expect(
     page.getByRole("combobox", { name: "Match selected tags", exact: true }),

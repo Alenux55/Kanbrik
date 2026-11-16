@@ -141,10 +141,34 @@ test("live blank-slot preview follows columns and stationary-pointer scrolling a
       .locator("[data-calendar-drop-caption]")
       .boundingBox())!;
   expect(
-    caption.y + caption.height <= boundary.y ||
-      caption.y >= boundary.y + boundary.height,
+    caption.y >= boundary.y &&
+      caption.y + caption.height <= boundary.y + boundary.height,
   ).toBe(true);
-  await page.screenshot({ path: testInfo.outputPath("live-week-preview.png") });
+  await expect(page.locator("[data-calendar-drop-caption]")).toContainText(
+    child.title,
+  );
+  await expect(page.locator("[data-calendar-drop-caption]")).toContainText(
+    "13:30–14:30",
+  );
+  await expect(page.locator("[data-calendar-drop-caption]")).not.toContainText(
+    "New one-hour block",
+  );
+  await expect(preview(page).locator("[data-project-id]")).toHaveAttribute(
+    "data-project-id",
+    project.id,
+  );
+  await expect(page.locator("[data-drag-preview]")).toHaveCount(0);
+  await page.screenshot({
+    path: testInfo.outputPath("live-week-preview.png"),
+    animations: "disabled",
+  });
+  await page.emulateMedia({ colorScheme: "dark" });
+  await expect(preview(page)).toHaveAttribute("data-drop-valid", "true");
+  await page.screenshot({
+    path: testInfo.outputPath("live-week-preview-dark.png"),
+    animations: "disabled",
+  });
+  await page.emulateMedia({ colorScheme: "light" });
   const old = await preview(page).getAttribute("data-preview-start");
   await page.locator(".fc-timegrid-body").evaluate((el) => {
     el.closest<HTMLElement>(".fc-scroller")!.scrollTop += 80;
