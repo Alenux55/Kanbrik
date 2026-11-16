@@ -1,6 +1,6 @@
 # 023: Calendar workspace scope and compact event presentation
 
-Status: Implemented and verified above the owner-integrated, independently accepted task 022 baseline `fb0ee56` (2026-11-16). Independent review is pending. The specification below remains the acceptance contract.
+Status: Independently accepted on 2026-11-16 at clean owner-committed `499cfd3`, against accepted `fb0ee56`. No actionable findings. Coordinator verification passed 167 backend checks, 26 focused browser cases/six intentional Android mouse-only skips, and separate fresh/populated migration proofs. Earlier larger-suite failures and subsequent corrected selections remain separately qualified below; no new complete browser-suite pass is claimed. The specification remains the acceptance contract.
 
 ## Outcome and inputs
 
@@ -106,3 +106,25 @@ Coordinator next step: independently review this candidate above fb0ee56, includ
 Proposed commit message: **feat: refine Calendar workspace scope and compact event presentation**.
 
 Final cleanup/staging: the task-owned main verification database, app and SMTP fixtures are stopped; no listeners remain on 3100–3126 or 15432/15434/15435. Documentation links and Git whitespace checks passed. All 23 task-owned files are staged for independent review, with no unstaged changes. Saved environments, credentials, generated clients, screenshots and local proof/database/log files are excluded. No commit or push was made.
+
+## Independent review — 2026-11-16
+
+Reviewed clean owner-committed `499cfd3` against accepted `fb0ee56`. No actionable findings. Source review covered the additive mode backfill/legacy API compatibility, locked membership recheck, Follow fallback and custom empty scope, selected-only palette/counts/choices/drop resolution, canonical project tints and compact accessible intervals, optional dated Agenda, keyboard/touch activation and unchanged draft/session/gesture contracts. No runtime or test change was made by the coordinator; task 023 is accepted.
+
+Independent `npm run check`, `npm run db:validate`, guarded Prisma migration status (**16 applied, none pending**) and `npm run build -- --webpack` passed. After the build, full backend/unit verification passed **167/167 across 18 files**, exit 0:
+
+```powershell
+node .local/task014-command.mjs integration --reporter=json --outputFile=.local/coordinator-review023-tests.json
+```
+
+Independent affected browser verification passed **26 cases / zero failures / six intentional Android mouse-only skips, 32 total, 7.3 minutes, exit 0**:
+
+```powershell
+node .local/task014-command.mjs browser calendar-presentation.spec.ts calendar-drop-preview.spec.ts calendar.spec.ts calendar-gesture-review.spec.ts compact-filters.spec.ts mobile-surfaces.spec.ts tag-recovery.spec.ts session-isolation.spec.ts --grep 'Follow creation|project tints|held source|Trash tint|live blank-slot|clipped cross-day|calendar distinguishes|obsolete workspace-access|work drops distinguish|calendar isolates pending saves|real Calendar drops|an ambiguous drop|Calendar Advanced|Calendar exposes|Board 503 recovery|same-cookie tabs'
+```
+
+This includes all new presentation/scope scenarios on applicable desktop/Pixel 7 profiles and the existing affected preview/DST/gesture, block/session recovery, filters, mobile grid/resize and tag recovery cases. The skips are existing/new explicit mouse-only cases on Android; explicit touch/keyboard cases passed. Fresh held-preview and representative supplied/regenerated Light/Dark/System Agenda/Trash captures were inspected for clipping, containment and readable context. This is emulation, not physical-device or screen-reader certification.
+
+Inspected `.local/task023-fresh-check.mjs` and `.local/task023-upgrade-check.mjs`, then reran copies with isolated `.local/review023-*` paths and newly generated disposable credentials. `node .local/review023-fresh-check.mjs` applied all 16 migrations on a new 15435 cluster with no schema drift. `node .local/review023-upgrade-check.mjs` used a new 15434 cluster and passed original/later populated row digests (18/23 tables), empty/nonempty custom backfill and zone preservation, new follow default and no drift. Both exited 0 and stopped their owned clusters. Generated proof scripts/data/results remain ignored; these results are coordinator reruns, separate from the implementer's proofs.
+
+All local application tests used the inspected guarded process-only 15432 adapter; README npm test/test:e2e equivalents take the same arguments. Saved environments/credentials were not changed. The earlier 132-case selection and corrections remain separately recorded, without aggregating a new all-green full-suite result. Physical Android, other engines, server/proxy/TLS/provider, fresh install/audit/container/default bundler and production deployment/restore remain unverified. All owned app/SMTP/database listeners are closed. Documentation only is updated/staged; no commit, push or server/provider action was performed. Rollout requires a real backup and all 16 migrations, without a reset; existing users deliberately select Follow in Advanced if desired.

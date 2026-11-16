@@ -1,7 +1,18 @@
 # Coordinator handoff — 2026-11-16
 
+## Task 023 independently accepted at `499cfd3` — 2026-11-16
 
-## Task 023 implementation — independent review pending — 2026-11-16
+Reviewed clean owner-committed **`499cfd3`** against accepted `fb0ee56`. **No actionable findings; task 023 is accepted.** The earlier authentication P1 remains closed. Scope modes/backfill, membership locking, selected-only display/drop sources, compact project-coloured labels/previews, optional Agenda and retained explicit scheduling meet the assigned contract. No runtime/test correction was made by the coordinator.
+
+Independent checks passed lint/types, schema validation, **16 applied migrations with none pending**, Webpack build and **167/167 backend/unit checks across 18 files**, exit 0. The focused browser run passed **26 cases / zero failures / six intentional Android mouse-only skips, 32 total, 7.3 minutes, exit 0**. All new scope/presentation scenarios passed where applicable on desktop/Pixel 7, alongside held preview/DST/no-popup behavior, deleted/revoked/obsolete-block recovery, pending-save account isolation, Advanced filters, mobile grid/resize, same-cookie isolation and desktop Board 503 tag recovery. The skips are explicit real-mouse cases on Android; touch/keyboard scheduling passed.
+
+Independent fresh and populated-upgrade checks also passed on new disposable clusters: all 16 migrations/no drift; preserved digests across 18 original and 23 later populated tables; existing nonempty/empty selections and zones retained as custom; new rows default to follow. These were reruns of the inspected implementation proofs with isolated review paths, separate from carried evidence. Fresh compact held-preview and supplied/regenerated desktop/Pixel 7 Light/Dark/System/Trash captures were inspected. Exact commands are in [023's independent record](tasks/023-calendar-presentation-and-workspace-scope.md#independent-review--2026-11-16).
+
+The earlier 132-case selection and subsequent corrected selections remain separately qualified; **no new complete application browser-suite pass or all-green rerun of all 132 cases is claimed**. Physical Android, other engines/screen readers, Ubuntu/proxy/TLS/mail/provider operation, fresh install/audit/container/default bundler and actual deployment/production restore remain outside this review.
+
+For rollout, back up real data and use README's stop/update/install/migrate/build/restart/browser-reload sequence. **All 16 migrations are required; do not reset data.** Existing accounts retain their custom selection, including empty; choose **Advanced → Follow creation workspace** deliberately to adopt Follow. No new package or environment setting is required. Review documentation only is updated/staged; the coordinator made no commit, push or server/provider action. Saved environments are unchanged. Owned review app/SMTP/database services are stopped and listeners checked, including both proof clusters.
+
+## Task 023 implementation handoff — now committed as `499cfd3` and reviewed above
 
 The owner integrated independently accepted 022 at **fb0ee56** and assigned **023 only**. Calendar now has saved Follow creation workspace/custom modes; the palette, counts, choices and drag sources share the visible authorized scope. Existing custom arrays, including empty, are preserved by additive migration **202611160001_calendar_scope** (16 total). Membership is rechecked under sorted Workspace locks before saving custom scope. Board remains independent, and explicit out-of-view block creation/retained input do not widen visibility.
 
