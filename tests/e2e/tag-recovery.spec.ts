@@ -60,22 +60,8 @@ for (const failure of ["503", "conflict", "lost response"] as const) {
       description: "Original work",
       tagIds: tags.slice(0, 2).map((t) => t.id),
     });
-    expect(
-      (
-        await page.request.patch(
-          `/api/workspaces/${ws.id}/tags/${tags[1].id}`,
-          {
-            headers: { origin },
-            data: {
-              name: tags[1].name,
-              color: "amber",
-              archived: true,
-              revision: 1,
-            },
-          },
-        )
-      ).status(),
-    ).toBe(200);
+    // Pre-021 archive fixture verifies retained legacy associations on Board recovery.
+    await testDB.workspaceTag.update({where:{id:tags[1].id},data:{archivedAt:new Date(),revision:{increment:1}}});
     const base = `/api/workspaces/${ws.id}/tasks/${task.id}`;
     const other = await post(page, `/api/workspaces/${mine.id}/tasks`, {
       title: "Unrelated retained work",
@@ -320,7 +306,7 @@ for (const failure of ["503", "conflict", "lost response"] as const) {
   });
 }
 
-test("migration-shaped Important and Urgent identities support normal tag editing without revising tagged work", async ({
+test("migration-shaped Important and Urgent identities support rename and recolor without revising tagged work", async ({
   page,
 }) => {
   const ws = await personal(page);
@@ -360,62 +346,55 @@ test("migration-shaped Important and Urgent identities support normal tag editin
     exact: true,
   });
   for (const tag of tags) {
-    for (const step of ["rename", "archive", "restore"] as const) {
-      const name = step === "rename" ? tag.name : `Imported ${tag.name}`;
-      await panel
-        .getByRole("button", { name: `Edit tag ${name}`, exact: true })
-        .click();
-      const definition = panel.getByRole("region", {
-        name: "Tag definition",
+    const name = tag.name;
+    await panel
+      .getByRole("button", { name: `Edit tag ${name}`, exact: true })
+      .click();
+    const definition = panel.getByRole("region", {
+      name: "Tag definition",
+      exact: true,
+    });
+    await definition
+      .getByLabel("Tag name", { exact: true })
+      .fill(`Imported ${tag.name}`);
+    await definition.getByRole("radio", { name: /^Sky/ }).check();
+    const response = page.waitForResponse(
+      (r) => r.request().method() === "PATCH" && r.url().includes("/tags/"),
+    );
+    await definition
+      .getByRole("button", { name: "Save tag definition", exact: true })
+      .click();
+    const result = await response;
+    expect(result.url()).toContain(`/tags/${encodeURIComponent(tag.id)}`);
+    expect(result.status()).toBe(200);
+    expect((await result.json()).tag).toMatchObject({
+      id: tag.id,
+      name: `Imported ${tag.name}`,
+      color: "sky",
+    });
+    await expect(definition).toHaveCount(0);
+    await expect(
+      panel.getByRole("button", {
+        name: `Edit tag Imported ${tag.name}`,
         exact: true,
-      });
-      await definition
-        .getByLabel("Tag name", { exact: true })
-        .fill(`Imported ${tag.name}`);
-      await definition.getByRole("radio", { name: /^Sky/ }).check();
-      await definition
-        .getByRole("checkbox", { name: "Archived tag", exact: true })
-        .setChecked(step === "archive");
-      const response = page.waitForResponse(
-        (r) => r.request().method() === "PATCH" && r.url().includes("/tags/"),
-      );
-      await definition
-        .getByRole("button", { name: "Save tag definition", exact: true })
-        .click();
-      const result = await response;
-      expect(result.url()).toContain(`/tags/${encodeURIComponent(tag.id)}`);
-      expect(result.status()).toBe(200);
-      expect((await result.json()).tag).toMatchObject({
-        id: tag.id,
-        name: `Imported ${tag.name}`,
-        color: "sky",
-      });
-      await expect(definition).toHaveCount(0);
-      await expect(
-        panel.getByRole("button", {
-          name: `Edit tag Imported ${tag.name}`,
-          exact: true,
-        }),
-      ).toBeEnabled();
-      const saved = await testDB.workspaceTag.findUniqueOrThrow({
-        where: { id: tag.id },
-      });
-      expect(!!saved.archivedAt).toBe(step === "archive");
-      const row = panel
-        .getByRole("list", { name: "Tag definitions", exact: true })
-        .getByRole("listitem")
-        .filter({ hasText: `Imported ${tag.name}` });
-      if (step === "archive")
-        await expect(row).toContainText("Archived (assignments retained)");
-      else await expect(row).toContainText("Active");
-      await closedEditor(page);
-      expect(
-        await testDB.task.findUniqueOrThrow({ where: { id: task.id } }),
-      ).toEqual(original);
-      expect(
-        await testDB.workActivity.findMany({ where: { taskId: task.id } }),
-      ).toEqual(history);
-    }
+      }),
+    ).toBeEnabled();
+    const saved = await testDB.workspaceTag.findUniqueOrThrow({
+      where: { id: tag.id },
+    });
+    expect(saved.archivedAt).toBeNull();
+    const row = panel
+      .getByRole("list", { name: "Tag definitions", exact: true })
+      .getByRole("listitem")
+      .filter({ hasText: `Imported ${tag.name}` });
+    await expect(row).toContainText("Active");
+    await closedEditor(page);
+    expect(
+      await testDB.task.findUniqueOrThrow({ where: { id: task.id } }),
+    ).toEqual(original);
+    expect(
+      await testDB.workActivity.findMany({ where: { taskId: task.id } }),
+    ).toEqual(history);
   }
   expect(
     (await testDB.taskTag.findMany({ where: { taskId: task.id } }))

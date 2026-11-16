@@ -173,13 +173,14 @@ export function updateTask(
     if (!current) throw new WorkspaceDenied(404, "Task not found");
     const { revision, tagIds, ...values } = input;
     const before = await taskWithStatus(tx, current.id);
+    // Reviewed bulk removal can retire a formerly valid selection. Show the
+    // newer canonical task before validating a retained draft against metadata.
+    if (current.revision !== revision) throw new PlanningConflict(before);
     const previousIds = before.tags.map((t) => t.id);
     if (tagIds) await validateTags(tx, workspaceId, tagIds, previousIds);
     const changedTags =
       tagIds !== undefined &&
       JSON.stringify([...tagIds].sort()) !== JSON.stringify(previousIds.sort());
-    if (current.revision !== revision)
-      throw new PlanningConflict(await taskWithStatus(tx, current.id));
     await resolveStatus(tx, workspaceId, input.status);
     if (
       !changedTags &&

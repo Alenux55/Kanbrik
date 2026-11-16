@@ -41,7 +41,7 @@ export function useSupplementalMutation(onSaved: () => void) {
     const lock =
       draft.form === "order"
         ? `order:${draft.workspaceId}/${draft.orderScope}`
-        : draft.form !== "tag" && draft.target?.record
+        : draft.form !== "tag" && draft.form !== "tag-remove" && draft.target?.record
           ? activityLock(draft.target)
           : "configuration:" + draft.workspaceId;
     if (draft.conflict || !store.beginSave(lock)) return;

@@ -647,7 +647,7 @@ describe("workspace workflows, labels and sibling ordering", () => {
       },
     ]);
   });
-  it("edits migration-shaped tag IDs as single encoded segments without changing linked work or bypassing scope checks", async () => {
+  it("supports encoded migrated-ID metadata edits and reviewed removal without bypassing scope checks", async () => {
     const definitions = await Promise.all(
       ["important", "urgent"].map((name) =>
         db.workspaceTag.create({
@@ -692,22 +692,16 @@ describe("workspace workflows, labels and sibling ordering", () => {
           )
         ).status,
       ).toBe(404);
-      for (let revision = 1; revision <= 3; revision++) {
-        const result = await request(
-          path,
-          "PATCH",
-          { ...payload, revision, archived: revision === 2 },
-          editor,
-        );
-        expect(result.status).toBe(200);
-        expect((await result.json()).tag).toMatchObject({
-          id: definition.id,
-          workspaceId: ws,
-          name: payload.name,
-          color: "sky",
-          revision: revision + 1,
-        });
-      }
+      const result = await request(path, "PATCH", payload, editor);
+      expect(result.status).toBe(200);
+      expect((await result.json()).tag).toMatchObject({
+        id: definition.id,
+        workspaceId: ws,
+        name: payload.name,
+        color: "sky",
+        revision: 2,
+      });
+      expect((await request(path, "PATCH", {...payload, revision:2, archived:true}, editor)).status).toBe(400);
       expect((await request(path, "PATCH", payload)).status).toBe(409);
     }
     expect(await db.task.findUniqueOrThrow({ where: { id: task.id } })).toEqual(
@@ -721,6 +715,18 @@ describe("workspace workflows, labels and sibling ordering", () => {
         .map((tag) => tag.tagId)
         .sort(),
     ).toEqual(definitions.map((tag) => tag.id).sort());
+    for (const definition of definitions) {
+      const path = `/api/workspaces/${ws}/tags/${encodeURIComponent(definition.id)}`;
+      const preview = await request(path+"/removal-preview", "POST", {revision:2}, editor);
+      expect(preview.status).toBe(200);
+      const review = await preview.json();
+      expect((await request(path+"/remove", "POST", {review:review.review,requestKey:randomUUID()}, editor)).status).toBe(200);
+      expect((await request(path, "PATCH", {name:definition.name+" renamed",color:"sky",archived:false,revision:3}, editor)).status).toBe(200);
+      expect((await db.workspaceTag.findUniqueOrThrow({where:{id:definition.id}})).id).toBe(definition.id);
+    }
+    expect(await db.taskTag.count({where:{taskId:task.id}})).toBe(0);
+    expect((await db.task.findUniqueOrThrow({where:{id:task.id}})).revision).toBe(original.revision+2);
+    expect(await db.workActivity.count({where:{taskId:task.id,action:"tag_removed"}})).toBe(2);
   });
   it("reconciles normalized concurrent definitions, receipts, all palette colors, archives and foreign identity guards", async () => {
     const name = "Arbitrary " + randomUUID(),
@@ -829,7 +835,10 @@ describe("workspace workflows, labels and sibling ordering", () => {
       archived: true,
       revision: tag.revision,
     });
-    expect(archived.status).toBe(200);
+    expect(archived.status).toBe(400);
+    // Preserve a pre-021 archived association fixture. New in-use archives must
+    // use reviewed removal; this legacy compatibility case is not an API bypass.
+    await db.workspaceTag.update({where:{id:tag.id},data:{name:"Renamed "+name,normalizedName:("Renamed "+name).toLowerCase(),color:"blue",archivedAt:new Date(),revision:{increment:1}}});
     expect(await db.task.findUniqueOrThrow({ where: { id: task.id } })).toEqual(
       original,
     );

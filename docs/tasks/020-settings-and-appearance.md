@@ -1,6 +1,6 @@
 # 020: Settings hub, appearance and centralized tag management
 
-Status: Implementation candidate above `9e41324` (accepted runtime `2742d15`), explicitly assigned on 2026-11-15. Implementation verification completed; independent review is pending. Tasks 021–023 remain unimplemented specifications.
+Status: Independently accepted at owner-committed `1f85e8a` on 2026-11-15, above `9e41324` and accepted runtime `2742d15`. No actionable findings in review. Coordinator checks and separately carried implementer evidence are recorded below. Tasks 021–023 remain unimplemented specifications; task 021's prerequisite review is satisfied.
 
 ## Outcome and inputs
 
@@ -84,3 +84,19 @@ This is a complete integrated run on final application/test sources, not an aggr
 Final candidate checks: Prisma generate/validate, lint/types and Webpack build passed; guarded test migration 15 applied; full backend/unit **133/133 across 14 files in 27.43 seconds** passed; fresh all-15/no-drift and populated preservation/System-backfill proofs passed. Source/tests were frozen through the successful full run. Screenshot and platform limits above remain in effect. Independent coordinator review is the next gate before task 021.
 
 Final cleanup: the owned main verification database and app/SMTP fixtures were stopped. No listeners remain on verification ports 3100–3126 or 15432/15434/15435. All task 020 changes are staged, alongside the three unchanged, previously staged 021–023 specifications (40 changed files total). Git whitespace checks passed and no unstaged task-owned changes remain. Environment files, credentials, generated output, local database/proof files and screenshots are excluded from the staged diff. Owner commits/pushes and arranges independent review.
+
+## Independent review — 2026-11-15
+
+Reviewed owner-committed `1f85e8a` against `9e41324`, carrying accepted runtime `2742d15`. Scope includes root read-only appearance initialization, the constrained additive preference column/partial writes, semantic palette presentation, centralized tag definitions, scoped draft navigation/recovery and unchanged role boundaries. Task 021 detachment/export and tasks 022–023 filter/Calendar redesign remain unimplemented; existing Archive accurately retains associations.
+
+Independent `npm run check`, `npm run db:validate`, guarded migration status (**15 applied, none pending**) and `npm run build -- --webpack` passed. After the build completed, the full backend/unit run passed **133/133 checks across 14 files**, exit 0. The inspected ignored process-only test adapter uses guarded loopback 15432 without changing saved environment values. Fresh desktop/Pixel 7 Settings, palette/dialog and dropdown screenshots were inspected across Light/Dark/System, including Dark Calendar and its live feedback on desktop.
+
+Focused browser re-review passed **26 cases / zero failures / four intentional Android mouse-only skips, 30 total, 6.7 minutes, exit 0**. All five new Settings scenarios passed on both profiles. The selection also verifies existing tag filtering and metadata retries, migrated-ID administration, all three desktop Board failure/conflict/lost-response cases, ordinary dialog history, invitation administrator boundaries and live Calendar drop feedback. The four skips are three Board mouse-drag cases and one Calendar held-mouse case; no new Settings case is skipped. No actionable finding was identified; task 020 is accepted and the prerequisite review for 021 is satisfied.
+
+Exact command used the inspected local adapter (portable README equivalent: `npm run test:e2e --` with the same arguments):
+
+```powershell
+node .local/task014-command.mjs browser settings-appearance.spec.ts tag-recovery.spec.ts task-labels.spec.ts dialog-history.spec.ts invitations.spec.ts calendar-drop-preview.spec.ts --grep 'account appearance|Settings workspace|retained definition retries|new task input|failed appearance|Board.*recovery preserves|migration-shaped|Scoped custom|custom tag edits|explicit tag creation|ordinary editor|administrator emails|live blank-slot'
+```
+
+The implementer's 156-pass full browser run and fresh/populated migration/backfill/no-drift proofs remain separately carried evidence, not coordinator reruns. No physical Android, Ubuntu/proxy/provider, fresh dependency installation/audit, default Turbopack or deployment result is claimed. Review changes are documentation only. The owned database was stopped after checking its temporary 15432 port; no review app/SMTP/database listeners remain. No runtime changes, commit, push or deployment were performed by the coordinator.

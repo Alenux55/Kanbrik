@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 import { projectPalette, tagColor, themedTint } from "@/lib/project-palette";
 import { usePlanningDrafts, type SupplementalDraft } from "./planning-drafts";
 import { button, control } from "./ui/planner-controls";
@@ -15,6 +16,7 @@ export function TagDefinitionForm({
 }) {
   const store = usePlanningDrafts(),
     pending = store.savingKeys.includes("configuration:" + draft.workspaceId);
+  const [wasArchived] = useState(!!draft.values.archived);
   return (
     <section aria-label="Tag definition" className="space-y-2 border p-2">
       <p>
@@ -59,6 +61,7 @@ export function TagDefinitionForm({
             <input
               type="checkbox"
               checked={!!draft.values.archived}
+              disabled={!wasArchived}
               onChange={(e) => update({ archived: e.target.checked })}
             />{" "}
             Archived tag
@@ -66,8 +69,10 @@ export function TagDefinitionForm({
         )}
       </fieldset>
       <p className="text-sm">
-        Archiving hides a tag from new selections and retains existing
-        assignments. Restore an archived definition to select it again.
+        Remove a tag from the workspace list to review and detach its
+        assignments. Restoring a definition makes it selectable again; it does
+        not automatically restore former assignments. Use removal reports to
+        recover assignments deliberately.
       </p>
       {draft.error && <p role="alert">{draft.error}</p>}
       {draft.conflict && (

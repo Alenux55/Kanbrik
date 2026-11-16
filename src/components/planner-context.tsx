@@ -327,7 +327,7 @@ export function PlannerContext({
               prefs.workspaces.some((w) => w.id === d.workspaceId),
             )
             .map(([key, d]) =>
-              d.form === "tag" ? (
+              d.form === "tag" || d.form === "tag-remove" ? (
                 <Link
                   key={key}
                   className="block min-h-11 underline"

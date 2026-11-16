@@ -47,7 +47,9 @@ export type SupplementalDraft = {
     | "vendor"
     | "workflow"
     | "order"
+    | "tag-remove"
     | "tag";
+  tagRemoval?: import("@/lib/tag-contracts").TagRemovalPreview;
   path: string;
   method: "POST" | "PATCH";
   values: Record<string, unknown>;

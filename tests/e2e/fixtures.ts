@@ -5,14 +5,18 @@ export const test = base.extend<{ signedIn: void }>({
   signedIn: [async ({ page, testAccounts }, use) => {
     const email = `${randomUUID()}@example.invalid`;
     testAccounts.push(email);
-    await page.goto("/sign-up");
-    await page.getByRole("textbox", { name: "Name", exact: true }).fill("Browser user");
-    await page.getByLabel("Email", { exact: true }).fill(email);
     const password = randomUUID() + randomUUID();
-    await page.getByLabel("Password", { exact: true }).fill(password);
-    await page.getByLabel("Confirm your password", { exact: true }).fill(password);
-    await page.getByRole("button", { name: "Create account", exact: true }).click();
+    // Planner fixtures require an authenticated actor, not a signup UI test.
+    // Use the real registration API and its context cookies; this avoids native
+    // form submission before hydration. Dedicated auth.spec.ts tests the UI.
+    const response = await page.request.post("/api/auth/sign-up/email", {
+      headers: { origin: "http://127.0.0.1:3100" },
+      data: { name: "Browser user", email, password },
+    });
+    expect(response.status()).toBe(200);
+    await page.goto("/projects");
     await expect(page).toHaveURL(/\/projects$/);
+    await expect(page.getByText(`Signed in as ${email}`, { exact: true })).toBeVisible();
     await use();
   }, { auto: true }],
 });

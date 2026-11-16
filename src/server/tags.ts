@@ -102,6 +102,10 @@ export function changeTag(
     if (!current) throw new WorkspaceDenied(404, "Tag unavailable.");
     if (current.revision !== input.revision)
       throw new PlanningConflict(current);
+    // Old archive clients may still archive an unused definition. In-use removal
+    // requires a reviewed snapshot; rename/recolor is never bulk detachment.
+    if (input.archived && !current.archivedAt && await tx.taskTag.count({where:{workspaceId,tagId:id}}))
+      throw new PlanningInputError("This tag is in use. Open Settings, review Remove tag and its usage list before detaching assignments.");
     const normalizedName = await normalize(tx, input.name),
       duplicate = await tx.workspaceTag.findUnique({
         where: { workspaceId_normalizedName: { workspaceId, normalizedName } },

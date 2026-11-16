@@ -481,6 +481,7 @@ test("obsolete Trash replies cannot retire a newer account's draft or release it
       data: { defaultWorkspaceId: ws.id },
     });
     await page.goto("/projects");
+    await expect(page.getByText("Projects and tasks in Account Trash. Saves require a connection.", {exact:true})).toBeVisible();
     await openTask(page, task.title);
     await page
       .getByRole("button", { name: "Preview Move to Trash", exact: true })
@@ -521,6 +522,9 @@ test("obsolete Trash replies cannot retire a newer account's draft or release it
     await page
       .getByLabel("Creation workspace", { exact: true })
       .selectOption(ws.id);
+    // Selecting starts an asynchronous preference save. Do not expand the old
+    // workspace's list while the new scope is still being rendered.
+    await expect(page.getByText("Projects and tasks in Account Trash. Saves require a connection.", {exact:true})).toBeVisible();
     await openTask(page, task.title);
     await page.getByLabel("Title", { exact: true }).fill("New account input");
     await page.route(

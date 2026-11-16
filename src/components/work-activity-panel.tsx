@@ -25,6 +25,7 @@ const actions: Record<string, string> = {
   status_changed: "Changed status",
   work_trashed: "Moved to Trash",
   work_restored: "Restored work",
+  tag_removed: "Removed tag assignment",
   comment_created: "Posted comment",
   comment_edited: "Edited comment",
   list_created: "Added list",
@@ -431,8 +432,8 @@ export function WorkActivityPanel({
             </p>
             {event.operationId && (
               <p>
-                {event.cascade ? "Included in" : "Root of"}{" "}
-                {event.action === "work_restored" ? "Restore" : "Trash"}{" "}
+                {event.operationKind === "tag" ? "Included in" : event.cascade ? "Included in" : "Root of"}{" "}
+                {event.operationKind === "tag" ? "tag removal" : event.action === "work_restored" ? "Restore" : "Trash"}{" "}
                 operation: {event.operationTitle} ({event.operationKind}).
               </p>
             )}

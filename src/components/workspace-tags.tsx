@@ -7,6 +7,8 @@ import { usePlannerContext } from "./planner-context";
 import { usePlanningDrafts } from "./planning-drafts";
 import { useSupplementalMutation } from "./use-supplemental-mutation";
 import { TagDefinitionForm } from "./tag-definition-form";
+import { TagRemovalForm } from "./tag-removal-form";
+import { TagRemovalReports, saveUsageFile } from "./tag-removal-reports";
 import { EditorDialog } from "./ui/editor-dialog";
 import { button, control } from "./ui/planner-controls";
 
@@ -27,6 +29,15 @@ export function WorkspaceTags({
     [error, setError] = useState("");
   const [epoch, setEpoch] = useState(0),
     [current, setCurrent] = useState<string | null>(requestedDraft ?? null);
+  const [reportTag, setReportTag] = useState<TagRecord | null>(null);
+  const alive = useRef(true);
+  const dialogSource = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
   const handlers = useRef(context);
   useEffect(() => {
     handlers.current = context;
@@ -67,16 +78,26 @@ export function WorkspaceTags({
     setEpoch((value) => value + 1);
   });
   const drafts = Object.entries(store.supplementalDrafts).filter(
-    ([, d]) => d.form === "tag" && d.workspaceId === workspaceId,
+    ([, d]) =>
+      (d.form === "tag" || d.form === "tag-remove") &&
+      d.workspaceId === workspaceId,
   );
   const candidate = current ? store.supplementalDrafts[current] : undefined;
   const draft =
-    candidate?.form === "tag" && candidate.workspaceId === workspaceId
+    (candidate?.form === "tag" || candidate?.form === "tag-remove") &&
+    candidate.workspaceId === workspaceId
       ? candidate
       : undefined;
   const pending = store.savingKeys.includes("configuration:" + workspaceId);
+  async function checkAccess(response: Response) {
+    if (response.status !== 403 && response.status !== 404) return;
+    const access = await session.fetch(`/api/workspaces/${workspaceId}`);
+    if (alive.current && session.isCurrent(lease) && access.status === 404)
+      handlers.current.revoke(workspaceId);
+  }
   function start(tag?: TagRecord) {
     if (!ready || pending) return;
+    dialogSource.current = document.activeElement as HTMLElement;
     const key = `${workspaceId}/tags/definitions/${tag?.id ?? "new"}`;
     // Reopening must preserve the original revision/request key, including uncertainty.
     if (!store.supplementalDrafts[key])
@@ -104,6 +125,108 @@ export function WorkspaceTags({
       }));
     setCurrent(key);
   }
+  async function reviewRemoval(tag: TagRecord, refresh = false) {
+    // Preparing a preview disables its trigger and can blur it before the
+    // modal mounts. Keep the original focus destination across that request.
+    if (!refresh) dialogSource.current = document.activeElement as HTMLElement;
+    const key = `${workspaceId}/tags/removal/${tag.id}`;
+    if (!refresh && store.supplementalDrafts[key]) {
+      setCurrent(key);
+      return;
+    }
+    const lock = "configuration:" + workspaceId;
+    if (!store.beginSave(lock)) return;
+    try {
+      let revision = tag.revision;
+      if (refresh) {
+        const response = await session.fetch(
+          `/api/workspaces/${workspaceId}/tags`,
+        );
+        if (!response.ok)
+          throw Error("Tags unavailable. Original review is kept.");
+        const latest: TagRecord[] = await response.json();
+        const found = latest.find((row) => row.id === tag.id);
+        if (!found) throw Error("Tag unavailable. Original review is kept.");
+        revision = found.revision;
+      }
+      const response = await session.fetch(
+        `/api/workspaces/${workspaceId}/tags/${encodeURIComponent(tag.id)}/removal-preview`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ revision }),
+        },
+      );
+      const result = await response.json();
+      if (!response.ok) {
+        await checkAccess(response);
+        throw Error(
+          result.error ??
+            "Removal preview unavailable. Refresh tags and review again.",
+        );
+      }
+      if (!alive.current || !session.isCurrent(lease)) return;
+      store.setSupplementalDrafts((rows) => ({
+        ...rows,
+        [key]: {
+          workspaceId,
+          form: "tag-remove",
+          label: `removal of tag ${result.tagName}`,
+          path: `/api/workspaces/${workspaceId}/tags/${encodeURIComponent(tag.id)}/remove`,
+          method: "POST",
+          values: { review: result.review, requestKey: crypto.randomUUID() },
+          tagRemoval: result,
+        },
+      }));
+      setError("");
+      setCurrent(key);
+    } catch (cause) {
+      if (alive.current && session.isCurrent(lease))
+        setError(
+          cause instanceof Error
+            ? cause.message
+            : "Removal review unavailable. Input is kept.",
+        );
+    } finally {
+      store.finishSave(lock, false);
+    }
+  }
+  async function downloadReview() {
+    if (!draft?.tagRemoval || !current) return;
+    const lock = "configuration:" + workspaceId;
+    if (!store.beginSave(lock)) return;
+    try {
+      const response = await session.fetch(
+        `/api/workspaces/${workspaceId}/tags/${encodeURIComponent(draft.tagRemoval.tagId)}/removal-preview/export`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ review: draft.values.review }),
+        },
+      );
+      if (!response.ok) {
+        await checkAccess(response);
+        const result = await response.json();
+        if (session.isCurrent(lease))
+          mutate.change(current, {
+            error: result.error ?? "Download failed. Original review is kept.",
+            conflict:
+              response.status === 409 ? { reviewRequired: true } : undefined,
+          });
+        return;
+      }
+      const blob = await response.blob();
+      if (alive.current && session.isCurrent(lease)) saveUsageFile(blob);
+    } catch {
+      if (session.isCurrent(lease))
+        mutate.change(current, {
+          error:
+            "Usage download failed. Nothing changed. Retry the download or review the latest impact.",
+        });
+    } finally {
+      store.finishSave(lock, false);
+    }
+  }
   const shown = tags.filter((tag) =>
     tag.name.toLowerCase().includes(query.trim().toLowerCase()),
   );
@@ -111,8 +234,10 @@ export function WorkspaceTags({
     <section aria-label="Workspace tags" className="space-y-4">
       <h3 className="text-xl font-semibold">Tags</h3>
       <p>
-        Workspace members can manage definitions. Archiving retains existing
-        task assignments.
+        Workspace members can manage definitions. Remove reviews all
+        assignments, detaches the selected tag and archives its definition.
+        Reports support deliberate recovery; restoring a definition does not
+        retag former work.
       </p>
       <div className="flex flex-wrap gap-2">
         <button
@@ -163,7 +288,7 @@ export function WorkspaceTags({
             >
               {tag.name} ·{" "}
               {projectPalette.find((c) => c.key === tag.color)?.name} ·{" "}
-              {tag.archivedAt ? "Archived (assignments retained)" : "Active"}
+              {tag.archivedAt ? "Archived" : "Active"}
             </span>
             <button
               className={button}
@@ -172,6 +297,23 @@ export function WorkspaceTags({
               onClick={() => start(tag)}
             >
               Edit tag {tag.name}
+            </button>
+            <button
+              className={button}
+              type="button"
+              disabled={!ready || pending}
+              onClick={() => void reviewRemoval(tag)}
+            >
+              {tag.archivedAt ? "Review remaining usage" : "Remove tag"}{" "}
+              {tag.name}
+            </button>
+            <button
+              className={button}
+              type="button"
+              disabled={pending}
+              onClick={() => setReportTag(tag)}
+            >
+              Removal reports {tag.name}
             </button>
           </li>
         ))}
@@ -188,7 +330,10 @@ export function WorkspaceTags({
               key={key}
               className={button}
               disabled={pending}
-              onClick={() => setCurrent(key)}
+              onClick={() => {
+                dialogSource.current = document.activeElement as HTMLElement;
+                setCurrent(key);
+              }}
             >
               Review tag draft: {value.label}
             </button>
@@ -205,30 +350,75 @@ export function WorkspaceTags({
         )}
       {current && draft && (
         <EditorDialog
-          title="Tag definition"
+          title={draft.form === "tag-remove" ? "Remove tag" : "Tag definition"}
           dirty
           pending={pending}
           discard={() => mutate.discard(current)}
           close={() => setCurrent(null)}
+          focusAfterClose={() =>
+            !dialogSource.current
+              ? null
+              : dialogSource.current.isConnected &&
+                  !dialogSource.current.matches(":disabled")
+                ? dialogSource.current
+                : document.getElementById("main-content")
+          }
         >
           <div className="p-4">
-            <TagDefinitionForm
-              draft={draft}
-              update={(values) => {
-                if (!draft.uncertain)
-                  mutate.change(current, {
-                    values: { ...draft.values, ...values },
-                  });
-              }}
-              save={() => {
-                void mutate.run(current, draft);
-              }}
-              discard={() => {
-                mutate.discard(current);
-                setCurrent(null);
-              }}
-            />
+            {draft.form === "tag-remove" ? (
+              <TagRemovalForm
+                draft={draft}
+                pending={pending}
+                save={() => void mutate.run(current, draft)}
+                download={() => void downloadReview()}
+                refresh={() => {
+                  if (draft.tagRemoval)
+                    void reviewRemoval(
+                      {
+                        id: draft.tagRemoval.tagId,
+                        workspaceId,
+                        name: draft.tagRemoval.tagName,
+                        color: "teal",
+                        revision: draft.tagRemoval.tagRevision,
+                        archivedAt: null,
+                      },
+                      true,
+                    );
+                }}
+                discard={() => {
+                  mutate.discard(current);
+                  setCurrent(null);
+                }}
+              />
+            ) : (
+              <TagDefinitionForm
+                draft={draft}
+                update={(values) => {
+                  if (!draft.uncertain)
+                    mutate.change(current, {
+                      values: { ...draft.values, ...values },
+                    });
+                }}
+                save={() => {
+                  void mutate.run(current, draft);
+                }}
+                discard={() => {
+                  mutate.discard(current);
+                  setCurrent(null);
+                }}
+              />
+            )}
           </div>
+        </EditorDialog>
+      )}
+      {reportTag && (
+        <EditorDialog
+          title={`Removal reports: ${reportTag.name}`}
+          dirty={false}
+          discard={() => setReportTag(null)}
+          close={() => setReportTag(null)}
+        >
+          <TagRemovalReports workspaceId={workspaceId} tagId={reportTag.id} />
         </EditorDialog>
       )}
     </section>
