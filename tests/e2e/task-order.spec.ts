@@ -1,3 +1,4 @@
+import { picker, finishPicker } from "./filter-helpers";
 import { randomUUID } from "node:crypto";
 import type { Page } from "@playwright/test";
 import { test, expect } from "./fixtures";
@@ -272,10 +273,7 @@ test("filtered or incomplete sibling views disable ordering and do not discard u
   page,
 }) => {
   const { ws, project, roots } = await setup(page);
-  const filter = page.getByRole("group", {
-    name: "Task tag filters",
-    exact: true,
-  });
+  const filter = await picker(page, "Tags");
   await filter.getByRole("checkbox", { name: /^Important \(/ }).check();
   await expect(
     page.getByRole("button", { name: "Move down: Order A", exact: true }),
@@ -288,8 +286,9 @@ test("filtered or incomplete sibling views disable ordering and do not discard u
       .first(),
   ).toBeVisible();
   await filter
-    .getByRole("button", { name: "Clear tag filters", exact: true })
+    .getByRole("button", { name: "Clear selection", exact: true })
     .click();
+  await finishPicker(page);
   await expect(
     page.getByRole("button", { name: "Move down: Order A", exact: true }),
   ).toBeEnabled();

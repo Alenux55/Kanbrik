@@ -162,6 +162,7 @@ test("calendar distinguishes collaborator-deleted blocks from revoked access wit
     const target = await provisionBlock(page, workspace.id, "Deleted target");
     const other = await provisionBlock(page, workspace.id, "Other saved block");
     await open(page);
+    await page.getByRole("button", { name: /^Advanced/ }).click();
     await page
       .getByRole("checkbox", {
         name: "Calendar deletion race (shared)",
@@ -169,8 +170,12 @@ test("calendar distinguishes collaborator-deleted blocks from revoked access wit
       })
       .check();
     await page
-      .getByRole("button", { name: "Apply calendar preferences", exact: true })
+      .getByRole("button", { name: "Apply filters", exact: true })
       .click();
+    await closedEditor(page);
+    await expect(
+      page.getByRole("button", { name: "New block", exact: true }),
+    ).toBeVisible();
     await page
       .getByRole("button", {
         name: "Edit block: Other saved block",
@@ -196,12 +201,10 @@ test("calendar distinguishes collaborator-deleted blocks from revoked access wit
       ).toBe(200);
     const kept = async () => {
       if (await page.locator("dialog").count()) await retained(page);
-      await expect(
-        page.getByRole("checkbox", {
-          name: "Calendar deletion race (shared)",
-          exact: true,
-        }),
-      ).toBeChecked();
+      expect(
+        (await (await page.request.get("/api/calendar/preferences")).json())
+          .workspaceIds,
+      ).toContain(workspace.id);
       await page
         .getByRole("button", {
           name: "Review draft: Unrelated retained input",
@@ -303,12 +306,15 @@ test("calendar distinguishes collaborator-deleted blocks from revoked access wit
         { exact: true },
       ),
     ).toBeVisible();
+    await page.getByRole("button", { name: /^Advanced/ }).click();
     await expect(
       page.getByRole("checkbox", {
         name: "Calendar deletion race (shared)",
         exact: true,
       }),
     ).toHaveCount(0);
+    await page.getByRole("button", { name: "Cancel", exact: true }).click();
+    await closedEditor(page);
     await expect(
       page.getByRole("button", {
         name: "Review draft: Unrelated retained input",
@@ -409,12 +415,10 @@ test("calendar ignores an obsolete workspace-access recheck after a missing-bloc
         .getByRole("form", { name: "Edit time block Old target", exact: true })
         .getByRole("button", { name: "Save block", exact: true }),
     ).toBeEnabled();
-    await expect(
-      page.getByRole("checkbox", {
-        name: "Personal workspace (personal)",
-        exact: true,
-      }),
-    ).toBeChecked();
+    expect(
+      (await (await page.request.get("/api/calendar/preferences")).json())
+        .workspaceIds,
+    ).toContain(personal.id);
     await retained(page);
     await page
       .getByRole("button", {
@@ -543,14 +547,17 @@ test("calendar pointer move/resize persist duration while no-op, canceled and to
   await page.mouse.down();
   await page.mouse.move(point.x + 12, point.y, { steps: 3 });
   await page.mouse.move(point.x, point.y + slot.height * 2, { steps: 5 });
-  await page
-    .getByRole("checkbox", {
-      name: "Personal workspace (personal)",
-      exact: true,
-    })
-    .focus();
+  await page.getByRole("button", { name: /^Advanced/ }).focus();
   await page.keyboard.press("Space");
+  await expect(
+    page.getByRole("dialog", {
+      name: "Calendar advanced filters",
+      exact: true,
+    }),
+  ).toBeVisible();
   await page.mouse.up();
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await closedEditor(page);
   expect((await events(page, personal.id))[0].revision).toBe(3);
   await page.reload();
   await page.getByLabel("Date", { exact: true }).fill("2030-06-03");
@@ -775,17 +782,26 @@ test("work drops distinguish original-block assignment, foreground rejection and
   testWorkspaces.push(foreign.id);
   await provisionBlock(page, foreign.id, "Foreign block");
   await open(page);
+  await page.getByRole("button", { name: /^Advanced/ }).click();
   await page
     .getByRole("checkbox", { name: "Foreign scheduling (shared)", exact: true })
     .check();
   await page
-    .getByRole("button", { name: "Apply calendar preferences", exact: true })
+    .getByRole("button", { name: "Apply filters", exact: true })
     .click();
+  await closedEditor(page);
+  await expect(
+    page.getByRole("button", { name: "New block", exact: true }),
+  ).toBeVisible();
   if (isMobile) {
     await page.getByRole("button", { name: "New block", exact: true }).tap();
     const form = createForm(page);
-    await form.getByLabel("Assigned work", { exact: true }).selectOption(`task:${task.id}`);
-    await form.getByLabel("Start time", { exact: true }).fill("2030-06-03T12:00");
+    await form
+      .getByLabel("Assigned work", { exact: true })
+      .selectOption(`task:${task.id}`);
+    await form
+      .getByLabel("Start time", { exact: true })
+      .fill("2030-06-03T12:00");
     await form.getByLabel("End time", { exact: true }).fill("2030-06-03T13:00");
     await expect(form.getByLabel("Assigned work", { exact: true })).toHaveValue(
       `task:${task.id}`,
@@ -808,6 +824,18 @@ test("work drops distinguish original-block assignment, foreground rejection and
     await showGridTime(page, "12:00:00");
     const source = (await palette.boundingBox())!;
     const target = (await targetEvent.boundingBox())!;
+    // A confirmed save refreshes every loaded workspace. Starting the next
+    // held gesture during that refresh legitimately invalidates its context.
+    const refreshed = [ws.id, foreign.id].flatMap((id) =>
+      ["tasks", "projects", "time-blocks"].map((resource) =>
+        page.waitForResponse(
+          (response) =>
+            response.request().method() === "GET" &&
+            new URL(response.url()).pathname ===
+              `/api/workspaces/${id}/${resource}`,
+        ),
+      ),
+    );
     await drag(
       page,
       { x: source.x + 20, y: source.y + 20 },
@@ -821,9 +849,21 @@ test("work drops distinguish original-block assignment, foreground rejection and
       .toBe(project.id);
     expect(await events(page, ws.id)).toHaveLength(1);
     expect((await events(page, ws.id))[0].endAt).toBe(empty.endAt);
-    await expect(page.getByRole("status").filter({ hasText: "Saved calendar change." })).toBeVisible();
+    await expect(
+      page.getByRole("status").filter({ hasText: "Saved calendar change." }),
+    ).toBeVisible();
     await closedEditor(page);
     await expect(targetEvent).toContainText("Schedule project");
+    for (const response of await Promise.all(refreshed)) {
+      expect(response.ok()).toBe(true);
+      await response.finished();
+    }
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) => {
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+        }),
+    );
     await showGridTime(page, "12:00:00");
     const before = (await events(page, ws.id))[0];
     const again = (await palette.boundingBox())!;
@@ -908,6 +948,7 @@ test("calendar marks failed scopes and pickers incomplete and ignores obsolete r
   });
   testWorkspaces.push(shared.id);
   await open(page);
+  await page.getByRole("button", { name: /^Advanced/ }).click();
   await page
     .getByRole("checkbox", {
       name: "Incomplete calendar (shared)",
@@ -915,8 +956,12 @@ test("calendar marks failed scopes and pickers incomplete and ignores obsolete r
     })
     .check();
   await page
-    .getByRole("button", { name: "Apply calendar preferences", exact: true })
+    .getByRole("button", { name: "Apply filters", exact: true })
     .click();
+  await closedEditor(page);
+  await expect(
+    page.getByRole("button", { name: "New block", exact: true }),
+  ).toBeVisible();
   await page.route(`**/api/workspaces/${shared.id}/tasks`, (route) =>
     route.fulfill({ status: 503, json: { error: "Picker fixture" } }),
   );
@@ -1032,12 +1077,17 @@ test("calendar isolates pending saves across cookie account switches, failed che
     });
     const block = await provisionBlock(page, shared.id, "Session block");
     await open(page);
+    await page.getByRole("button", { name: /^Advanced/ }).click();
     await page
       .getByRole("checkbox", { name: "Session calendar (shared)", exact: true })
       .check();
     await page
-      .getByRole("button", { name: "Apply calendar preferences", exact: true })
+      .getByRole("button", { name: "Apply filters", exact: true })
       .click();
+    await closedEditor(page);
+    await expect(
+      page.getByRole("button", { name: "New block", exact: true }),
+    ).toBeVisible();
     await page
       .getByRole("button", { name: "Edit block: Session block", exact: true })
       .click();
@@ -1091,6 +1141,7 @@ test("calendar isolates pending saves across cookie account switches, failed che
       page.getByText(`Signed in as ${email}`, { exact: true }),
     ).toBeVisible();
     await open(page);
+    await page.getByRole("button", { name: /^Advanced/ }).click();
     await expect(
       page.getByRole("checkbox", {
         name: "Session calendar (shared)",
@@ -1101,8 +1152,12 @@ test("calendar isolates pending saves across cookie account switches, failed che
       .getByRole("checkbox", { name: "Session calendar (shared)", exact: true })
       .check();
     await page
-      .getByRole("button", { name: "Apply calendar preferences", exact: true })
+      .getByRole("button", { name: "Apply filters", exact: true })
       .click();
+    await closedEditor(page);
+    await expect(
+      page.getByRole("button", { name: "New block", exact: true }),
+    ).toBeVisible();
     await page
       .getByRole("button", { name: "Edit block: Session block", exact: true })
       .click();
@@ -1181,12 +1236,15 @@ test("calendar isolates pending saves across cookie account switches, failed che
     await page
       .getByRole("button", { name: "Refresh calendar", exact: true })
       .click();
+    await page.getByRole("button", { name: /^Advanced/ }).click();
     await expect(
       page.getByRole("checkbox", {
         name: "Session calendar (shared)",
         exact: true,
       }),
     ).toHaveCount(0);
+    await page.getByRole("button", { name: "Cancel", exact: true }).click();
+    await closedEditor(page);
     await expect(savedEdit).toHaveCount(0);
     // Same-cookie logout while a new block is pending: its completion belongs to
     // B's old document and cannot revive protected data or an account draft.

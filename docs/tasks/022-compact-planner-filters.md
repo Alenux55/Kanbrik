@@ -1,6 +1,6 @@
 # 022: Compact basic and advanced filters across planner views
 
-Status: Planned on 2026-11-15; 020/021 prerequisite feature reviews are satisfied, but prioritize baseline P1 [024](024-auth-form-submission-safety.md) before this task or server deployment. This task remains unimplemented; no application checks were performed for its specification.
+Status: Independently accepted for integration on 2026-11-16: reviewed staged source/tests above accepted `1e08a80`, with no actionable findings. Owner commit/integration remains pending; 023 is ready for separate assignment after integration. Coordinator checks passed 161 backend and 25 focused browser cases/three intentional Android mouse-only skips. The implementer's complete-suite failures and subsequent passing corrections remain separately qualified below; no new all-green complete-suite run is claimed. The 020/021 prerequisites and 024 closure remain satisfied.
 
 ## Outcome and inputs
 
@@ -44,3 +44,69 @@ Confirmed direction: basic Project and Tags multi-select dropdowns, inline searc
 ## Handoff and boundaries
 
 No new search service, task model, tag metadata CRUD inside dropdowns, cross-workspace task movement, Board ordering, offline filters or unrelated scheduling redesign. Prefer shared controls and predicates with view-specific labels/meaning instead of three inconsistent implementations. Record actual behavior, adopted defaults, checks and limitations here and in product/architecture/handoff; stage task-owned files and return for review before task 023. Owner commits/pushes/deploys.
+
+
+## Implementation handoff — 2026-11-16
+
+Implemented above accepted `1e08a80` and the coordinator's eight staged review/planning documents. This is **022 only**; 023 remains unimplemented. No dependency, schema, migration, saved environment, credential, server or provider change is introduced. Existing auth/session, canonical work ownership and all 15 migration requirements are preserved. Independent review is pending.
+
+### Behavior and adopted defaults
+
+- Shared Project/Tags/search/Advanced/Clear controls replace permanent checklists. Basic restrictions apply immediately; Android uses two contained rows. Searchable checklist popovers show selection counts, bounded internal scrolling, long-name wrapping, workspace-qualified choices, clear selection and deliberate keyboard/touch/Escape/outside/Done/Back handling. They add no drag sensor or work/status/scheduling write.
+- Popup history is removed before following a real link, so sidebar navigation cannot race dismissal. Layout positioning happens before paint and stays clamped to the viewport. Advanced reuses native modal/history/session/pending behavior, with one shared Cancel control and visible failure/retry inside the dialog.
+- Advanced merges only its own fields into current basic state after acknowledgement; Cancel/Back discards only the proposed filters. Board/Calendar scope remains independently server-saved. Clear resets restrictions without a preference write or widening scope. Out-of-scope IDs stay selected with concise recovery feedback; dropdowns expose only the current scope's choices. Tag read failures remain distinct and refresh retries without clearing selections.
+- Projects now composes project OR selection, own-workspace Any/All tags, independent task creation/edit days and project/task/subtask title search. Matching descendants retain project/parent context without increasing task matches; a project-only title match cannot bypass task restrictions. Empty projects remain visible unfiltered. Any active project/tag/search/date restriction disables incomplete-sibling ordering; clearing restores the prior disclosures and complete-scope controls, preserving retained order proposals.
+- Old Projects memory state explicitly normalizes missing fields to empty restrictions, keeping tag IDs/scopes/match mode. Board/Calendar retain existing fields and account memory. No provider reset, cross-view mirroring or new browser/cross-device filter store was added.
+- Projects/Board inclusive days reuse half-open viewing-zone bounds, with strict ISO-day/order validation and 23/25-hour DST coverage. Parent/child dates are independent; scheduling remains outside task last-edited metadata. Hide completed is Board Advanced only, defaults off and uses every workspace definition's completion metadata, including renamed Done and Won't do.
+- Calendar retains its broader work/description/project/parent/block-label predicate for palette, blocks, Agenda and drop eligibility. Empty/project-only blocks still cannot match tags. Its toolbar portal targets a host within the same protected session subtree above stable parent-owned date navigation; pending/failed range loads cannot remove date controls or keep an obsolete gesture alive. The existing broader authorized block-editor loader and hidden-workspace palette behavior remain until 023.
+
+### Verification
+
+Commands use README scripts. On this Windows checkout, the existing ignored `.local/task014-command.mjs` adapter supplies guarded loopback 15432 process URLs because the saved 55432 port is reserved; saved environment files were not changed.
+
+- `npm run check` passed lint/generated Next types/TypeScript after the Calendar correction. `npm run db:validate` passed; guarded Prisma migration status confirmed **15 applied, none pending**. No migration/preservation rewrite was needed.
+- Final backend/unit command, equivalent to `npm test` through the adapter: **161/161 across 17 files, 29.31 seconds, exit 0**. Five new pure-predicate cases cover hierarchy/context, project-only/Standalone/empty work, independent dates/DST/invalid days, legacy state conversion, all completion identities and own-workspace tag/Calendar tagless rules.
+- `npm run build -- --webpack` passed on the corrected Calendar source; no default-bundler claim is made.
+- Focused navigation/filter selection: **14/14, zero failures/skips, 3.4 minutes, exit 0**. All eight new cases passed desktop/Pixel 7, plus existing Board/card/cross-account and scoped-tag composition regressions.
+- After the Calendar correction: `npm run test:e2e -- calendar.spec.ts calendar-drop-preview.spec.ts compact-filters.spec.ts` via the adapter passed **30 cases / zero failures / six intentional Android mouse-only skips, 36 total, 8.2 minutes, exit 0**. All nine failures from the earlier complete attempt are resolved in this selection. It includes actual held pointers, filter/range/session invalidation, membership loss, uncertain/pending block saves, cross-cookie account changes, touch/explicit scheduling, DST and date changes during a genuinely held old range response.
+- Fresh desktop/Pixel 7 captures exercise Projects/Board/Calendar in Light/Dark/System (dark device scheme), including closed mobile toolbars and long-name pickers. Representative captures were visually inspected for two-row containment, wrapping, focus and popup placement. These use generated planner fixtures; no populated credentials, trace or video were captured. Pixel 7 is emulation, not a physical device.
+
+### Earlier attempts and corrections
+
+Exploratory selection one passed 13/26 in 6.6 minutes and exposed duplicate Cancel controls, a combined hint/control accessible name, broad test alert locators, inactive-tab keyboard activation and creation-scope timing. Selection two passed 20/26 in 6.6 minutes; it identified the real popup-to-link history race plus remaining fixture assertions. The 14-case pass above verifies those corrections separately.
+
+The first complete browser attempt was **183 passed / nine failed / 12 intentional skips, 204 total, 46.5 minutes, exit 1**. It found the real Calendar date-navigation loading regression and remaining old inline-workspace assertions, a pending-scope grid measurement race and a reused pointer coordinate after session recovery. Date controls are now parent-owned; fixture assertions inspect Advanced or authoritative saved selection while an editor is open, wait for completed scope application and remeasure actual geometry. The subsequent 30-pass Calendar selection directly resolves all nine; it is not aggregated into a green complete-suite claim. The next complete attempt was deliberately stopped after **16 passes and zero failures** when source review found that Calendar's Show creation workspace shortcut could use a canceled tag-mode proposal. A dedicated new assertion reproduced this on both profiles against the prior build (Any expected, All observed). The shortcut now explicitly uses applied state; the two corrected cases passed **2/2 in 36.6 seconds, exit 0**. Toolbar reads/choices also intersect current context membership so revocation cannot leave metadata from a superseded scope. Final lint/types and Webpack build passed again. The final complete attempt and the subsequent test-only correction are recorded below. The stopped attempt may leave generated fixtures in the ignored disposable database; no broad cleanup/reset was used.
+
+### Final result and cleanup
+
+The final complete command, `npm run test:e2e` through the guarded adapter, finished **191 passed / one failed / 12 intentional Android mouse-only skips, 204 total, 43.8 minutes, exit 1**. All four new compact-filter scenarios passed on both profiles (eight checks), as did the remaining Projects/Board/tag/order/history/session/recovery/Trash/list/workflow/authentication cases. The sole failure was the existing desktop repeated-drop fixture: it expected occupied-target rejection while the metadata refresh following its first successful save could legitimately invalidate the next held gesture.
+
+The test now registers and waits for all six workspace tasks/projects/blocks refresh responses, checks successful replies and lets the resulting layout commit before measuring the next gesture. It retains both the rejection-message and unchanged-data assertions; no application source was changed for this correction and no automatic retry was added. `npm run check` passed again. `npm run test:e2e -- calendar.spec.ts --grep 'work drops distinguish' --repeat-each=2` passed **4/4, zero failures/skips, 1.1 minutes, exit 0** (two desktop and two Pixel 7 cases). **There is no single green final complete-suite run after this test-only synchronization change; the complete attempt and repeated correction are reported separately.**
+
+The corrected application source passed final lint/types and `npm run build -- --webpack` before the complete attempt; the later change is test-only. Schema/dependencies/environment files and all applied migrations are unchanged. Fresh final-build Calendar desktop/Dark and Pixel 7/System captures were inspected again, confirming the anchored popup and two contained mobile rows.
+
+Owned app/SMTP fixtures have exited, and the owned portable PostgreSQL cluster was stopped cleanly. No listeners remain on 3100–3126 or 15432/15434/15435. The eight pre-existing staged coordinator documents are preserved; task-owned source/tests/docs are staged without generated/local/database artifacts. No commit, push, server/provider change or deployment was performed. Proposed owner commit message: `feat: add compact planner filters across views`.
+
+### Limits and review
+
+No physical Android, other browser engine, Ubuntu/proxy/TLS/Mailcow/provider, fresh install/audit, container runtime, default Turbopack or deployment verification is claimed. Existing pinned dependency and earlier fresh/populated schema proofs are carried evidence, not reruns. No production backup/restore/server action, commit or push was performed. Task 023's Follow creation/custom scope, selected-only palette, preview/project-color/Agenda redesign remains deferred. Review this candidate independently before starting 023.
+
+## Independent review — 2026-11-16
+
+Reviewed staged 022 source/tests above accepted `1e08a80`; the prior eight staged coordinator documents were preserved. No actionable findings. Shared controls/history, applied/proposed state separation, scoped metadata/stale replies, Projects ancestry/date/order predicates, completion metadata, Calendar portal/date navigation and existing work/session recovery meet the task's bounded scope. No runtime/test correction was made by the coordinator. **Accepted for integration; 023 may be assigned separately after owner integration.**
+
+Independent `npm run check`, `npm run db:validate`, guarded Prisma migration status (15 applied, none pending) and `npm run build -- --webpack` passed. After the build completed, full backend/unit verification passed **161/161 across 17 files**, exit 0:
+
+```powershell
+node .local/task014-command.mjs integration --reporter=json --outputFile=.local/coordinator-review022-tests.json
+```
+
+Independent affected browser verification passed **25 cases / zero failures / three intentional Android mouse-only skips, 28 total, 6.3 minutes, exit 0**:
+
+```powershell
+node .local/task014-command.mjs browser compact-filters.spec.ts board.spec.ts calendar.spec.ts calendar-drop-preview.spec.ts task-labels.spec.ts task-order.spec.ts tag-recovery.spec.ts session-isolation.spec.ts --grep 'compact multi-pickers|Board Advanced|Calendar Advanced|late tag choices|compact cards use|Scoped custom tag filters|custom tag edits persist independently|filtered or incomplete sibling|work drops distinguish|calendar marks failed scopes|filter/range/session invalidation|verified membership loss|same-cookie tabs|Board 503 recovery'
+```
+
+The inspected ignored adapter supplies guarded loopback 15432 process URLs; portable equivalents are README `npm test` and `npm run test:e2e --` with the same arguments. All eight new cases passed on desktop/Pixel 7. Existing checks independently confirm Calendar assignment/range/gesture guards and revocation, Board controls and 503 tag recovery, same-cookie account isolation, cross-view tags, retained work/comment/list drafts and incomplete sibling-order guards. The skips are existing real-mouse tests on Android; explicit/touch cases passed. Representative supplied/regenerated Light/Dark/System captures were inspected for containment, long names and mobile rows.
+
+The initial restricted build attempt hit a local output-directory permission error; the permitted rebuild passed. The first backend/migration attempt lost the portable database process and failed setup; restarting the owned database persistently yielded the passing complete rerun above. Neither is attributed to application behavior. Saved environments were unchanged. No schema/dependency/migration change required a new preservation proof. Earlier implementer complete-suite results/corrections remain separate; this is not a new all-green full application browser run. Physical Android, other engines, server/proxy/provider, fresh install/audit/container/default bundler and deployment remain unverified. All owned review services were stopped and listeners checked; documentation only was updated/staged, with no commit, push or deployment.

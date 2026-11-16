@@ -293,20 +293,20 @@ test("filter/range/session invalidation cannot restore a phantom preview or save
   await move(page, p);
   await expect(preview(page)).toHaveAttribute("data-drop-valid", "true");
   await page
-    .getByRole("textbox", { name: "Search work and block labels", exact: true })
+    .getByRole("textbox", { name: "Search work and blocks", exact: true })
     .fill("Hidden source");
   await expect(preview(page)).toHaveCount(0);
   await move(page, p);
   await page.mouse.up();
   expect(changes).toEqual([]);
   await page
-    .getByRole("button", { name: "Clear Calendar filters", exact: true })
+    .getByRole("button", { name: "Clear filters", exact: true })
     .focus();
   // Deliberate activation follows dnd-kit's 50ms residual-click capture.
   await page.keyboard.press("Space", { delay: 75 });
   await expect(
     page.getByRole("textbox", {
-      name: "Search work and block labels",
+      name: "Search work and blocks",
       exact: true,
     }),
   ).toHaveValue("");
@@ -361,6 +361,7 @@ test("filter/range/session invalidation cannot restore a phantom preview or save
   await move(page, p);
   await expect(preview(page)).toHaveCount(0);
   await hold(page);
+  p = await point(page, "12:00:00", "2030-06-04");
   await move(page, p);
   await expect(preview(page)).toBeVisible();
   await cancel(page);
@@ -462,7 +463,7 @@ test("failed work context clears held feedback and cannot make hidden blocks ass
   await page.getByLabel("Date", { exact: true }).fill("2030-06-03");
   await page.getByLabel("View", { exact: true }).selectOption("day");
   await page
-    .getByRole("textbox", { name: "Search work and block labels", exact: true })
+    .getByRole("textbox", { name: "Search work and blocks", exact: true })
     .fill("Preview project");
   const p = await point(page, "12:00:00"),
     changes = writes(page);

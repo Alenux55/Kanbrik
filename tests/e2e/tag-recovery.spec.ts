@@ -85,7 +85,7 @@ for (const failure of ["503", "conflict", "lost response"] as const) {
       .fill("Retained list input");
     await retained(page);
     await page.getByRole("link", { name: "Board", exact: true }).click();
-    await page.getByRole("button", { name: /^Filters \(/ }).click();
+    await page.getByRole("button", { name: /^Advanced/ }).click();
     await page
       .getByRole("checkbox", {
         name: "Tag recovery shared (shared)",

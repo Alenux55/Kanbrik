@@ -1,3 +1,4 @@
+import { picker, finishPicker, tagMode } from "./filter-helpers";
 import { randomUUID } from "node:crypto";
 import { test, expect } from "./fixtures";
 import {
@@ -104,10 +105,7 @@ test("Scoped custom tag filters compose across views without hiding child contex
     if (r.method() !== "GET" && /\/tasks(?:\/|$)|time-blocks/.test(r.url()))
       writes++;
   });
-  let filter = page.getByRole("group", {
-    name: "Task tag filters",
-    exact: true,
-  });
+  let filter = await picker(page, "Tags");
   await filter
     .getByRole("checkbox", { name: /^Important \(/ })
     .first()
@@ -128,26 +126,24 @@ test("Scoped custom tag filters compose across views without hiding child contex
   await expect(
     page.getByText("Matching tasks: 4 of 6 total.", { exact: false }),
   ).toBeVisible();
-  await filter
-    .getByRole("combobox", { name: "Match selected tags", exact: true })
-    .selectOption("all");
+  filter = await tagMode(page, "all");
   await expect(
     page.getByText("Matching tasks: 1 of 6 total.", { exact: false }),
   ).toBeVisible();
   await filter
-    .getByRole("button", { name: "Clear tag filters", exact: true })
+    .getByRole("button", { name: "Clear selection", exact: true })
     .click();
   await page.getByRole("link", { name: "Board", exact: true }).click();
-  await page.getByRole("button", { name: /^Filters \(/ }).click();
+  await page.getByRole("button", { name: /^Advanced/ }).click();
   const dialog = page.getByRole("dialog", {
-    name: "Board filters",
+    name: "Board advanced filters",
     exact: true,
   });
   await dialog.getByLabel("Label shared (shared)", { exact: true }).check();
-  filter = dialog.getByRole("group", {
-    name: "Task tag filters",
-    exact: true,
-  });
+  await dialog
+    .getByRole("button", { name: "Apply filters", exact: true })
+    .click();
+  filter = await picker(page, "Tags");
   await filter
     .getByRole("checkbox", { name: /^Important \(/ })
     .first()
@@ -155,9 +151,7 @@ test("Scoped custom tag filters compose across views without hiding child contex
   await filter
     .getByRole("checkbox", { name: /^Important \(Label shared\)/ })
     .check();
-  await dialog
-    .getByRole("button", { name: "Apply filters", exact: true })
-    .click();
+  await finishPicker(page);
   await expect(
     page.getByText("Matching tasks: 4 of 7 total.", { exact: false }),
   ).toBeVisible();
@@ -174,7 +168,7 @@ test("Scoped custom tag filters compose across views without hiding child contex
   ).toBe(200);
   await page.getByRole("link", { name: "Calendar", exact: true }).click();
   await page.getByLabel("Date", { exact: true }).fill("2030-06-03");
-  filter = page.getByRole("group", { name: "Task tag filters", exact: true });
+  filter = await picker(page, "Tags");
   await filter
     .getByRole("checkbox", { name: /^Important \(/ })
     .first()
@@ -205,22 +199,21 @@ test("Scoped custom tag filters compose across views without hiding child contex
       exact: false,
     }),
   ).toBeVisible();
-  await filter
-    .getByRole("combobox", { name: "Match selected tags", exact: true })
-    .selectOption("all");
+  filter = await tagMode(page, "all");
   await expect(
     page.getByText("Matching Total blocks in range: 2 of 7 total", {
       exact: false,
     }),
   ).toBeVisible();
   await filter
-    .getByRole("button", { name: "Clear tag filters", exact: true })
+    .getByRole("button", { name: "Clear selection", exact: true })
     .click();
   await expect(
     page.getByText("Total blocks in range: 7.", { exact: false }),
   ).toBeVisible();
+  await finishPicker(page);
   const search = page.getByRole("textbox", {
-    name: "Search work and block labels",
+    name: "Search work and blocks",
     exact: true,
   });
   await search.fill("Context parent");
@@ -244,10 +237,8 @@ test("Scoped custom tag filters compose across views without hiding child contex
       exact: false,
     }),
   ).toBeVisible();
-  const projectFilters = page.getByRole("group", {
-    name: "Calendar project and text filters",
-    exact: true,
-  });
+  await finishPicker(page);
+  const projectFilters = await picker(page, "Project");
   await projectFilters
     .getByRole("checkbox", { name: /^Label project \(/ })
     .check();
@@ -256,14 +247,15 @@ test("Scoped custom tag filters compose across views without hiding child contex
       exact: false,
     }),
   ).toBeVisible();
+  await finishPicker(page);
   await search.fill("Label project");
   await expect(
     page.getByText("Matching Total blocks in range: 5 of 7 total", {
       exact: false,
     }),
   ).toBeVisible();
-  await projectFilters
-    .getByRole("button", { name: "Clear Calendar filters", exact: true })
+  await page
+    .getByRole("button", { name: "Clear filters", exact: true })
     .click();
   await expect(
     page.getByText("Total blocks in range: 7.", { exact: false }),
@@ -343,17 +335,9 @@ test("custom tag edits persist independently and filtered-out work/comment/list 
     .fill("Keep filtered list");
   await retained(page);
   await page.getByRole("link", { name: "Board", exact: true }).click();
-  await page.getByRole("button", { name: /^Filters \(/ }).click();
-  const dialog = page.getByRole("dialog", {
-    name: "Board filters",
-    exact: true,
-  });
-  await dialog
-    .getByLabel("Title search", { exact: true })
+  await page
+    .getByRole("textbox", { name: "Search task titles", exact: true })
     .fill("No matching title");
-  await dialog
-    .getByRole("button", { name: "Apply filters", exact: true })
-    .click();
   await expect(
     page.getByRole("article", { name: task.title, exact: true }),
   ).toHaveCount(0);

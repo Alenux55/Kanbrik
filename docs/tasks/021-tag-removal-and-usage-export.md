@@ -1,6 +1,6 @@
 # 021: Reviewed tag removal, usage export and recovery
 
-Status: Task 021's tag-removal change independently accepted at `4524fd4` on 2026-11-15 with no actionable feature defect. Deployment is held for separately confirmed baseline P1 [024: authentication submission safety](024-auth-form-submission-safety.md), not introduced by 021. Full-suite limitations remain explicit below; no single green final full run is claimed. Tasks 022–023 remain unimplemented and follow the priority security correction.
+Status: Task 021's tag-removal change independently accepted at `4524fd4` on 2026-11-15 with no actionable feature defect. The separate baseline P1 [024](024-auth-form-submission-safety.md) is now independently closed at `1e08a80`, lifting the deployment hold. Full-suite limitations remain explicit below; no single green final full run is claimed. Tasks 022–023 remain unimplemented.
 
 ## Outcome and confirmed decision
 

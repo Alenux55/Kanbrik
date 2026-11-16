@@ -4,7 +4,9 @@ import {
   matchesCalendarBlock,
 } from "@/lib/calendar-filters";
 import { labelsActive } from "@/lib/task-labels";
-import { TaskLabelBadges, TaskLabelFilter } from "./task-labels";
+import { TaskLabelBadges } from "./task-labels";
+import { PlannerFilters, TagMatchControl } from "./planner-filters";
+import { EditorDialog } from "./ui/editor-dialog";
 import { statusName } from "@/lib/task-statuses";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -75,6 +77,10 @@ export function CalendarPlanner() {
   const session = usePlannerSession();
   const [lease] = useState(session.capture);
   const context = usePlannerContext();
+  const store = usePlanningDrafts();
+  const [filterHost, setFilterHost] = useState<HTMLDivElement | null>(null);
+  const [panel, setPanel] = useState(false);
+  const [matchAll, setMatchAll] = useState(false);
   const [prefs, setPrefs] = useState<Pref | null>(null);
   const [ids, setIds] = useState<string[]>([]);
   const [day, setDay] = useState("");
@@ -119,7 +125,7 @@ export function CalendarPlanner() {
     };
     // Preference reload preserves date; display zone comes only from account settings.
   }, [session, lease, preferenceRetry]);
-  async function apply(selected = ids) {
+  async function apply(selected = ids, tagsAll = matchAll) {
     if (busy.current) return;
     busy.current = true;
     setPending(true);
@@ -135,6 +141,11 @@ export function CalendarPlanner() {
       if (session.isCurrent(lease)) {
         setPrefs((current) => current && { ...current, ...saved });
         setIds(saved.workspaceIds);
+        store.setViewLabels((current) => ({
+          ...current,
+          calendar: { ...current.calendar, matchAll: tagsAll },
+        }));
+        setPanel(false);
         setEditing(null);
       }
     } catch {
@@ -173,7 +184,7 @@ export function CalendarPlanner() {
       <p className="mt-3">
         Scheduling never changes task status. Saves require a connection.
       </p>
-      {error && (
+      {error && !panel && (
         <p role="alert" className="mt-4 text-red-800">
           {error}
         </p>
@@ -199,45 +210,55 @@ export function CalendarPlanner() {
         <p role="status">Loading preferences…</p>
       ) : (
         <>
-          <fieldset
-            disabled={pending}
-            className="my-5 space-y-3 rounded border p-4"
-          >
-            <legend>Calendar workspaces (independent of Board)</legend>
-            <div className="flex flex-wrap gap-3">
-              {prefs.workspaces.map((w) => (
-                <label
-                  className="flex min-h-12 min-w-0 items-center gap-2"
-                  key={w.id}
-                >
-                  <input
-                    type="checkbox"
-                    checked={ids.includes(w.id)}
-                    onChange={(event) =>
-                      setIds((current) =>
-                        event.target.checked
-                          ? [...current, w.id]
-                          : current.filter((id) => id !== w.id),
-                      )
-                    }
-                  />
-                  <span>
-                    {w.name} ({w.kind})
-                  </span>
-                </label>
-              ))}
-            </div>
-            <button
-              className={button}
-              onClick={() => void apply()}
-              disabled={pending}
+          {panel && (
+            <EditorDialog
+              title="Calendar advanced filters"
+              dirty={false}
+              pending={pending}
+              close={() => {
+                setIds(prefs.workspaceIds);
+                setError("");
+                setPanel(false);
+              }}
+              discard={() => {}}
             >
-              {pending ? "Saving…" : "Apply calendar preferences"}
-            </button>{" "}
-            <button className={button} onClick={() => setIds([])}>
-              Clear calendar selection
-            </button>
-          </fieldset>
+              {error && <p role="alert">{error}</p>}
+              <form
+                className="space-y-4"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void apply();
+                }}
+              >
+                <fieldset disabled={pending} className="space-y-3">
+                  <legend>Calendar workspaces (independent of Board)</legend>
+                  {prefs.workspaces.map((w) => (
+                    <label
+                      key={w.id}
+                      className="flex min-h-11 items-center gap-2"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={ids.includes(w.id)}
+                        onChange={(event) =>
+                          setIds((current) =>
+                            event.target.checked
+                              ? [...current, w.id]
+                              : current.filter((id) => id !== w.id),
+                          )
+                        }
+                      />
+                      {w.name} ({w.kind})
+                    </label>
+                  ))}
+                  <TagMatchControl value={matchAll} change={setMatchAll} />
+                  <button className={button}>
+                    {pending ? "Saving…" : "Apply filters"}
+                  </button>{" "}
+                </fieldset>
+              </form>
+            </EditorDialog>
+          )}
           <p>
             Display zone: {context.zone}.{" "}
             <Link className="underline" href="/settings">
@@ -250,22 +271,18 @@ export function CalendarPlanner() {
               <button
                 className={button}
                 onClick={() =>
-                  void apply([
-                    ...prefs.workspaceIds,
-                    context.defaultWorkspaceId,
-                  ])
+                  void apply(
+                    [...prefs.workspaceIds, context.defaultWorkspaceId],
+                    store.viewLabels.calendar.matchAll,
+                  )
                 }
               >
                 Show creation workspace
               </button>
             </p>
           )}
-          {dirty || pending ? (
-            <p role="status">
-              Unsaved preferences. Apply them to display the calendar. Any
-              gesture is canceled.
-            </p>
-          ) : (
+          <div ref={setFilterHost} />
+          {
             <>
               <div className="my-4 flex flex-wrap items-end gap-3">
                 <label>
@@ -336,22 +353,31 @@ export function CalendarPlanner() {
                 {range &&
                   `${display(range.start, context.zone)} – ${display(range.end, context.zone)}`}
               </p>
-              {range && (
-                <CalendarScope
-                  key={`${preferenceRetry}:${prefs.workspaceIds.join(",")}:${context.zone}:${day}:${view}`}
-                  workspaces={prefs.workspaces}
-                  visibleIds={prefs.workspaceIds}
-                  zone={context.zone}
-                  day={day}
-                  view={view}
-                  range={range}
-                  editing={editing}
-                  setEditing={setEditing}
-                  revoked={revoked}
-                />
-              )}
             </>
-          )}
+          }
+          <>
+            {range && (
+              <CalendarScope
+                key={`${preferenceRetry}:${prefs.workspaceIds.join(",")}:${context.zone}:${day}:${view}`}
+                workspaces={prefs.workspaces}
+                visibleIds={prefs.workspaceIds}
+                zone={context.zone}
+                day={day}
+                view={view}
+                range={range}
+                editing={editing}
+                setEditing={setEditing}
+                revoked={revoked}
+                filterHost={filterHost}
+                advanced={() => {
+                  setIds(prefs.workspaceIds);
+                  setMatchAll(store.viewLabels.calendar.matchAll);
+                  setPanel(true);
+                }}
+                paused={panel || pending}
+              />
+            )}
+          </>
         </>
       )}
     </section>
@@ -368,6 +394,9 @@ function CalendarScope({
   editing,
   setEditing,
   revoked,
+  advanced,
+  paused,
+  filterHost,
 }: {
   workspaces: WorkspaceSummary[];
   visibleIds: string[];
@@ -378,6 +407,9 @@ function CalendarScope({
   editing: string | null;
   setEditing: (id: string | null) => void;
   revoked: (id: string) => void;
+  advanced: () => void;
+  paused: boolean;
+  filterHost: HTMLDivElement | null;
 }) {
   const session = usePlannerSession();
   const [lease] = useState(session.capture);
@@ -402,11 +434,11 @@ function CalendarScope({
     session,
     lease,
     context: scopes,
-    filter: store.viewLabels.calendar,
+    filter: paused ? null : store.viewLabels.calendar,
     resolve: resolveDrop,
   });
   function resolveDrop(sourceId: string, point: Point) {
-    if (!root.current || !scopes) return null;
+    if (paused || !root.current || !scopes) return null;
     const filter = store.viewLabels.calendar;
     const item = scopes
       .flatMap((s) => s.work)
@@ -864,90 +896,51 @@ function CalendarScope({
       {savingKeys.some((key) => key.startsWith("calendar:")) && (
         <p role="status">Saving Calendar change…</p>
       )}
-      <TaskLabelFilter
-        value={labelFilter}
-        onChange={(value) =>
-          store.setViewLabels((current) => ({ ...current, calendar: value }))
-        }
-      />
-      <fieldset
-        aria-label="Calendar project and text filters"
-        className="my-3 min-w-0 space-y-2 rounded border p-3"
-      >
-        <legend>Filter and search</legend>
-        <label className="block">
-          Search work and block labels
-          <input
-            className={control}
-            value={labelFilter.search ?? ""}
-            onChange={(e) =>
+      {filterHost &&
+        createPortal(
+          <PlannerFilters
+            value={labelFilter}
+            change={(value) =>
               store.setViewLabels((current) => ({
                 ...current,
-                calendar: { ...current.calendar, search: e.target.value },
+                calendar: value,
               }))
             }
-          />
-        </label>
-        <div className="flex max-h-40 flex-wrap gap-2 overflow-y-auto">
-          {[
-            ...work
-              .filter((item) => item.kind === "project")
+            workspaceIds={visibleIds}
+            projects={work
+              .filter(
+                (item) =>
+                  item.kind === "project" &&
+                  visibleIds.includes(item.workspaceId) &&
+                  context.workspaces.some(
+                    (workspace) => workspace.id === item.workspaceId,
+                  ),
+              )
               .map((item) => ({
                 id: item.id,
-                title: `${item.title} (${scopes.find((s) => s.workspace.id === item.workspaceId)?.workspace.name})`,
-              })),
-            { id: "standalone", title: "Standalone work / unassigned blocks" },
-          ].map((project) => (
-            <label
-              key={project.id}
-              className="inline-flex min-h-11 max-w-full items-center gap-2 break-words"
-            >
-              <input
-                type="checkbox"
-                checked={projectFilter.includes(project.id)}
-                onChange={(e) =>
-                  store.setViewLabels((current) => ({
-                    ...current,
-                    calendar: {
-                      ...current.calendar,
-                      projects: e.target.checked
-                        ? [...projectFilter, project.id]
-                        : projectFilter.filter((id) => id !== project.id),
-                    },
-                  }))
-                }
-              />
-              {project.title}
-            </label>
-          ))}
-        </div>
-        <p>
-          Project, tag and text filters combine with AND. Text searches titles,
-          descriptions, displayed project/parent names and block labels.
-          Comments/history are excluded. Task tags apply to the task palette and
-          every task-linked block; project-only and unassigned blocks have no
-          task tags. Block editors offer all authorized active work. Hidden
-          reservations remain saved and cannot be drop targets.
-        </p>
-        <button
-          type="button"
-          className={button}
-          onClick={() =>
-            store.setViewLabels((current) => ({
-              ...current,
-              calendar: {
-                tagIds: [],
-                tagScopes: {},
-                matchAll: false,
-                projects: [],
-                search: "",
-              },
-            }))
-          }
-        >
-          Clear Calendar filters
-        </button>
-      </fieldset>
+                title:
+                  item.title +
+                  " (" +
+                  scopes.find(
+                    (scope) => scope.workspace.id === item.workspaceId,
+                  )?.workspace.name +
+                  ")",
+              }))}
+            projectError={
+              scopes.some(
+                (scope) =>
+                  visibleIds.includes(scope.workspace.id) && scope.pickerFailed,
+              )
+                ? "Project choices incomplete. Filters kept; refresh to retry."
+                : undefined
+            }
+            disabled={paused}
+            placeholder="Search work and blocks"
+            advancedCount={Number(labelFilter.matchAll)}
+            advanced={advanced}
+          />,
+          filterHost,
+        )}
       <p className="my-3">
         {displayFiltering ? "Matching" : ""} {incomplete ? "Loaded" : "Total"}{" "}
         blocks in range: {all.length}

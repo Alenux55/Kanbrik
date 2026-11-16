@@ -5,6 +5,10 @@ export type LabelFilter = {
   matchAll: boolean;
   projects?: string[];
   search?: string;
+  createdFrom?: string;
+  createdTo?: string;
+  editedFrom?: string;
+  editedTo?: string;
 };
 export const emptyLabelFilter: LabelFilter = {
   tagIds: [],

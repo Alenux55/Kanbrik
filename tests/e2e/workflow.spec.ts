@@ -146,7 +146,7 @@ test("owner configures workspace defaults and completion metadata without rewrit
   await expect(
     page.getByRole("region", { name: "Verified column", exact: true }),
   ).toContainText(task.title);
-  await page.getByRole("button", { name: /^Filters \(/ }).click();
+  await page.getByRole("button", { name: /^Advanced/ }).click();
   await page
     .getByRole("checkbox", { name: "Hide completed", exact: true })
     .check();

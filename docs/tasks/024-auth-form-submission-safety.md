@@ -1,6 +1,6 @@
 # 024: Prevent credential URLs before authentication forms hydrate
 
-Status: Priority P1 baseline security finding independently reproduced on 2026-11-15 during task 021 review at `4524fd4`. Not introduced by task 021 and not fixed by changing planner fixtures. Implement and independently re-review before another server deployment or lower-priority feature work. Implemented and locally verified for independent re-review on 2026-11-15. The P1/deployment hold remains until the coordinator independently closes it; no deployment is performed.
+Status: Original P1 independently closed at owner-committed `1e08a80` on 2026-11-15. No new actionable findings in the correction review; the deployment hold is lifted. Task 021's feature acceptance remains intact, and 022 is ready for a separate assignment. Original reproduction, implementation evidence and current independent verification remain separately recorded below. No deployment was performed by review.
 
 ## Outcome and inputs
 
@@ -75,3 +75,19 @@ Four empty/unfilled JavaScript-disabled sign-in/sign-up screenshots were capture
 Task 024 is complete for independent re-review, above `4524fd4`. **Do not lift the deployment hold until that review closes the P1.** Existing tag/workspace/data behavior and 022/023 plans remain unchanged. No full authentication without JavaScript, new stack, secret rotation, user-data cleanup, SSH/provider action, commit, push or deployment was performed.
 
 The owned portable PostgreSQL cluster and all app/SMTP fixtures stopped cleanly. A listener check found **3100–3126 and 15432/15434/15435 closed**. Saved `.env`/credentials are unchanged; local proof/log/image/generated artifacts stay ignored. Task-owned files are staged with the eight preserved coordinator input documents (15 files total). Git whitespace/local Markdown links are checked. Proposed commit message: `fix: prevent credential URLs before auth forms hydrate`.
+
+## Independent correction review — 2026-11-15
+
+Reviewed clean owner-committed `1e08a80` against `4524fd4`. The shared readiness gate, explicit HTML POST target and reject-only handler close the demonstrated native GET path without altering normal identity, registration/invitation, session, token-fragment or workspace policy. The fallback reads no body and performs no auth/data/cookie action. No schema, applied migration, dependency or environment change exists. No new actionable defect was found; the original P1 is closed and the deployment hold is lifted.
+
+Independent lint/types, schema validation, all-15 migration status (none pending) and Webpack build passed. The full backend/unit run passed **156/156 across 16 files**, exit 0, after the build completed. Focused browser verification passed **34/34 cases, zero failures/skips, 7.1 minutes, exit 0**. All 18 new safety cases passed on desktop and Pixel 7, including actual delayed script release, preserved autofill, native bypass, pending exclusion, fallback body/cookie/session invariants and recovery/invitation audit. Normal signup/sign-in/error/confirmation/Back, production signup closure, Origin/keyboard behavior, local SMTP recovery/invitations, HTTPS preview/secure cookies and same-cookie cross-tab/account/logout behavior also passed.
+
+Exact focused command used the inspected ignored process-only guarded 15432 adapter (portable equivalent: README `npm run test:e2e --` with the same arguments):
+
+```powershell
+node .local/task014-command.mjs browser auth-submission-safety.spec.ts auth.spec.ts password-recovery.spec.ts invitations.spec.ts preview.spec.ts session-isolation.spec.ts --grep 'safe native submission|delayed hydration|closed registration still|recovery and invitation forms|native fallback rejects|signup, session refresh|deployed-mode registration|untrusted auth origins|forgot password explains|password recovery delivers|administrator emails|HTTPS preview accounts|same-cookie tabs'
+```
+
+The explicit title filter excludes Calendar preview cases that the filename alone would also match. These coordinator runs are separate from the implementer's 48-pass/six-skip selection and prior qualified whole-application runs; no new complete application browser pass is claimed. No schema preservation rerun was needed for this code-only correction. Physical Android/password-manager products, other engines, Ubuntu/proxy/provider operation, install/audit/default Turbopack/container runtime and historical exposure investigation remain unverified/out of scope.
+
+The separate ignored `.local/review024-native-auth.mjs` independently repeated all eight original desktop/Pixel 7 × sign-in/sign-up × JavaScript-disabled/scripts-blocked combinations on owned loopback app 3115. Even with disabled fieldsets deliberately bypassed, every attempt used POST to `/auth/form-unavailable`, received 400, kept secrets out of URLs/response text and emitted no cookie. Only sanitized methods/field-presence/boolean outcomes were recorded; no populated-form screenshots, traces, credential values or real accounts were used. The owned app and test database were stopped; no review listeners remain. Saved environments are unchanged. Documentation only is updated/staged; no runtime edit, commit, push or deployment was performed by review.

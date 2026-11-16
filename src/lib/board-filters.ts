@@ -27,6 +27,11 @@ export const emptyBoardFilters: BoardFilters = {
   matchAll: false,
 };
 export function dateBounds(from: string, to: string, zone: string) {
+  if (
+    (from && !/^\d{4}-\d{2}-\d{2}$/.test(from)) ||
+    (to && !/^\d{4}-\d{2}-\d{2}$/.test(to))
+  )
+    return null;
   const start = from ? DateTime.fromISO(from, { zone }).startOf("day") : null;
   const end = to
     ? DateTime.fromISO(to, { zone }).plus({ days: 1 }).startOf("day")

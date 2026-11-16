@@ -481,7 +481,12 @@ test("obsolete Trash replies cannot retire a newer account's draft or release it
       data: { defaultWorkspaceId: ws.id },
     });
     await page.goto("/projects");
-    await expect(page.getByText("Projects and tasks in Account Trash. Saves require a connection.", {exact:true})).toBeVisible();
+    await expect(
+      page.getByText(
+        "Projects and tasks in Account Trash. Saves require a connection.",
+        { exact: true },
+      ),
+    ).toBeVisible();
     await openTask(page, task.title);
     await page
       .getByRole("button", { name: "Preview Move to Trash", exact: true })
@@ -524,7 +529,12 @@ test("obsolete Trash replies cannot retire a newer account's draft or release it
       .selectOption(ws.id);
     // Selecting starts an asynchronous preference save. Do not expand the old
     // workspace's list while the new scope is still being rendered.
-    await expect(page.getByText("Projects and tasks in Account Trash. Saves require a connection.", {exact:true})).toBeVisible();
+    await expect(
+      page.getByText(
+        "Projects and tasks in Account Trash. Saves require a connection.",
+        { exact: true },
+      ),
+    ).toBeVisible();
     await openTask(page, task.title);
     await page.getByLabel("Title", { exact: true }).fill("New account input");
     await page.route(
@@ -625,11 +635,12 @@ test("a collaborator's Trash does not revoke workspace access or erase unrelated
       .fill("Keep unrelated input");
     await retained(page);
     await page.getByRole("link", { name: "Calendar", exact: true }).click();
+    await page.getByRole("button", { name: /^Advanced/ }).click();
     await page
       .getByRole("checkbox", { name: "Peer Trash (shared)", exact: true })
       .check();
     await page
-      .getByRole("button", { name: "Apply calendar preferences", exact: true })
+      .getByRole("button", { name: "Apply filters", exact: true })
       .click();
     await page
       .getByRole("button", {

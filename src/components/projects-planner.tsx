@@ -8,8 +8,22 @@ import type { TaskOrderRecord } from "@/lib/task-order-contracts";
 import { useEffect, useRef, useState } from "react";
 import type { WorkspaceSummary } from "@/lib/workspace-contracts";
 import type { ProjectRecord, TaskRecord } from "@/lib/planning-contracts";
-import { matchesLabels, labelsActive } from "@/lib/task-labels";
-import { TaskLabelBadges, TaskLabelFilter } from "./task-labels";
+import {
+  matchesProjectsTask,
+  matchesProjectsProject,
+  projectsFiltered,
+  normalizeProjectsFilter,
+} from "@/lib/projects-filters";
+import type { LabelFilter } from "@/lib/task-labels";
+import {
+  PlannerFilters,
+  TagMatchControl,
+  FilterDates,
+  advancedCount,
+  validFilterDates,
+} from "./planner-filters";
+import { EditorDialog } from "./ui/editor-dialog";
+import { TaskLabelBadges } from "./task-labels";
 import { statusName } from "@/lib/task-statuses";
 import { usePlanningDrafts } from "./planning-drafts";
 import { usePlannerSession } from "./planner-session";
@@ -46,9 +60,12 @@ function WorkspacePlanning({ workspace }: { workspace: WorkspaceSummary }) {
   const [lease] = useState(session.capture);
   const { saveEpoch, expansion, setExpansion, viewLabels, setViewLabels } =
     usePlanningDrafts();
-  const labelFilter = viewLabels.projects,
-    filtering = labelsActive(labelFilter);
-  const matches = (task: TaskRecord) => matchesLabels(task, labelFilter);
+  const labelFilter = normalizeProjectsFilter(viewLabels.projects),
+    filtering = projectsFiltered(labelFilter);
+  const matches = (task: TaskRecord) =>
+    matchesProjectsTask(task, labelFilter, context.zone);
+  const [advanced, setAdvanced] = useState(false);
+  const [proposal, setProposal] = useState<LabelFilter>(labelFilter);
   const [data, setData] = useState<{
     projects: ProjectRecord[];
     tasks: TaskRecord[];
@@ -264,18 +281,90 @@ function WorkspacePlanning({ workspace }: { workspace: WorkspaceSummary }) {
           Refresh planning
         </button>
       </div>
-      <TaskLabelFilter
+      <PlannerFilters
+        refreshKey={epoch}
         value={labelFilter}
-        onChange={(value) =>
+        change={(value) =>
           setViewLabels((current) => ({ ...current, projects: value }))
         }
+        workspaceIds={[workspace.id]}
+        projects={(data?.projects ?? []).map((project) => ({
+          id: project.id,
+          title: project.title,
+        }))}
+        projectError={error || undefined}
+        disabled={advanced}
+        placeholder="Search project and task titles"
+        advancedCount={advancedCount(labelFilter)}
+        advanced={() => {
+          setProposal(labelFilter);
+          setAdvanced(true);
+        }}
       />
+      {advanced && (
+        <EditorDialog
+          title="Projects advanced filters"
+          dirty={false}
+          close={() => setAdvanced(false)}
+          discard={() => {}}
+        >
+          <form
+            className="space-y-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (!validFilterDates(proposal, context.zone)) return;
+              setViewLabels((current) => ({
+                ...current,
+                projects: {
+                  ...current.projects,
+                  matchAll: proposal.matchAll,
+                  createdFrom: proposal.createdFrom,
+                  createdTo: proposal.createdTo,
+                  editedFrom: proposal.editedFrom,
+                  editedTo: proposal.editedTo,
+                },
+              }));
+              setAdvanced(false);
+            }}
+          >
+            <TagMatchControl
+              value={proposal.matchAll}
+              change={(matchAll) =>
+                setProposal((current) => ({ ...current, matchAll }))
+              }
+            />
+            <FilterDates
+              value={proposal}
+              zone={context.zone}
+              change={(key, value) =>
+                setProposal((current) => ({ ...current, [key]: value }))
+              }
+            />
+            <button
+              className={button}
+              disabled={!validFilterDates(proposal, context.zone)}
+            >
+              Apply filters
+            </button>{" "}
+          </form>
+        </EditorDialog>
+      )}
       {data && filtering && (
         <p>
           Matching tasks: {data.tasks.filter(matches).length} of{" "}
           {data.tasks.length} total. Ancestors shown as context are not
-          additional matches. Clear filters to restore normal disclosures and
-          ordering controls.
+          additional matches. Matching projects:{" "}
+          {
+            data.projects.filter((project) =>
+              matchesProjectsProject(
+                project,
+                data.tasks,
+                labelFilter,
+                context.zone,
+              ),
+            ).length
+          }{" "}
+          of {data.projects.length}.
         </p>
       )}
       {error && (
@@ -290,12 +379,13 @@ function WorkspacePlanning({ workspace }: { workspace: WorkspaceSummary }) {
       ) : (
         <ul aria-label="Projects hierarchy" className="mt-5 space-y-2">
           {data.projects
-            .filter(
-              (project) =>
-                !filtering ||
-                data.tasks.some(
-                  (t) => t.projectId === project.id && matches(t),
-                ),
+            .filter((project) =>
+              matchesProjectsProject(
+                project,
+                data.tasks,
+                labelFilter,
+                context.zone,
+              ),
             )
             .map((project) => (
               <li key={project.id} className="rounded-lg border bg-white p-2">
@@ -348,36 +438,39 @@ function WorkspacePlanning({ workspace }: { workspace: WorkspaceSummary }) {
                 )}
               </li>
             ))}
-          <li className="rounded-lg border bg-white p-2">
-            <div className="flex items-center gap-2">
-              <button
-                className={button}
-                aria-label="Expand Standalone tasks"
-                aria-expanded={expanded("standalone")}
-                onClick={() => toggle("standalone")}
-              >
-                {expanded("standalone") ? "−" : "+"}
-              </button>
-              <h2 className="font-semibold">Standalone tasks</h2>
-            </div>
-            {expanded("standalone") && (
-              <>
-                {tasks(null)}
+          {(!labelFilter.projects?.length ||
+            labelFilter.projects.includes("standalone")) && (
+            <li className="rounded-lg border bg-white p-2">
+              <div className="flex items-center gap-2">
                 <button
-                  className={button + " mt-2"}
-                  onClick={() =>
-                    context.openEntity({
-                      kind: "tasks",
-                      workspaceId: workspace.id,
-                      projectId: null,
-                    })
-                  }
+                  className={button}
+                  aria-label="Expand Standalone tasks"
+                  aria-expanded={expanded("standalone")}
+                  onClick={() => toggle("standalone")}
                 >
-                  Add standalone task
+                  {expanded("standalone") ? "−" : "+"}
                 </button>
-              </>
-            )}
-          </li>
+                <h2 className="font-semibold">Standalone tasks</h2>
+              </div>
+              {expanded("standalone") && (
+                <>
+                  {tasks(null)}
+                  <button
+                    className={button + " mt-2"}
+                    onClick={() =>
+                      context.openEntity({
+                        kind: "tasks",
+                        workspaceId: workspace.id,
+                        projectId: null,
+                      })
+                    }
+                  >
+                    Add standalone task
+                  </button>
+                </>
+              )}
+            </li>
+          )}
         </ul>
       )}
     </div>

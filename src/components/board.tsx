@@ -11,18 +11,23 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import { themedTint } from "@/lib/project-palette";
-import { TaskLabelBadges, TaskLabelFilter } from "./task-labels";
+import { TaskLabelBadges } from "./task-labels";
 import { usePlannerSession } from "./planner-session";
 import { usePlanningDrafts, type PlanningDraft } from "./planning-drafts";
 import { usePlannerContext } from "./planner-context";
 import { EditorDialog } from "./ui/editor-dialog";
-import { button, control } from "./ui/planner-controls";
+import {
+  PlannerFilters,
+  TagMatchControl,
+  FilterDates,
+  advancedCount,
+  validFilterDates,
+} from "./planner-filters";
+import { button } from "./ui/planner-controls";
 import type { WorkspaceSummary } from "@/lib/workspace-contracts";
 import type { ProjectRecord, TaskRecord } from "@/lib/planning-contracts";
 import { type TaskStatus } from "@/lib/task-statuses";
 import {
-  dateBounds,
-  emptyBoardFilters,
   matchesBoard,
   projectColor,
   type BoardFilters,
@@ -37,6 +42,10 @@ export function Board() {
   const [lease] = useState(session.capture);
   const context = usePlannerContext();
   const store = usePlanningDrafts();
+  const handlers = useRef(context);
+  useEffect(() => {
+    handlers.current = context;
+  });
   const filters = store.boardFilters;
   const [prefs, setPrefs] = useState<Preferences | null>(null);
   const [error, setError] = useState("");
@@ -68,14 +77,22 @@ export function Board() {
       active = false;
     };
   }, [session, lease, epoch]);
+  const projectScope = prefs?.workspaceIds.slice().sort().join(",") ?? "";
   useEffect(() => {
     let active = true;
     Promise.all(
-      context.workspaces.map(async (w) => {
-        const r = await session.fetch(`/api/workspaces/${w.id}/projects`);
-        if (!r.ok) throw new Error();
-        return (await r.json()) as ProjectRecord[];
-      }),
+      context.workspaces
+        .filter((w) => projectScope.split(",").includes(w.id))
+        .map(async (w) => {
+          const r = await session.fetch(`/api/workspaces/${w.id}/projects`);
+          if (r.status === 404) {
+            if (active && session.isCurrent(lease))
+              handlers.current.revoke(w.id);
+            return [];
+          }
+          if (!r.ok) throw new Error();
+          return (await r.json()) as ProjectRecord[];
+        }),
     )
       .then((rows) => {
         if (active && session.isCurrent(lease)) {
@@ -89,17 +106,20 @@ export function Board() {
     return () => {
       active = false;
     };
-  }, [session, lease, context.workspaces, store.saveEpoch, epoch]);
+  }, [
+    session,
+    lease,
+    context.workspaces,
+    projectScope,
+    store.saveEpoch,
+    epoch,
+  ]);
   async function apply(ids = draftIds, applied = draftFilters) {
-    if (busy.current || !prefs) return;
+    if (busy.current || !prefs || !validFilterDates(applied, context.zone))
+      return;
     busy.current = true;
     setPending(true);
     setError("");
-    const allowedProjects = applied.projects.filter(
-      (id) =>
-        id === "standalone" ||
-        projects.some((p) => p.id === id && ids.includes(p.workspaceId)),
-    );
     try {
       const r = await session.fetch("/api/board/preferences", {
         method: "PUT",
@@ -113,7 +133,15 @@ export function Board() {
           (current) =>
             current && { ...current, workspaceIds: result.workspaceIds },
         );
-        store.setBoardFilters({ ...applied, projects: allowedProjects });
+        store.setBoardFilters((current) => ({
+          ...current,
+          matchAll: applied.matchAll,
+          hideDone: applied.hideDone,
+          createdFrom: applied.createdFrom,
+          createdTo: applied.createdTo,
+          editedFrom: applied.editedFrom,
+          editedTo: applied.editedTo,
+        }));
         setPanel(false);
       }
     } catch {
@@ -169,17 +197,6 @@ export function Board() {
         </button>
         <button
           className={button}
-          disabled={!prefs}
-          onClick={() => {
-            setDraftIds(prefs!.workspaceIds);
-            setDraftFilters(filters);
-            setPanel(true);
-          }}
-        >
-          Filters ({count})
-        </button>
-        <button
-          className={button}
           onClick={() => {
             setPrefs(null);
             setEpoch((x) => x + 1);
@@ -187,15 +204,46 @@ export function Board() {
         >
           Refresh board
         </button>
-        <button
-          className={button}
-          disabled={!prefs || pending}
-          onClick={() => void apply(prefs!.workspaceIds, emptyBoardFilters)}
-        >
-          Clear filters
-        </button>
       </div>
-      {error && <p role="alert">{error}</p>}
+      <PlannerFilters
+        refreshKey={epoch}
+        value={filters}
+        change={(value) =>
+          store.setBoardFilters((current) => ({ ...current, ...value }))
+        }
+        workspaceIds={prefs?.workspaceIds ?? []}
+        projects={projects
+          .filter(
+            (project) =>
+              prefs?.workspaceIds.includes(project.workspaceId) &&
+              context.workspaces.some(
+                (workspace) => workspace.id === project.workspaceId,
+              ),
+          )
+          .map((project) => ({
+            id: project.id,
+            title:
+              project.title +
+              " (" +
+              context.workspaces.find((w) => w.id === project.workspaceId)
+                ?.name +
+              ")",
+          }))}
+        projectError={
+          pickerError
+            ? "Project choices incomplete. Filters kept; refresh to retry."
+            : undefined
+        }
+        disabled={!prefs || pending || panel}
+        placeholder="Search task titles"
+        advancedCount={advancedCount(filters)}
+        advanced={() => {
+          setDraftIds(prefs!.workspaceIds);
+          setDraftFilters(filters);
+          setPanel(true);
+        }}
+      />
+      {error && !panel && <p role="alert">{error}</p>}
       {!prefs ? (
         <p role="status">Loading board…</p>
       ) : (
@@ -236,19 +284,24 @@ export function Board() {
             />
           ) : (
             <p>
-              No workspaces selected. Open Filters to choose visible workspaces.
+              No workspaces selected. Open Advanced to choose visible
+              workspaces.
             </p>
           )}
         </>
       )}
       {panel && prefs && (
         <EditorDialog
-          title="Board filters"
+          title="Board advanced filters"
           dirty={false}
           pending={pending}
-          close={() => setPanel(false)}
+          close={() => {
+            setPanel(false);
+            setError("");
+          }}
           discard={() => {}}
         >
+          {error && <p role="alert">{error}</p>}
           <form
             className="space-y-4"
             onSubmit={(e) => {
@@ -274,54 +327,12 @@ export function Board() {
                   {w.name} ({w.kind})
                 </label>
               ))}
-              <fieldset>
-                <legend>Projects (none means all)</legend>
-                {[
-                  { id: "standalone", title: "Standalone" },
-                  ...projects.filter((p) => draftIds.includes(p.workspaceId)),
-                ].map((p) => (
-                  <label
-                    key={p.id}
-                    className="flex min-h-11 items-center gap-2"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={draftFilters.projects.includes(p.id)}
-                      onChange={(e) =>
-                        setDraftFilters((current) => ({
-                          ...current,
-                          projects: e.target.checked
-                            ? [...current.projects, p.id]
-                            : current.projects.filter((id) => id !== p.id),
-                        }))
-                      }
-                    />
-                    {p.title}
-                  </label>
-                ))}
-                {pickerError && (
-                  <p role="alert">
-                    Project picker incomplete. Refresh board to retry; existing
-                    project filters are retained.
-                  </p>
-                )}
-              </fieldset>
-              <TaskLabelFilter
-                value={draftFilters}
-                onChange={(value) =>
-                  setDraftFilters((current) => ({ ...current, ...value }))
+              <TagMatchControl
+                value={draftFilters.matchAll}
+                change={(matchAll) =>
+                  setDraftFilters((current) => ({ ...current, matchAll }))
                 }
               />
-              <label className="block">
-                Title search
-                <input
-                  className={control}
-                  value={draftFilters.search}
-                  onChange={(e) =>
-                    setDraftFilters((f) => ({ ...f, search: e.target.value }))
-                  }
-                />
-              </label>
               <label className="flex min-h-11 items-center gap-2">
                 <input
                   type="checkbox"
@@ -335,48 +346,20 @@ export function Board() {
                 />
                 Hide completed
               </label>
-              {(
-                [
-                  ["createdFrom", "Created from"],
-                  ["createdTo", "Created through"],
-                  ["editedFrom", "Edited from"],
-                  ["editedTo", "Edited through"],
-                ] as const
-              ).map(([key, label]) => (
-                <label key={key} className="block">
-                  {label}
-                  <input
-                    type="date"
-                    className={control}
-                    value={draftFilters[key]}
-                    onChange={(e) =>
-                      setDraftFilters((f) => ({ ...f, [key]: e.target.value }))
-                    }
-                  />
-                </label>
-              ))}
-              <p className="text-sm">
-                Through dates include that entire local day. Last edited
-                includes status moves.
-              </p>
+              <FilterDates
+                value={draftFilters}
+                zone={context.zone}
+                change={(key, value) =>
+                  setDraftFilters((current) => ({ ...current, [key]: value }))
+                }
+              />
               <button
                 className={button}
                 disabled={
-                  pending ||
-                  (pickerError && !!draftFilters.projects.length) ||
-                  !dateBounds(
-                    draftFilters.createdFrom,
-                    draftFilters.createdTo,
-                    context.zone,
-                  ) ||
-                  !dateBounds(
-                    draftFilters.editedFrom,
-                    draftFilters.editedTo,
-                    context.zone,
-                  )
+                  pending || !validFilterDates(draftFilters, context.zone)
                 }
               >
-                Apply filters
+                {pending ? "Saving…" : "Apply filters"}
               </button>
             </fieldset>
           </form>

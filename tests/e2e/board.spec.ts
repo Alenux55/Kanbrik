@@ -1,3 +1,4 @@
+import { picker, finishPicker } from "./filter-helpers";
 import { randomUUID } from "node:crypto";
 import { test, expect } from "./fixtures";
 import {
@@ -11,11 +12,11 @@ import {
 import { testDB } from "../database";
 test.setTimeout(90000);
 const filters = async (page: import("@playwright/test").Page) => {
-  await expect(page.getByRole("button", { name: /^Filters \(/ })).toBeEnabled();
-  await page.getByRole("button", { name: /^Filters \(/ }).focus();
-  await page.keyboard.press("Space", { delay: 75 });
+  await page.bringToFront();
+  await expect(page.getByRole("button", { name: /^Advanced/ })).toBeEnabled();
+  await page.getByRole("button", { name: /^Advanced/ }).click();
   await expect(
-    page.getByRole("dialog", { name: "Board filters", exact: true }),
+    page.getByRole("dialog", { name: "Board advanced filters", exact: true }),
   ).toBeVisible();
 };
 test("compact cards use stable project colors, whole-card mouse dragging and touch/keyboard editors with applied filters", async ({
@@ -177,9 +178,7 @@ test("compact cards use stable project colors, whole-card mouse dragging and tou
     await saved(page);
   }
   await filters(page);
-  await page
-    .getByRole("checkbox", { name: "Project label", exact: true })
-    .check();
+  await page.getByLabel("Hide completed", { exact: true }).check();
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(
     page.getByText("Matching tasks: 3 of 3 total.", { exact: false }),
@@ -197,13 +196,9 @@ test("compact cards use stable project colors, whole-card mouse dragging and tou
   await page
     .getByRole("button", { name: "Clear filters", exact: true })
     .click();
-  await filters(page);
-  await page
-    .getByRole("checkbox", { name: "Project label", exact: true })
-    .check();
-  await page
-    .getByRole("button", { name: "Apply filters", exact: true })
-    .click();
+  const projects = await picker(page, "Project");
+  await projects.getByRole("checkbox", { name: /^Project label \(/ }).check();
+  await finishPicker(page);
   await expect(
     page.getByText("Matching tasks: 2 of 3 total.", { exact: false }),
   ).toBeVisible();
@@ -224,11 +219,9 @@ test("compact cards use stable project colors, whole-card mouse dragging and tou
       .getByRole("button")
       .evaluate((e) => getComputedStyle(e).backgroundColor),
   ).toBe(color);
-  await filters(page);
-  await page.getByLabel("Title search").fill("No matching title");
   await page
-    .getByRole("button", { name: "Apply filters", exact: true })
-    .click();
+    .getByRole("textbox", { name: "Search task titles", exact: true })
+    .fill("No matching title");
   await expect(
     page.getByText("No tasks match these filters.", { exact: true }),
   ).toBeVisible();
@@ -243,11 +236,9 @@ test("compact cards use stable project colors, whole-card mouse dragging and tou
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
-  await filters(page);
-  await page.getByLabel("Title search", { exact: true }).fill("Parent card");
   await page
-    .getByRole("button", { name: "Apply filters", exact: true })
-    .click();
+    .getByRole("textbox", { name: "Search task titles", exact: true })
+    .fill("Parent card");
   await card.getByRole("button").click();
   const filteredEdit = page.getByRole("form", {
     name: "Edit task",

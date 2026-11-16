@@ -1,6 +1,6 @@
 # 023: Calendar workspace scope and compact event presentation
 
-Status: Planned on 2026-11-15; implement after task 022 is integrated and independently reviewed. Integrate task 020's themes if present. No runtime changes or application checks were performed for this specification.
+Status: Ready for a separate implementation assignment after owner integration of the staged 022 candidate independently accepted on 2026-11-16 above `1e08a80`. The prerequisite review is satisfied; this task remains unimplemented. Integrate task 020's themes. No runtime changes or application checks were performed for this specification.
 
 ## Outcome and inputs
 
