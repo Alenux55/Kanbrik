@@ -1,6 +1,6 @@
 # 022: Compact basic and advanced filters across planner views
 
-Status: Planned on 2026-11-15; implement after settings/tag work is integrated and reviewed in the default sequence. This task does not depend technically on bulk tag removal. No runtime changes or application checks were performed for this specification.
+Status: Planned on 2026-11-15; 020/021 prerequisite feature reviews are satisfied, but prioritize baseline P1 [024](024-auth-form-submission-safety.md) before this task or server deployment. This task remains unimplemented; no application checks were performed for its specification.
 
 ## Outcome and inputs
 

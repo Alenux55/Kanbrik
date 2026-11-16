@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { button, control } from "./ui/planner-controls";
+import { SafeCredentialForm } from "./safe-credential-form";
 
 export function AcceptInvitation() {
   const [token, setToken] = useState<string | null>(null);
@@ -57,14 +58,14 @@ export function AcceptInvitation() {
   if (token === null) return <p role="status">Opening invitation…</p>;
   if (!token) return <><p>This invitation link is missing. Reopen the original email, or ask your administrator for another invitation.</p><SignIn /></>;
   return <>
-    {email ? <form onSubmit={submit} aria-busy={pending} className="space-y-5">
+    {email ? <SafeCredentialForm onSubmit={submit} pending={pending}>
       <p>Creating an account for <strong className="break-all">{email}</strong>. The invitation does not grant shared-workspace access.</p>
       <label className="block">Name<input name="name" className={control} required maxLength={100} autoComplete="name" disabled={pending} /></label>
       <label className="block">Password<input name="password" className={control} type="password" required minLength={12} maxLength={128} autoComplete="new-password" disabled={pending} /></label>
       <label className="block">Confirm your password<input ref={confirm} name="confirmation" className={control} type="password" required minLength={12} maxLength={128} autoComplete="new-password" disabled={pending} /></label>
       <p>Use at least 12 characters.</p>
       <button className={button} disabled={pending}>{pending ? "Creating account…" : "Create invited account"}</button>
-    </form> : <><p role="status">Check your invitation to continue.</p><button className={button} onClick={() => { setError(""); setAttempt(value => value + 1); }}>Retry invitation check</button></>}
+    </SafeCredentialForm> : <><p role="status">Check your invitation to continue.</p><button className={button} onClick={() => { setError(""); setAttempt(value => value + 1); }}>Retry invitation check</button></>}
     {error && <p role="alert" className="mt-4 text-red-800">{error}</p>}
     <p className="mt-5 text-sm">After reloading this page, reopen the link from your email.</p>
     <SignIn />

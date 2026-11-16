@@ -1,6 +1,6 @@
 # 021: Reviewed tag removal, usage export and recovery
 
-Status: Assigned by the owner after task 020 was independently accepted at `1f85e8a` on 2026-11-15. Task 021 implementation and scoped verification are complete for independent review. The full-suite limitation and corrected fixture reruns are recorded below; no single green final full run is claimed. Tasks 022–023 remain unimplemented.
+Status: Task 021's tag-removal change independently accepted at `4524fd4` on 2026-11-15 with no actionable feature defect. Deployment is held for separately confirmed baseline P1 [024: authentication submission safety](024-auth-form-submission-safety.md), not introduced by 021. Full-suite limitations remain explicit below; no single green final full run is claimed. Tasks 022–023 remain unimplemented and follow the priority security correction.
 
 ## Outcome and confirmed decision
 
@@ -103,3 +103,17 @@ Fresh desktop Light review, desktop Dark report, and Android Light/Dark review i
 The owned main verification PostgreSQL cluster and all app/SMTP fixtures are stopped. A listener check found verification ports **3100–3126 and 15432/15434/15435 closed**. No database reset, production/SSH/provider action, commit or push was performed. Applied migration/schema/dependency files and saved environments are unchanged. Generated/local/test artifacts are excluded. All task-owned files are staged alongside the preserved coordinator review documentation (34 files total); Git whitespace and local Markdown link checks passed. Propose commit message: `feat: add reviewed tag removal and usage reports`.
 
 Return task 021 for independent data-contract review. Tasks 022–023 remain unimplemented; permanent purge, automatic retagging/bulk undo, new roles and deployment remain outside this assignment.
+
+## Independent review — 2026-11-15
+
+Reviewed owner-committed `4524fd4` against accepted `1f85e8a`. Inspected exact-impact HMAC/export/receipt authorization, bounded atomic detachment, truthful task/config activity, exact Trash-member reconciliation, report retention/pagination, legacy archive compatibility and stale-draft review. No schema/dependency/applied-migration change is present. Independent lint/types, schema validation, all-15 migration status (none pending) and Webpack build passed. The full backend/unit run passed **156/156 checks across 16 files**, exit 0, after the build completed.
+
+Focused browser verification passed **23 cases / zero failures / three intentional Android mouse-drag skips, 26 total, 5.6 minutes, exit 0**. All ten new task 021 cases passed on desktop/Pixel 7, along with prior Board recovery/migrated-ID, shared access, deployed-signup/Origin and obsolete-Trash cases. Fresh Light/Dark review/report screenshots were inspected. No actionable defect was found in the tag-removal change; its bounded feature review is accepted. Exact command (portable equivalent: README `npm run test:e2e --` with the same arguments):
+
+```powershell
+node .local/task014-command.mjs browser tag-removal.spec.ts tag-recovery.spec.ts trash.spec.ts shared-workspaces.spec.ts auth.spec.ts --grep 'Settings removal|bulk removal preserves|stale impact|uncertain removal|obsolete account export|obsolete Trash replies|owner|Board.*recovery|migration-shaped|account survives|deployed-mode|untrusted auth'
+```
+
+The implementer's two full browser attempts remain separately qualified failures followed by targeted fixture passes, not an all-green full suite. The selector above includes deployed-mode/Origin auth cases, not the separate normal signup/session/sign-in UI case (its title does not match `account survives`); native fallback was verified independently as described below. Coordinator checks do not repeat fresh/populated schema-preservation proofs or physical-device/server/provider verification. Saved test URLs use the inspected process-only guarded loopback 15432 adapter. The owned database was stopped and review app/SMTP/database listeners are closed; no environment or runtime change was made by review.
+
+Separate baseline P1 confirmed: the pre-hydration sign-in/sign-up form can attempt native GET with password fields in the URL. Eight independent desktop/Pixel 7/script-disabled-or-blocked cases reproduced it with generated input and aborted requests, without logging values or creating accounts. This predates 021; the planner-fixture change does not fix it. [024: authentication form safety](024-auth-form-submission-safety.md) is the concrete next correction before server deployment. No runtime authentication fix was made during this review.

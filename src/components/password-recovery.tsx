@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { authClient } from "@/lib/auth-client";
 import { announceSessionChange } from "@/lib/session-signal";
+import { SafeCredentialForm } from "./safe-credential-form";
 
 const inputClass = "mt-2 block min-h-12 w-full rounded-lg border border-neutral-400 bg-white px-3 focus-visible:outline-2 focus-visible:outline-teal-700";
 const buttonClass = "min-h-12 rounded-lg bg-action px-5 py-3 text-on-action disabled:opacity-60";
@@ -26,11 +27,11 @@ export function ForgotPassword({ enabled }: { enabled: boolean }) {
   }
   if (!enabled) return <><p>Email password recovery is not configured yet. Contact the administrator for help.</p><BackToSignIn /></>;
   if (received) return <><p role="status">If an account matches that email, check your inbox for a password reset link. Check your spam folder too.</p><BackToSignIn /></>;
-  return <><p className="mb-5 leading-7 text-neutral-600">Enter your account email to request a password reset link.</p><form onSubmit={submit} aria-busy={pending} className="space-y-5">
+  return <><p className="mb-5 leading-7 text-neutral-600">Enter your account email to request a password reset link.</p><SafeCredentialForm onSubmit={submit} pending={pending}>
     <label className="block">Email<input className={inputClass} name="email" type="email" autoComplete="email" required maxLength={254} disabled={pending} /></label>
     {error && <p role="alert" className="text-red-800">{error}</p>}
     <button disabled={pending} className={buttonClass}>{pending ? "Sending…" : "Send reset link"}</button>
-  </form><BackToSignIn /></>;
+  </SafeCredentialForm><BackToSignIn /></>;
 }
 
 export function ResetPassword() {
@@ -67,12 +68,12 @@ export function ResetPassword() {
   if (complete) return <><p role="status">Your password has been reset. Sign in with your new password. Previous sessions have been signed out.</p><BackToSignIn /></>;
   if (token === null) return <p role="status">Opening reset link…</p>;
   if (!token) return <><p>This reset link is missing or invalid.</p><Link className="inline-flex min-h-12 items-center underline" href="/forgot-password">Request a new reset link</Link></>;
-  return <><p className="mb-5 text-neutral-600">Choose a new password with at least 12 characters.</p><form onSubmit={submit} aria-busy={pending} className="space-y-5">
+  return <><p className="mb-5 text-neutral-600">Choose a new password with at least 12 characters.</p><SafeCredentialForm onSubmit={submit} pending={pending}>
     <label className="block">New password<input className={inputClass} name="password" type="password" autoComplete="new-password" minLength={12} maxLength={128} required disabled={pending} /></label>
     <label className="block">Confirm your password<input ref={confirmation} className={inputClass} name="confirmPassword" type="password" autoComplete="new-password" minLength={12} maxLength={128} required disabled={pending} /></label>
     {error && <p role="alert" className="text-red-800">{error}</p>}
     <button disabled={pending} className={buttonClass}>{pending ? "Saving…" : "Reset password"}</button>
-  </form><Link href="/forgot-password" className="mt-4 inline-flex min-h-12 items-center underline">Request a new reset link</Link></>;
+  </SafeCredentialForm><Link href="/forgot-password" className="mt-4 inline-flex min-h-12 items-center underline">Request a new reset link</Link></>;
 }
 
 function BackToSignIn() { return <p className="mt-5"><Link href="/sign-in" className="inline-flex min-h-12 items-center underline">Back to sign in</Link></p>; }

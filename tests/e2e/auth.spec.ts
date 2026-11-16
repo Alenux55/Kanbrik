@@ -64,6 +64,7 @@ test("untrusted auth origins are rejected and forms remain usable with keyboard"
   });
   expect(result.status()).toBe(403);
   await page.goto("/sign-in");
+  await expect(page.getByRole("button", {name:"Sign in",exact:true})).toBeEnabled();
   await page.keyboard.press("Tab");
   await expect(page.getByLabel("Email", { exact: true })).toBeFocused();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

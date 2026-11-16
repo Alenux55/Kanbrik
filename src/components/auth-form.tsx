@@ -3,6 +3,7 @@ import { useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
 import { announceSessionChange } from "@/lib/session-signal";
+import { SafeCredentialForm } from "./safe-credential-form";
 
 export function AuthForm({ signUp, registrationEnabled }: { signUp: boolean; registrationEnabled: boolean }) {
   const [pending, setPending] = useState(false);
@@ -29,7 +30,7 @@ export function AuthForm({ signUp, registrationEnabled }: { signUp: boolean; reg
   }
   if (signUp && !registrationEnabled) return <p>Registration is disabled. <Link className="underline" href="/sign-in">Sign in</Link></p>;
   const inputClass = "mt-2 block min-h-12 w-full rounded-lg border border-neutral-400 bg-white px-3 focus-visible:outline-2 focus-visible:outline-teal-700";
-  return <form onSubmit={submit} className="space-y-5" aria-busy={pending}>
+  return <SafeCredentialForm onSubmit={submit} pending={pending}>
     {signUp && <label className="block">Name<input className={inputClass} name="name" autoComplete="name" required maxLength={100} disabled={pending} /></label>}
     <label className="block">Email<input className={inputClass} name="email" type="email" autoComplete="email" required maxLength={254} disabled={pending} /></label>
     <label className="block">Password<input className={inputClass} name="password" type="password" autoComplete={signUp ? "new-password" : "current-password"} required minLength={signUp ? 12 : undefined} maxLength={128} disabled={pending} /></label>
@@ -39,5 +40,5 @@ export function AuthForm({ signUp, registrationEnabled }: { signUp: boolean; reg
     <button disabled={pending} className="min-h-12 rounded-lg bg-action px-5 py-3 text-on-action disabled:opacity-60">{pending ? "Please wait…" : signUp ? "Create account" : "Sign in"}</button>
     {!signUp && <p><Link href="/forgot-password" className="inline-flex min-h-12 items-center underline">Forgot your password?</Link></p>}
     <p className="text-sm">{signUp ? <Link className="underline" href="/sign-in">Already have an account? Sign in</Link> : registrationEnabled ? <Link className="underline" href="/sign-up">Create an account</Link> : "Registration is disabled."}</p>
-  </form>;
+  </SafeCredentialForm>;
 }
