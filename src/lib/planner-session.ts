@@ -50,7 +50,9 @@ export class PlannerSession {
     ++this.version; this.phase("checking"); void this.verify();
   };
   verify = (blocking = true): Promise<SessionLease | null> => {
-    if (this.leaving) return Promise.resolve(null);
+    // Only explicit retry/navigation/account signals may reopen a failed gate.
+    // An older read must not implicitly retry and lift a newer failure.
+    if (this.leaving || this.snapshot.phase === "error") return Promise.resolve(null);
     if (blocking) this.phase("checking");
     const version = this.version;
     if (this.flight?.version === version) return this.flight.promise;
@@ -84,7 +86,8 @@ export class PlannerSession {
     // Consume the network body before checking context. A held A-era response
     // must not later run callbacks against a newly authenticated document.
     const body = await response.arrayBuffer();
-    if (!this.isCurrent(lease)) throw new SessionUnavailable();
+    // A late 401/412 must not turn a newer failed gate into an implicit retry.
+    if (!this.isCurrent(lease) || this.snapshot.phase === "error") throw new SessionUnavailable();
     if (response.status === 401 || response.status === 412) this.revalidate();
     const current = await this.verify(false);
     if (!current || !this.isCurrent(lease)) throw new SessionUnavailable();

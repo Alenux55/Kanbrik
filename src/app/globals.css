@@ -135,6 +135,25 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+/* Conceal every protected descendant/portal without collapsing its geometry.
+   The substitute contains no account, work, tooltip or live-region content. */
+[data-session-state="checking"],
+[data-session-state="checking"] *,
+[data-session-state="checking"] *::before,
+[data-session-state="checking"] *::after,
+[data-session-state="checking"] dialog::backdrop {
+  visibility: hidden !important;
+}
+.session-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  pointer-events: auto;
+  background-color: var(--canvas);
+  background-image: linear-gradient(var(--border-subtle) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px);
+  background-size: 100% 5rem, 12.5% 100%;
+}
 input,
 textarea,
 select {

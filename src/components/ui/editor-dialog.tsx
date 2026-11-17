@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   useSyncExternalStore,
@@ -96,6 +97,11 @@ export function EditorDialog({
     callbacks.current = { dirty, pending, close, focusAfterClose };
   }, [dirty, pending, close, focusAfterClose]);
   const source = useRef<HTMLElement | null>(null);
+  const lastFocused = useRef<HTMLElement | null>(null);
+  const paused = useRef<{
+    focus: HTMLElement | null;
+    scroll: { node: HTMLElement; top: number; left: number }[];
+  } | null>(null);
   const historyToken = useRef(heading);
   const downOnBackdrop = useRef(false);
   function requestClose() {
@@ -152,7 +158,6 @@ export function EditorDialog({
   useEffect(() => {
     alive.current = true;
     const node = dialog.current;
-    source.current = document.activeElement as HTMLElement;
     const acquire = () =>
       ownDialogHistory(
         historyToken.current,
@@ -205,20 +210,65 @@ export function EditorDialog({
             ? document.getElementById("main-content")
             : (callbacks.current.focusAfterClose?.() ?? source.current);
           if (target?.isConnected && !target.closest("[hidden]"))
-            target.focus();
-          else document.getElementById("main-content")?.focus();
+            target.focus({ preventScroll: true });
+          else
+            document
+              .getElementById("main-content")
+              ?.focus({ preventScroll: true });
         });
       };
       unsubscribe = session.subscribe(restore);
       restore();
     };
   }, [session, lease]);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const node = dialog.current;
     if (!node) return;
+    const x = window.scrollX,
+      y = window.scrollY;
     if (snapshot.phase === "ready") {
-      if (!node.open) node.showModal();
-    } else node.close();
+      if (!node.open) {
+        source.current ??= document.activeElement as HTMLElement;
+        node.showModal();
+        const previous = paused.current;
+        if (previous) {
+          const target = previous.focus;
+          if (
+            target?.isConnected &&
+            node.contains(target) &&
+            !target.matches(":disabled")
+          )
+            target.focus({ preventScroll: true });
+          else
+            node
+              .querySelector<HTMLElement>("h2")
+              ?.focus({ preventScroll: true });
+          for (const item of previous.scroll) {
+            item.node.scrollTop = item.top;
+            item.node.scrollLeft = item.left;
+          }
+          paused.current = null;
+        }
+        window.scrollTo(x, y);
+      }
+    } else if (node.open) {
+      paused.current = {
+        focus: lastFocused.current,
+        scroll: [node, ...node.querySelectorAll<HTMLElement>("*")]
+          .filter(
+            (element) =>
+              element.scrollHeight > element.clientHeight ||
+              element.scrollWidth > element.clientWidth,
+          )
+          .map((element) => ({
+            node: element,
+            top: element.scrollTop,
+            left: element.scrollLeft,
+          })),
+      };
+      node.close();
+      window.scrollTo(x, y);
+    }
   }, [snapshot.phase]);
   return (
     <NavigationContext.Provider
@@ -231,6 +281,10 @@ export function EditorDialog({
         ref={dialog}
         aria-labelledby={heading}
         className="editor-dialog"
+        onFocusCapture={(event) => {
+          if (snapshot.phase === "ready")
+            lastFocused.current = event.target as HTMLElement;
+        }}
         onCancel={(event) => {
           event.preventDefault();
           requestClose();
@@ -248,6 +302,7 @@ export function EditorDialog({
           <header className="flex shrink-0 items-center justify-between gap-3 border-b p-4">
             <h2
               id={heading}
+              tabIndex={-1}
               className="min-w-0 break-words text-xl font-semibold"
             >
               {title}

@@ -917,34 +917,47 @@ function CalendarScope({
   const selected =
     unfilteredBlocks.find((block) => block.id === editing) ??
     retained.find((draft) => draft.base?.id === editing)?.base;
+  // Input stays in the shared store while its editor/request owns it. Showing
+  // a second recovery section underneath a pending save changes page geometry.
+  const reviewable = retained.filter(
+    (draft) =>
+      draft.base!.id !== editing &&
+      !savingKeys.includes(`calendar:${draft.base!.id}`),
+  );
   const incomplete = scopes.some((scope) => scope.failed);
   return (
     <div ref={root} className="min-w-0">
-      {incomplete && (
-        <p role="alert">
-          Calendar incomplete. Failed workspaces have no editable stale events;
-          counts cover loaded scopes only. Refresh calendar to retry.
-        </p>
-      )}
-      {scopes.some((scope) => scope.pickerFailed) && (
-        <p role="alert">
-          Work picker incomplete. Assignment/create controls are unavailable for
-          failed scopes; refresh to retry.
-        </p>
-      )}
-      {error && (
-        <p role="status" className="my-3 break-words text-red-800">
-          {error}
-        </p>
-      )}
-      {notice && (
-        <p role="status" className="my-3 break-words text-teal-800">
-          {notice}
-        </p>
-      )}
-      {savingKeys.some((key) => key.startsWith("calendar:")) && (
-        <p role="status">Saving Calendar change…</p>
-      )}
+      <div
+        data-calendar-feedback
+        className="h-20 overflow-y-auto break-words py-2"
+      >
+        {incomplete && (
+          <p role="alert">
+            Calendar incomplete. Failed workspaces have no editable stale
+            events; counts cover loaded scopes only. Refresh calendar to retry.
+          </p>
+        )}
+        {scopes.some((scope) => scope.pickerFailed) && (
+          <p role="alert">
+            Work picker incomplete. Assignment/create controls are unavailable
+            for failed scopes; refresh to retry.
+          </p>
+        )}
+        {error && (
+          <p role="status" className="text-red-800">
+            {error}
+          </p>
+        )}
+        {savingKeys.some((key) => key.startsWith("calendar:")) ? (
+          <p role="status">Saving Calendar change…</p>
+        ) : (
+          notice && (
+            <p role="status" className="text-teal-800">
+              {notice}
+            </p>
+          )
+        )}
+      </div>
       {filterHost &&
         createPortal(
           <PlannerFilters
@@ -1419,6 +1432,8 @@ function CalendarScope({
           ([key, draft]) =>
             key.endsWith("/new") &&
             draft.dirty &&
+            editing !== "new" &&
+            !savingKeys.includes("calendar:" + key) &&
             scopes.some((scope) => scope.workspace.id === key.split("/")[0]),
         )
         .map(([key, draft]) => (
@@ -1435,7 +1450,7 @@ function CalendarScope({
             Review new block draft: {draft.label}
           </button>
         ))}
-      {retained.length > 0 && (
+      {reviewable.length > 0 && (
         <section
           aria-label="Retained block drafts"
           className="my-4 space-y-3 rounded border p-4"
@@ -1446,7 +1461,7 @@ function CalendarScope({
             the original input or reconcile an uncertain removal; they are not
             additional saved events.
           </p>
-          {retained.map((draft) => (
+          {reviewable.map((draft) => (
             <button
               type="button"
               key={draft.base!.id}

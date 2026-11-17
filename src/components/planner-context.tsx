@@ -232,12 +232,12 @@ export function PlannerContext({
       {notice && (
         <p
           role="status"
-          className="sticky bottom-3 z-40 mr-3 mb-3 ml-auto flex max-w-[min(30rem,90vw)] items-start gap-3 rounded border bg-teal-50 p-3 text-teal-950 shadow"
+          className="pointer-events-none fixed right-3 bottom-3 z-40 flex max-h-[40vh] max-w-[min(30rem,90vw)] items-start gap-3 overflow-y-auto rounded border bg-teal-50 p-3 text-teal-950 shadow"
         >
           <span className="min-w-0 [overflow-wrap:anywhere]">{notice}</span>
           <button
             type="button"
-            className={button + " shrink-0"}
+            className={button + " pointer-events-auto shrink-0"}
             aria-label="Dismiss save confirmation"
             onClick={() => setNotice("")}
           >

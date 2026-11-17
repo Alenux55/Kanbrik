@@ -1,5 +1,13 @@
 # Product scope
 
+## Stable saves (025 candidate) and planned touch interactions (026)
+
+Requested on 2026-11-16 after accepted 023. Task 025 is implemented pending independent review; task 026 remains **unimplemented**. The owner wants less accidental highlighting, Android long-press dragging, click-to-edit/hold-to-drag task/subtask rows without permanent Projects Drag/Move sections, live neighbour displacement during reordering and a Calendar save experience that does not resemble a page reload.
+
+[025](tasks/025-stable-save-feedback.md) retains the mounted planner and its geometry during same-account save verification. Protected content is concealed and inert under a generic, content-free veil whenever identity is uncertain. Required pre-dispatch/post-body verification, expected-account headers and account-bound invalidation remain in force; a late read (including 401/412) cannot implicitly reopen a failed session gate. Dialogs pause their native modality so Retry remains reachable, then restore input focus and internal scroll. Confirmed Calendar updates reconcile locally before authoritative refresh; reserved feedback space, non-flow confirmation notices and recovery controls shown only when needed avoid temporary page-height changes. Failed or uncertain saves retain their original input/revision/intent. The task records actual checks and limitations; no literal document reload was observed in the instrumented same-account workflow. [026](tasks/026-touch-dragging-and-sortable-feedback.md) follows its review/integration and owns scoped selection handling, genuine touch gestures across Projects/Board/Calendar, compact row activation and transient insertion feedback. Tasks reorder within their project and subtasks within their parent only. Hover previews are unsaved and send zero work mutations.
+
+Recommended defaults, not additional confirmed policy: approximately 350 ms stationary touch hold with 8–10 px tolerance, midpoint/hysteresis insertion and compact Move commands in an Actions menu for keyboard/precise non-drag use. Swiping before activation still scrolls; editing/reading text remains selectable. Projects' neighbours preview allowed sibling positions; Board previews valid columns without manual order; Calendar previews slots without automatically moving reservations. No ownership, scheduling/DST, offline, role or sharing change is assigned. Task files distinguish source-supported diagnoses from unverified symptoms.
+
 ## Confirmed direction
 
 - Kanban boards, project planning, subtasks, and configurable calendar time blocks.

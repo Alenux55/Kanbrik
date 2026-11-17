@@ -1,0 +1,59 @@
+# 026: Long-press dragging, compact rows and live insertion feedback
+
+Status: Planned on 2026-11-16 from owner feedback after accepted `499cfd3`. Implement after 025 is integrated and independently reviewed. Not implemented; no application tests were run for this specification.
+
+Suggested model: GPT-6.1 Sol, High effort. This is a recommendation, not agent configuration.
+
+## Outcome and inputs
+
+Make Projects, Board and Calendar gestures work deliberately on desktop and Android: click/tap opens the item, press/hold then move drags, ordinary swipes scroll, and a completed/cancelled drag does not open an editor. Remove Projects' always-visible Drag/Move up/Move down sections and show live neighbour displacement during allowed sibling reordering.
+
+Read AGENTS.md, README, product/architecture/current handoff, tasks 008/011/013/018/019/022/023/025 and their reviewed session/tag/order/gesture corrections. Inspect `task-order-controls.tsx`, `projects-planner.tsx`, `board.tsx`, `calendar.tsx`, drop controller/hit testing/preview, shared controls/styles and keyboard/history/session providers. Use the established drag stack; no second general drag library is assigned.
+
+## Confirmed requests, evidence and recommendations
+
+- Owner requests less accidental text highlighting, Android long-press dragging, click-to-edit/hold-to-drag Projects rows without the visible reorder-control section, live insertion feedback and a smoother Calendar save experience. 025 owns the latter.
+- Source currently uses only MouseSensor for Projects ordering, Board and Calendar palette drags, with an eight-pixel activation distance. Calendar's `eventLongPressDelay=600000` effectively disables normal mobile event dragging. This is intentional earlier behavior now superseded by this task, not evidence of a broken phone.
+- Current Projects drag targets are a separate controls strip; drop always inserts before the hovered sibling, without a provisional neighbour layout. Cards/rows lack scoped selection suppression before gesture activation. The owner's highlighting symptom still needs reproduction; do not assert its precise cause without checking it.
+- Recommended defaults, not additional owner-confirmed product policy: approximately 350 ms stationary touch hold with 8–10 CSS-pixel pre-activation movement tolerance, tuned against real touch tests; mouse press/move with a short hold/threshold that preserves normal click responsiveness; midpoint insertion with hysteresis rather than a hard bottom-third requirement. Keep these values shared/configurable in code, not a new settings page.
+- Preserve a compact accessible Actions/Move menu or equivalent non-drag move command. This replaces the permanent Move up/down section while retaining keyboard and precise touch alternatives. Long-press is an enhancement, not the only way to schedule/change status/reorder.
+
+## Scope
+
+### Selection, activation and scrolling
+
+- Reproduce the selection issue using click, slight pointer movement, repeated clicks and long press on eligible row/card surfaces. Scope nonselection/native text-drag/callout prevention to those activators and their gesture lifetime as needed. Text in inputs, descriptions, comments, notes, history and other reading surfaces remains selectable/copyable. Do not add document/body-wide user-select:none or suppress all context menus.
+- Share deliberate mouse/touch activation behavior across Projects rows, Board cards and Calendar work cards. A brief release without activation edits; a real drag/hold gesture consumes its trailing click/tap so release/cancel cannot open an editor. An intentional later click still works. Give visible lift/drag-ready feedback without requiring vibration support.
+- Movement before the hold threshold cancels drag intent and permits native vertical/horizontal scrolling. Touch cancellation, second finger, scroll, resize/orientation, navigation, Escape/Back, modal opening and session/scope/filter/access changes retire pending holds and active gestures. No timer may start a drag after its source was removed or its account changed.
+- Do not apply touch-action:none to the whole app, board, calendar or list. Choose event/sensor handling compatible with native pre-hold scrolling; prove it with actual touch events. Card-level long-press handling must avoid the browser selecting text instead of dragging, without breaking ordinary zoom/scroll or form interactions.
+- Exclude disclosure buttons, action menus, links, inputs, tag controls, resize handles and nested child rows from a parent's activator. Keep keyboard focus and semantics intact. Whole-row dragging cannot turn a child's press into a parent move or create nested buttons.
+
+### Projects: compact activation and insertion preview
+
+- Remove the permanent Drag/Move up/Move down strip. Eligible root-task/subtask row bodies open editors on click/tap and become drag surfaces after deliberate activation. Project titles still edit; disclosures still expand/collapse. Keep compact non-drag Move commands accessible from a named Actions menu, with disabled explanations where applicable.
+- Retain task 018 boundaries: roots reorder only within the same project; subtasks only within the same parent task. No project ordering, standalone-root ordering, reparenting, cross-project/workspace movement or status change is assigned. Moving a root carries its rendered subtree visually, preserving child identity/order.
+- During hover, compute a provisional sibling order and animate displaced neighbours to expose the insertion space. Example: Item 1, Item 3, Item 2 → hover Item 3 below Item 2's insertion threshold → visually preview Item 1, Item 2, Item 3 before release. Moving upward must likewise preview before/after correctly, including first/last/empty-edge targets. The midpoint recommendation may be tuned; use hysteresis so a moving placeholder does not make targets oscillate.
+- Keep preview state separate from canonical saved order and retained move intents. Hover sends zero writes and creates no saved revisions/history. Release translates the final visible placement to the existing beforeId/null contract against the original complete sibling set/revision, with at most one operation. A final no-op/cancel sends none. Do not accidentally insert before the last sibling when preview promised after it.
+- Handle expanded, variable-height and nested rows without duplicate subtree content, measurement loops or document scroll growth. Use a stable placeholder/overlay and restrained transforms; honour reduced motion. Preview is reversible on cancel/conflict/failure, and unconfirmed order remains visibly unconfirmed. Preserve original receipts/revisions and collaborator conflict/Trash/Restore behavior.
+- Active filters or incomplete sibling scopes still disable reordering. Clearing filters restores controls without losing expansion or retained work/comment/list/order proposals. Preview never reorders only the visible subset.
+
+### Board and Calendar touch gestures
+
+- Board: long press drags the whole eligible task/subtask card between valid statuses in that task's workspace. Preserve workspace-specific workflow/status metadata, save locks, tag associations, conflicts and cross-account guards. Keep native horizontal board swipe before activation. Show valid target-column/landing feedback; this task does not add persisted manual order within a column.
+- Calendar palette: long press then move can schedule an authorized visible project/task/subtask onto a valid blank slot or empty same-workspace block. Retain 023's selected-only source scope, compact project-coloured preview, zero hover writes, 15-minute snap/one-elapsed-hour creation, original label/interval assignment, occupied/foreign rejection, DST Review and one release write. Do not shift other saved reservations out of the way; overlapping blocks remain supported.
+- Calendar saved blocks: replace the deliberately disabled long-press behavior with usable touch move/resize activation supported by the installed calendar. Distinguish tap-to-edit, hold-to-move and an explicit resize affordance after selection if required. Touch scrolling before activation stays native. Preserve no-popup release/cancel, pending/dirty locks, elapsed duration, repeated/missing-time review and original revision/conflict/uncertain-intent recovery.
+- Support bounded edge scrolling only for an activated gesture within its intended scroll region. Board horizontal scrolling, Projects vertical scrolling and Calendar time/week-grid scrolling must not expand the page, lose coordinates or make overlays intercept hit testing. Recompute preview after stationary-pointer scrolling; cancellation/session invalidation stops scrolling immediately. Agenda keeps explicit scheduling/editing; no time grid is implied there.
+
+## Acceptance criteria and verification
+
+1. Desktop click and Pixel 7 tap edit; genuine touch hold/move drags on Projects, Board and Calendar palette. Saved Calendar events move/resize by touch. Short press, pre-hold swipe, second finger and cancelled hold produce no writes/editor surprise/selected-text residue. Verify a later deliberate click/tap still opens the correct editor.
+2. Touch scrolling works before activation in Projects, palette, calendar and the horizontally scrollable Board. Use actual touch start/move/end/cancel through browser touch/CDP support, not a mouse with a mobile viewport. Physical Android evidence is preferred when available; report emulation honestly.
+3. Projects has no permanent reorder strip. Test up/down and first/last insertion, the owner's Item 1/3/2 example before release, crossing a row midpoint repeatedly, expanded subtree/variable heights, scrolling, reduced motion and compact Move-menu keyboard operation. Assert zero hover writes, one final write, no-op/cancel zero and unchanged work/parent/project/status identities.
+4. Filtered/incomplete/foreign/nested scope drops cannot reorder. Test conflict, lost response, concurrent reorder/create/Trash/Restore, pending duplicate suppression, original receipt retry and retained unrelated input. Board column changes must retain tags, including archived associations and 503 recovery.
+5. Calendar touch create/assign/move/resize and desktop regressions preserve compact preview/hit testing, hidden-source exclusion, scope/filter/range/session cancellation, cross-day/DST correctness, stationary scrolling, no post-drag editor and block-only Remove. Verify no automatic displacement of existing reservations or Board manual ordering.
+6. Exercise account switch/logout/revocation and open dirty/pending task/comment/list/block/tag/order drafts with pending hold/drag timers. No obsolete callback may save or restore protected UI. Keep 025's stable same-account save behavior.
+7. Run README lint/types/build, meaningful order/status/scheduling backend coverage and the full integrated suites. Include `task-order`, `board`, `tag-recovery`, `calendar`, `calendar-gesture-review`, `calendar-drop-preview`, `calendar-presentation`, `mobile-surfaces`, `compact-filters`, `dialog-history`, Trash and `session-isolation`. Add genuine touch and transient pre-release displacement assertions; do not replace the desktop regressions or simply remove old skips to claim Android support.
+
+## Handoff and boundaries
+
+No schema/API shape, ownership/status semantics, new ordering scope, recurrence, offline saving or deployment is assigned. A compatible sortable helper from the established stack may be justified if needed; verify installed-version compatibility and record any dependency/lockfile change. Preserve source/server ordering and calendar contracts. Record adopted thresholds, actual checks/skips, visual/touch evidence and limitations; update implemented documentation only after verification. Stage task-owned changes and return for independent review. Owner commits/pushes/deploys.

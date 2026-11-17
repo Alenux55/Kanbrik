@@ -26,6 +26,9 @@ Current independently accepted candidate is **`499cfd3`** (023), above accepted 
 
 ## Implementation handoffs
 
+- [025: stable save feedback](tasks/025-stable-save-feedback.md): implemented above 125858e/accepted runtime 499cfd3, pending independent review. Stable mounted/concealed session gate, preserved dialog/document/grid position, bounded Calendar feedback and failed-gate ownership retain required account checks and authoritative refresh. Instrumented held saves distinguish layout collapse from document navigation. Actual verification is recorded in the task; review/integrate before 026.
+- [026: touch dragging and sortable feedback](tasks/026-touch-dragging-and-sortable-feedback.md): planned after 025 is integrated and independently reviewed; scoped selection handling, Android long-press gestures, compact Projects row activation/Move menu and reversible neighbour insertion previews. Keep sibling boundaries, Board status semantics and Calendar slot/DST/recovery behavior; normal touch scrolling remains available.
+
 - [024: authentication submission safety](tasks/024-auth-form-submission-safety.md): independently accepted at `1e08a80`; original P1 closed and deployment hold lifted. SSR readiness/native POST guards protect credential forms. Coordinator checks passed lint/types/schema/all-15 status/Webpack, 156 backend, 34 focused browser cases without skips and eight independent native-submission probes. Implementer evidence remains separately attributed.
 
 - [020: Settings and appearance](tasks/020-settings-and-appearance.md): independently accepted at `1f85e8a`; unified Settings, centralized tags, original-intent recovery and account Light/Dark/System with additive migration 15. Coordinator checks passed 133 backend and 26 focused browser cases/four skips; full-suite and preservation evidence remain separately attributed.
