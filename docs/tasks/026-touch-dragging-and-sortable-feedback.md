@@ -1,6 +1,6 @@
 # 026: Long-press dragging, compact rows and live insertion feedback
 
-Status: The native-scroll P2 correction above owner-committed `0bd6f8d` is implemented, verified and staged on 2026-11-18. Ready for independent re-review; 026 remains unaccepted and import/deployment stays on hold until that review. The original independent finding/evidence is retained below and [the correction record](026-review-fixes.md) carries current results.
+Status: Independently accepted on 2026-11-18 at clean owner-committed `427ed1d` above `0bd6f8d`. The original native-scroll P2 is independently closed, no new actionable findings were identified, and 026's import/deployment hold is lifted. Coordinator checks passed 178 backend and 30 focused browser cases/two intentional Android mouse-only skips; the unchanged original probe now shows zero page movement on both profiles. The original finding/evidence remains historical below; [the correction review](026-review-fixes.md#independent-correction-review--2026-11-18) records current acceptance and separately attributed verification. No later feature is assigned.
 
 Suggested model: GPT-6.1 Sol, High effort. This is a recommendation, not agent configuration.
 

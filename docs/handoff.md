@@ -1,6 +1,18 @@
 # Coordinator handoff — 2026-11-18
 
-## Task 026 native-scroll correction handoff — 2026-11-18
+## Task 026 independently accepted; native-scroll P2 closed — 2026-11-18
+
+Reviewed clean owner-committed **`427ed1d`** against `0bd6f8d`, carrying the prior 026 feature review and accepted 025. **The original native-scroll P2 is independently closed; no new actionable findings. Task 026 is accepted and its import/deployment hold is lifted.** No later feature is assigned.
+
+The unchanged independent `.local/review026-native-boundary.mjs` now reports **desktop 471 → 471** and **Pixel 7 1140 → 1140**, with the native dragged pointer outside Calendar. Both have zero document movement, zero PATCH writes and block revision 1. This directly closes the original reproduced behavior, separately from the implementer's rerun. The probe removed only its generated fixture records and stopped its owned app.
+
+Independent lint/types, schema validation, **16 applied migrations/none pending**, Webpack build and **178/178 backend/unit checks across 20 files**, exit 0, passed. Independent affected browser verification passed **30 cases / zero failures / two intentional Android mouse-only skips, 32 total, 7.8 minutes, exit 0**. All ten new native-scroll cases passed on desktop/Pixel 7: outside move/resize bounds, useful inside-pane scrolling/exact single saves, and pending/selected/second-finger/modal/range/session/account interruption. Existing touch, Projects/Board/palette scrolling, cancellation, 025 held-save geometry and desktop tag recovery also passed. Exact commands are in [the correction review](tasks/026-review-fixes.md#independent-correction-review--2026-11-18).
+
+Source review confirms public `dragScroll=false`, a shared bounded step with no native document fallback, and movement/current-input-generation guards. No API/schema/migration/package/environment change exists. The supplied complete-browser log was inspected and records **236 passes / 14 intentional skips, 250 total, 54.5 minutes**; that remains implementer evidence, separate from coordinator runs. No new coordinator full-browser, physical Android/other-engine/screen-reader/server/proxy/provider/install/audit/container/default-bundler/deployment/production-restore proof is claimed.
+
+Owner may use README's existing update/migrate/build/restart/browser-reload sequence, retaining all **16 existing migrations** and real data; no reset or new setting/package is needed. Review documentation only is updated/staged; no runtime/test correction, commit, push or server/provider action was performed. Owned app/SMTP/database listeners are closed; the main test database was stopped after checking port 15432. Saved environments remain unchanged.
+
+## Task 026 native-scroll implementation handoff — now committed as `427ed1d` and reviewed above
 
 **The native-scroll correction is implemented, verified and staged for independent re-review**, above the clean owner-committed feature/review baseline **`0bd6f8d`**. Accepted 025 remains `7d4fa4c`. This addresses only [026's native-scroll P2](tasks/026-review-fixes.md); no API, schema/migration, package/lockfile, saved environment, server/provider or deployment change is introduced. All 16 existing migrations remain required. **The P2 is not independently closed; keep import/deployment on hold until coordinator re-review.**
 

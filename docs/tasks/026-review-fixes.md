@@ -1,6 +1,6 @@
 # 026 review correction: bound native Calendar event scrolling
 
-Status: Correction implemented, verified and staged on 2026-11-18 above owner-committed `0bd6f8d`. Ready for independent re-review; the P2 is not independently closed and import/deployment remains on hold until that review.
+Status: Original P2 independently closed on 2026-11-18 at clean owner-committed `427ed1d`, reviewed against `0bd6f8d`. No new actionable findings. Task 026 is accepted and its import/deployment hold is lifted. Coordinator checks passed 178 backend and 30 focused browser cases/two intentional Android mouse-only skips; the unchanged original reproduction now shows zero document movement on both profiles. Earlier negative/implementation evidence remains separately recorded below.
 
 ## Outcome and inputs
 
@@ -8,7 +8,7 @@ Dragging or resizing a saved Calendar event must not auto-scroll the document wh
 
 Read AGENTS.md, README, product/architecture/current handoff, tasks 023/025/026 and this review. Inspect `calendar.tsx`'s FullCalendar configuration, `use-calendar-touch.ts`, `planner-drag.ts` and the native/palette/cancellation regressions. Preserve the original staged coordinator inputs and the current 026 source/tests; no unrelated work is assigned.
 
-## Confirmed P2 and reproduction
+## Original confirmed P2 and reproduction (closed)
 
 The new bounded-scroll implementation is in the custom `PlannerSensor`, which handles Projects, Board and Calendar palette gestures. Saved Calendar events still use FullCalendar's native interaction auto-scroller. The installed interaction code defaults its scroll targets to `[window, '.fc-scroller']`; the Calendar configuration enables native touch gestures without restricting that default. `eventAllow` guards eligibility, not the native auto-scroller's window target.
 
@@ -40,6 +40,28 @@ The probe removed only its generated fixture accounts/workspaces/blocks and stop
 ## Completion handoff
 
 Record the final approach, exact source/test checks, results, earlier failures and limits here and in 026/current handoff. Stage task-owned corrections and return for independent re-review before owner integration/deployment. Do not mark the original P2 closed solely from the implementer's passing regression. No runtime correction, commit, push or deployment was performed by this review.
+
+## Independent correction review — 2026-11-18
+
+Reviewed clean owner-committed `427ed1d` against `0bd6f8d`. No new actionable findings; the original P2 is closed and task 026 is accepted. Public FullCalendar native-scroll disablement, the shared bounded pane step, movement-qualified/current-generation native callbacks and retained gesture/session/save contracts meet the correction scope. No runtime or test edit was made by the coordinator.
+
+After the independent Webpack build, the **unchanged** reviewer-owned command `node .local/review026-native-boundary.mjs` observed desktop document scroll **471 → 471** and Pixel 7 **1140 → 1140**, pointer explicitly outside Calendar for the original stationary interval. Both recorded zero PATCH writes and block revision 1. This is direct independent closure evidence, separate from implementer probe results. Its generated local accounts/workspaces/blocks were removed and owned app 3115 stopped; no credentials/cookies/trace/video or populated auth screenshots were recorded.
+
+Independent `npm run check`, `npm run db:validate`, guarded migration status (**16 applied, none pending**) and `npm run build -- --webpack` passed. Full backend/unit verification passed **178/178 across 20 files**, exit 0:
+
+```powershell
+node .local/task014-command.mjs integration --reporter=json --outputFile=.local/coordinator-review026-fix-tests.json
+```
+
+Independent affected browser verification passed **30 cases / zero failures / two intentional Android mouse-only skips, 32 total, 7.8 minutes, exit 0**:
+
+```powershell
+node .local/task014-command.mjs browser native-scroll-boundary.spec.ts touch-gestures.spec.ts drag-cancellation.spec.ts stable-save-feedback.spec.ts calendar-gesture-review.spec.ts tag-recovery.spec.ts --grep 'saved-event|native scroll frames|Projects whole-row|Board genuine|Calendar palette hold previews|Saved Calendar events|Projects edge scrolling|hold retires on a range|account switch retires|held Calendar save|real Calendar drops|Board 503 recovery'
+```
+
+All ten added native boundary scenarios passed without skips on desktop/Pixel 7, including move/resize outside each edge, useful inside-pane scrolling/exact saved interval and interruption/obsolete-release guards. Existing whole-row sibling preview, Board/palette touch and scrolling, native pre-hold move/resize/cancel, context/account retirement, 025 stable-save geometry and desktop Board 503 recovery passed. The two skips are historical real-mouse native-gesture/tag-recovery cases on Android, not the new touch tests.
+
+Inspected the supplied final complete-browser log: **236 passes / 14 intentional skips, 250 total, 54.5 minutes**. That is carried implementer evidence; no new coordinator complete suite is claimed. Physical Android, other engines/screen readers, Ubuntu/proxy/TLS/provider, fresh install/audit/container/default bundler and actual deployment/production restore remain unverified. The inspected ignored process-only 15432 adapter leaves saved environments unchanged; README npm test/test:e2e equivalents take the same arguments. No schema/dependency/API change required a new migration/preservation proof; all 16 existing migrations remain required. Review app/SMTP/database listeners are closed and the owned main test database was stopped after port verification. Documentation only is updated/staged; no commit, push or server/provider action was performed.
 
 ## Correction handoff — 2026-11-18
 
