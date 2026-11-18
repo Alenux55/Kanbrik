@@ -1,6 +1,6 @@
 # 025: Stable planner layout during saves and verification
 
-Status: Implemented and verified above coordinator documentation `125858e` and independently accepted runtime `499cfd3` (2026-11-16). Independent review is pending. Task 026 remains unimplemented and requires review/integration of this task first.
+Status: Independently accepted on 2026-11-16 at clean owner-committed `7d4fa4c`, against `125858e`/accepted runtime `499cfd3`. No actionable findings. Coordinator checks passed 172 backend and 30 focused browser cases/two intentional Android mouse-only skips. The implementer's complete-browser pass remains separately attributed below. Task 026 remains unimplemented and is ready for a separate assignment.
 
 Suggested model: GPT-6.1 Sol, High effort; this touches the shared session boundary. This is a recommendation, not agent configuration.
 
@@ -51,6 +51,28 @@ Inspect `src/lib/planner-session.ts`, `src/components/planner-session.tsx`, `pla
 
 No schema/migration/dependency change is expected, and no new auth stack, offline queue, polling/push service or deployment is assigned. 026 owns long-press dragging, selection suppression, row controls and sortable previews. Keep source/proofs, actual counts/skips and device limits in this task; update implemented docs only after verification. Stage task-owned changes and return for independent review. Owner commits/pushes/deploys.
 
+
+## Independent review — 2026-11-16
+
+Reviewed clean owner-committed `7d4fa4c` against `125858e`, including the preserved planning inputs. No actionable findings. Source review covered the mounted aria-hidden/inert/visibility gate and portals, before-paint native-dialog pause/resume, source/input focus and inner-scroll restoration, Calendar feedback/recovery ownership, confirmation pointer handling and the failed-gate/late-response guards. Preflight/post-body checks, expected-account/epoch/lease/abort protections and canonical save refresh remain intact. No runtime or test correction was made by the coordinator. Task 025 is accepted; 026's prerequisite review is satisfied.
+
+Independent `npm run check`, `npm run db:validate`, guarded Prisma migration status (**16 applied, none pending**) and `npm run build -- --webpack` passed. After the build completed, full backend/unit verification passed **172/172 across 19 files**, exit 0, including all five added session ownership cases:
+
+```powershell
+node .local/task014-command.mjs integration --reporter=json --outputFile=.local/coordinator-review025-tests.json
+```
+
+Independent affected browser verification passed **30 cases / zero failures / two intentional Android mouse-only skips, 32 total, 7.3 minutes, exit 0**:
+
+```powershell
+node .local/task014-command.mjs browser stable-save-feedback.spec.ts session-isolation.spec.ts dialog-history.spec.ts trash-navigation.spec.ts activity.spec.ts tag-removal.spec.ts calendar.spec.ts tag-recovery.spec.ts --grep 'held Calendar save|confirmed create and Remove|real drop, native move|failed verification conceals|same-cookie tabs|session verification failures|obsolete save completion|Back during a pending save|ordinary editor closure|clean and dirty work-editor|record-unavailable recovery|failed session checks retain|Trash activity stays|Settings removal exports|calendar overlays retain|Board 503 recovery'
+```
+
+All applicable new stable-save scenarios passed on desktop/Pixel 7. These assert genuinely held preflight/body/post-check, protected concealment, retained grid identity/geometry and document/grid/dialog scroll, one actual mutation/no document navigation, confirmed creation/removal despite failed/obsolete refresh, and failed verification/Retry with restored input/focus. Existing account-isolation, ordinary/pending Back, uncertainty/conflict, notification dismissal, tag recovery/removal and direct Trash-recovery cases passed. The skips are the real-mouse stable-gesture and Board 503 recovery cases on Android; explicit/touch cases passed.
+
+Inspected the supplied `.local/task025-corrected-full-browser.log`: its final result is **206 passes / 14 intentional skips, 220 total, 50.7 minutes**. This is carried implementer evidence, not a coordinator full-suite rerun. Earlier failures and corrections remain distinct. Supplied/regenerated Light/System-dark held-gate, failed-check and resumed-draft captures were inspected for concealment, containment and retained focus/scroll. Physical Android, other engines/screen readers, Ubuntu/proxy/TLS/provider, install/audit/container/default bundler and actual deployment/production restore remain unverified.
+
+The inspected ignored adapter uses guarded loopback 15432 process URLs; README npm test/test:e2e equivalents take the same arguments. Saved environment files/credentials are unchanged. No schema/migration/dependency change required a new preservation proof; all 16 existing migrations still apply. The owned database was stopped after port verification and no review app/SMTP/database listeners remain. Documentation only is updated/staged; no commit, push or server/provider action was performed. The content-free verification cover remains intentional; the accepted improvement is stable geometry/position and safe same-account recovery, not an identity-check bypass.
 
 ## Implementation record — 2026-11-16
 

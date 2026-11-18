@@ -35,13 +35,13 @@ import { DateTime } from "luxon";
 import {
   DndContext,
   DragOverlay,
-  MouseSensor,
   useDraggable,
   useDroppable,
-  useSensor,
-  useSensors,
 } from "@dnd-kit/core";
 import { usePlannerSession } from "./planner-session";
+import { usePlannerDrag } from "./use-planner-drag";
+import { useCalendarTouch } from "./use-calendar-touch";
+import { dragActivation, eventPoint } from "@/lib/planner-drag";
 import { usePlanningDrafts } from "./planning-drafts";
 import { calendarRange } from "@/lib/calendar-time";
 import { blockDraft, type CalendarDraft } from "@/lib/calendar-draft";
@@ -524,8 +524,11 @@ function CalendarScope({
   const canceledGesture = useRef(false);
   useEffect(() => {
     const cancel = (event: KeyboardEvent) => {
-      if (event.key === "Escape") canceledGesture.current = true;
-      else if (
+      if (event.key === "Escape") {
+        canceledGesture.current = true;
+        if (gestureActive.current)
+          setNotice("Gesture canceled. No change was saved.");
+      } else if (
         !gestureActive.current &&
         (event.key === "Enter" || event.key === " ")
       )
@@ -541,9 +544,37 @@ function CalendarScope({
       document.removeEventListener("pointerdown", intentionalPress, true);
     };
   }, []);
-  const sensors = useSensors(
-    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
+  const gestureParts = [
+    scopes,
+    calendarDrafts,
+    savingKeys.join("|"),
+    store.viewLabels.calendar,
+    paused,
+    zone,
+    day,
+    view,
+    visibleIds.join(","),
+  ];
+  const { sensors } = usePlannerDrag(
+    gestureParts,
+    !paused && !!scopes,
+    "calendar",
   );
+  const nativeTouch = useCalendarTouch({
+    root,
+    parts: gestureParts,
+    enabled: !paused,
+    active: gestureActive,
+    canceled: canceledGesture,
+    suppressClick,
+    onTap: (id) => {
+      if (
+        !savingKeys.includes(`calendar:${id}`) &&
+        scopes?.some((scope) => scope.blocks.some((block) => block.id === id))
+      )
+        setEditing(id);
+    },
+  });
   function lost(id: string) {
     if (!alive.current || !session.isCurrent(lease)) return;
     if (editing === "new" && destination === id) setEditing(null);
@@ -926,7 +957,7 @@ function CalendarScope({
   );
   const incomplete = scopes.some((scope) => scope.failed);
   return (
-    <div ref={root} className="min-w-0">
+    <div ref={root} data-calendar-gesture-region className="min-w-0">
       <div
         data-calendar-feedback
         className="h-20 overflow-y-auto break-words py-2"
@@ -1026,9 +1057,7 @@ function CalendarScope({
         onDragStart={({ active, activatorEvent }) => {
           dropFeedback.controller.start(
             String(active.id),
-            activatorEvent instanceof MouseEvent
-              ? { x: activatorEvent.clientX, y: activatorEvent.clientY }
-              : { x: 0, y: 0 },
+            eventPoint(activatorEvent),
           );
           canceledGesture.current = false;
           suppressClick.current = true;
@@ -1073,6 +1102,7 @@ function CalendarScope({
           <div
             className="order-2 max-h-[400px] min-w-0 overflow-auto rounded border p-3 lg:order-none lg:max-h-[650px]"
             aria-label="Calendar work palette"
+            data-drag-scroll="y"
           >
             <h2 className="font-semibold">
               Work cards: edit, or drag onto the grid to schedule
@@ -1184,7 +1214,7 @@ function CalendarScope({
                 }
               >
                 <FullCalendar
-                  key={`${day}:${view}:${zone}`}
+                  key={`${day}:${view}:${zone}:${nativeTouch.revision}`}
                   plugins={[timeGrid, interaction, luxonPlugin]}
                   initialView={view === "week" ? "timeGridWeek" : "timeGridDay"}
                   initialDate={day}
@@ -1233,28 +1263,37 @@ function CalendarScope({
                   headerToolbar={false}
                   allDaySlot={false}
                   height="max(380px, min(70vh, 650px))"
-                  eventLongPressDelay={600000}
+                  eventLongPressDelay={dragActivation.touchDelay}
+                  dragRevertDuration={0}
                   slotMinTime="00:00:00"
                   scrollTime="09:00:00"
                   snapDuration="00:15:00"
                   editable
-                  eventDragStop={() => {
+                  eventAllow={() =>
+                    !canceledGesture.current &&
+                    !paused &&
+                    session.getSnapshot().phase === "ready" &&
+                    !document.querySelector("dialog[open]")
+                  }
+                  eventDragStop={(info) => {
+                    if (!nativeTouch.owns(info.jsEvent)) return;
                     gestureActive.current = false;
                     if (canceledGesture.current)
                       setNotice("Gesture canceled. No change was saved.");
                   }}
-                  eventResizeStop={() => {
+                  eventResizeStop={(info) => {
+                    if (!nativeTouch.owns(info.jsEvent)) return;
                     gestureActive.current = false;
                     if (canceledGesture.current)
                       setNotice("Gesture canceled. No change was saved.");
                   }}
-                  eventDragStart={() => {
-                    canceledGesture.current = false;
+                  eventDragStart={(info) => {
+                    if (!nativeTouch.owns(info.jsEvent)) return;
                     gestureActive.current = true;
                     suppressClick.current = true;
                   }}
-                  eventResizeStart={() => {
-                    canceledGesture.current = false;
+                  eventResizeStart={(info) => {
+                    if (!nativeTouch.owns(info.jsEvent)) return;
                     gestureActive.current = true;
                     suppressClick.current = true;
                   }}
@@ -1272,6 +1311,7 @@ function CalendarScope({
                     borderColor: "var(--border)",
                     textColor: "var(--foreground)",
                     editable:
+                      !paused &&
                       !savingKeys.includes(`calendar:${block.id}`) &&
                       !calendarDrafts[`${block.workspaceId}/blocks/${block.id}`]
                         ?.dirty,
@@ -1300,6 +1340,7 @@ function CalendarScope({
                   }}
                   eventDrop={(info) => {
                     if (
+                      !nativeTouch.owns(info.jsEvent) ||
                       canceledGesture.current ||
                       !alive.current ||
                       session.getSnapshot().phase !== "ready" ||
@@ -1355,6 +1396,7 @@ function CalendarScope({
                   }}
                   eventResize={(info) => {
                     if (
+                      !nativeTouch.owns(info.jsEvent) ||
                       canceledGesture.current ||
                       !alive.current ||
                       session.getSnapshot().phase !== "ready" ||
@@ -1415,7 +1457,7 @@ function CalendarScope({
           </div>
         </div>
         {createPortal(
-          <DragOverlay dropAnimation={null}>
+          <DragOverlay dropAnimation={null} style={{ pointerEvents: "none" }}>
             {dragged && (
               <CalendarDragTitle
                 controller={dropFeedback.controller}
@@ -1559,11 +1601,14 @@ function Palette({ item, open }: { item: Work; open: () => void }) {
     >
       <button
         ref={setNodeRef}
+        data-drag-activator
         onClick={open}
         {...listeners}
         {...attributes}
         aria-label={"Edit " + item.kind + ": " + item.title}
-        className={button + " w-full break-words text-left"}
+        className={
+          button + " planner-drag-activator w-full break-words text-left"
+        }
         style={{ opacity: isDragging ? 0.4 : 1 }}
       >
         {item.title} · {item.context}

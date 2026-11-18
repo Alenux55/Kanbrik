@@ -128,7 +128,13 @@ test("compact cards use stable project colors, whole-card mouse dragging and tou
     await page.mouse.move(current.x + 20, current.y + 20);
     await page.mouse.down();
     await page.mouse.move(current.x - 40, current.y + 30, { steps: 6 });
-    await filters(page);
+    // The mouse is already held. Open the filter with the keyboard rather
+    // than synthesizing a second mouse press during the same gesture.
+    await page.getByRole("button", { name: /^Advanced/ }).focus();
+    await page.keyboard.press("Enter");
+    await expect(
+      page.getByRole("dialog", { name: "Board advanced filters", exact: true }),
+    ).toBeVisible();
     await page.mouse.up();
     await page.getByRole("button", { name: "Cancel", exact: true }).click();
     expect(

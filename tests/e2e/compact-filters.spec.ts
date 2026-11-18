@@ -98,6 +98,7 @@ test("compact multi-pickers preserve hierarchy, keyboard/Back focus, ordering an
     page.getByRole("button", {
       name: "Move down: Context ancestor",
       exact: true,
+      includeHidden: true,
     }),
   ).toBeDisabled();
   await expect(
@@ -136,6 +137,7 @@ test("compact multi-pickers preserve hierarchy, keyboard/Back focus, ordering an
     page.getByRole("button", {
       name: "Move down: Context ancestor",
       exact: true,
+      includeHidden: true,
     }),
   ).toHaveCount(0);
   await page
@@ -148,6 +150,7 @@ test("compact multi-pickers preserve hierarchy, keyboard/Back focus, ordering an
     page.getByRole("button", {
       name: "Move down: Context ancestor",
       exact: true,
+      includeHidden: true,
     }),
   ).toBeEnabled();
   expect(writes).toBe(0);

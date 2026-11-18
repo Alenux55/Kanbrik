@@ -154,49 +154,55 @@ function WorkspacePlanning({ workspace }: { workspace: WorkspaceSummary }) {
             childScope,
           );
           return (
-            <SiblingOrderRow key={task.id} task={task}>
-              <div className="flex min-w-0 items-center gap-2 rounded border-b py-1">
-                <button
-                  className={button}
-                  aria-expanded={expanded(task.id)}
-                  aria-label={`Expand task: ${task.title}`}
-                  onClick={() => toggle(task.id)}
-                >
-                  {expanded(task.id) ? "−" : "+"}
-                </button>
-                <button
-                  aria-label={task.title}
-                  title={
-                    [
-                      filtering &&
-                        !matches(task) &&
-                        "Context for matching subtasks",
-                      ...(task.tags ?? []).map((t) => t.name),
-                    ]
-                      .filter(Boolean)
-                      .join(", ") || undefined
-                  }
-                  className="min-h-11 min-w-0 flex-1 break-words py-2 text-left font-medium"
-                  onClick={() =>
-                    context.openEntity({
-                      kind: "tasks",
-                      workspaceId: workspace.id,
-                      record: task,
-                    })
-                  }
-                >
-                  {task.title}
-                  <TaskLabelBadges task={task} />
-                  {filtering && !matches(task) && (
-                    <span className="block text-xs">
-                      Context for matching subtasks
-                    </span>
-                  )}
-                </button>
-                <span className="text-xs">
-                  {statusName(task)} · {children.length} subtasks
-                </span>
-              </div>
+            <SiblingOrderRow
+              key={task.id}
+              task={task}
+              open={() =>
+                context.openEntity({
+                  kind: "tasks",
+                  workspaceId: workspace.id,
+                  record: task,
+                })
+              }
+              header={
+                <>
+                  <button
+                    className={button}
+                    aria-expanded={expanded(task.id)}
+                    aria-label={`Expand task: ${task.title}`}
+                    onClick={() => toggle(task.id)}
+                  >
+                    {expanded(task.id) ? "−" : "+"}
+                  </button>
+                  <button
+                    data-drag-edit
+                    aria-label={task.title}
+                    title={
+                      [
+                        filtering &&
+                          !matches(task) &&
+                          "Context for matching subtasks",
+                        ...(task.tags ?? []).map((t) => t.name),
+                      ]
+                        .filter(Boolean)
+                        .join(", ") || undefined
+                    }
+                    className="min-h-11 min-w-0 flex-1 break-words py-2 text-left font-medium"
+                  >
+                    {task.title}
+                    <TaskLabelBadges task={task} />
+                    {filtering && !matches(task) && (
+                      <span className="block text-xs">
+                        Context for matching subtasks
+                      </span>
+                    )}
+                  </button>
+                  <span className="text-xs">
+                    {statusName(task)} · {children.length} subtasks
+                  </span>
+                </>
+              }
+            >
               {expanded(task.id) && (
                 <div>
                   <SiblingOrderGroup
@@ -207,29 +213,36 @@ function WorkspacePlanning({ workspace }: { workspace: WorkspaceSummary }) {
                     refresh={() => setEpoch((x) => x + 1)}
                   >
                     {children.map((child) => (
-                      <SiblingOrderRow key={child.id} task={child}>
-                        <button
-                          aria-label={child.title}
-                          title={
-                            (child.tags ?? [])
-                              .map((t) => t.name)
-                              .filter(Boolean)
-                              .join(", ") || undefined
-                          }
-                          className="min-h-11 w-full min-w-0 flex-1 break-words text-left"
-                          onClick={() =>
-                            context.openEntity({
-                              kind: "tasks",
-                              workspaceId: workspace.id,
-                              record: child,
-                            })
-                          }
-                        >
-                          {child.title}
-                          <TaskLabelBadges task={child} />
-                        </button>
-                        <span className="text-xs">{statusName(child)}</span>
-                      </SiblingOrderRow>
+                      <SiblingOrderRow
+                        key={child.id}
+                        task={child}
+                        open={() =>
+                          context.openEntity({
+                            kind: "tasks",
+                            workspaceId: workspace.id,
+                            record: child,
+                          })
+                        }
+                        header={
+                          <>
+                            <button
+                              data-drag-edit
+                              aria-label={child.title}
+                              title={
+                                (child.tags ?? [])
+                                  .map((t) => t.name)
+                                  .filter(Boolean)
+                                  .join(", ") || undefined
+                              }
+                              className="min-h-11 w-full min-w-0 flex-1 break-words text-left"
+                            >
+                              {child.title}
+                              <TaskLabelBadges task={child} />
+                            </button>
+                            <span className="text-xs">{statusName(child)}</span>
+                          </>
+                        }
+                      />
                     ))}
                   </SiblingOrderGroup>
                   <button

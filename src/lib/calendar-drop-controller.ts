@@ -99,6 +99,13 @@ export class CalendarDropController {
   private move = (event: MouseEvent) => {
     this.point = { x: event.clientX, y: event.clientY };
   };
+  private touch = (event: TouchEvent) => {
+    if (event.touches.length !== 1) {
+      this.cancel();
+      return;
+    }
+    this.point = { x: event.touches[0].clientX, y: event.touches[0].clientY };
+  };
   private leave = (event: MouseEvent) => {
     if (event.relatedTarget === null) {
       this.point = null;
@@ -111,6 +118,9 @@ export class CalendarDropController {
   attach = () => {
     this.attached = true;
     document.addEventListener("mousemove", this.move, { passive: true });
+    document.addEventListener("touchmove", this.touch, { passive: true });
+    document.addEventListener("touchstart", this.touch, { passive: true });
+    document.addEventListener("touchcancel", this.cancel);
     document.addEventListener("mouseout", this.leave);
     document.addEventListener("keydown", this.key, true);
     window.addEventListener("blur", this.cancel);
@@ -118,6 +128,9 @@ export class CalendarDropController {
       this.attached = false;
       this.cancel();
       document.removeEventListener("mousemove", this.move);
+      document.removeEventListener("touchmove", this.touch);
+      document.removeEventListener("touchstart", this.touch);
+      document.removeEventListener("touchcancel", this.cancel);
       document.removeEventListener("mouseout", this.leave);
       document.removeEventListener("keydown", this.key, true);
       window.removeEventListener("blur", this.cancel);

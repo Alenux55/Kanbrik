@@ -122,8 +122,23 @@ test("live blank-slot preview follows columns and stationary-pointer scrolling a
     /^2030-06-04T13:30/,
   );
   await move(page, { x: 2, y: 2 });
+  const outsideScroll = await page.evaluate(() => scrollY);
   await expect(preview(page)).toHaveCount(0);
-  await move(page, next);
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      ),
+  );
+  expect(await page.evaluate(() => scrollY)).toBe(outsideScroll);
+  // Activated edge scrolling can move the document/grid while outside its
+  // target. Re-measure the same intended slot instead of reusing old pixels.
+  const returned = await point(page, "13:30:00", "2030-06-04", 0.25);
+  await move(page, returned);
+  await expect(preview(page)).toHaveAttribute(
+    "data-preview-start",
+    /^2030-06-04T13:30/,
+  );
   await expect(preview(page)).toHaveAttribute("data-drop-valid", "true");
   expect(
     await page.evaluate(
@@ -131,7 +146,7 @@ test("live blank-slot preview follows columns and stationary-pointer scrolling a
         !!document
           .elementFromPoint(x, y)
           ?.closest("[data-calendar-drop-preview]"),
-      next,
+      returned,
     ),
   ).toBe(false);
   const boundary = (await page

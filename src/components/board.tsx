@@ -4,15 +4,13 @@ import { createPortal } from "react-dom";
 import {
   DndContext,
   DragOverlay,
-  MouseSensor,
   useDraggable,
   useDroppable,
-  useSensor,
-  useSensors,
 } from "@dnd-kit/core";
 import { themedTint } from "@/lib/project-palette";
 import { TaskLabelBadges } from "./task-labels";
 import { usePlannerSession } from "./planner-session";
+import { usePlannerDrag } from "./use-planner-drag";
 import { usePlanningDrafts, type PlanningDraft } from "./planning-drafts";
 import { usePlannerContext } from "./planner-context";
 import { EditorDialog } from "./ui/editor-dialog";
@@ -396,8 +394,17 @@ function SelectedBoard({
   const alive = useRef(true);
   const generation = useRef(0);
   const suppressClick = useRef(false);
-  const sensors = useSensors(
-    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
+  const { sensors } = usePlannerDrag(
+    [
+      scopes,
+      filters,
+      paused,
+      store.saveEpoch,
+      store.drafts,
+      store.savingKeys.join("|"),
+    ],
+    !paused,
+    "board",
   );
   useEffect(() => {
     alive.current = true;
@@ -558,9 +565,7 @@ function SelectedBoard({
   const incomplete = scopes.some((s) => s.failed);
   function end() {
     setDragged(null);
-    window.setTimeout(() => {
-      suppressClick.current = false;
-    }, 100);
+    suppressClick.current = false;
   }
   return (
     <div className="mt-5 min-w-0">
@@ -618,13 +623,14 @@ function SelectedBoard({
         accessibility={{
           screenReaderInstructions: {
             draggable:
-              "Open a task to change its status with keyboard or touch. Mouse users can drag the card.",
+              "Tap to edit. Hold then drag a card to another status. The editor also offers explicit status controls.",
           },
         }}
       >
         <div
           role="region"
           aria-label="Board statuses"
+          data-drag-scroll="x"
           tabIndex={0}
           className="min-w-0 overflow-x-auto overscroll-x-contain pb-3"
         >
@@ -729,7 +735,7 @@ function SelectedBoard({
           </div>
         </div>
         {createPortal(
-          <DragOverlay dropAnimation={null}>
+          <DragOverlay dropAnimation={null} style={{ pointerEvents: "none" }}>
             {dragged && (
               <div
                 data-drag-preview
@@ -806,6 +812,7 @@ function Card({
     <article aria-label={task.title} className="mb-2 min-w-0">
       <button
         ref={setNodeRef}
+        data-drag-activator
         {...attributes}
         {...listeners}
         type="button"
@@ -819,7 +826,7 @@ function Card({
         }
         onClick={open}
         disabled={pending}
-        className="block min-h-14 w-full min-w-0 rounded-lg border border-neutral-300 p-3 text-left text-neutral-950 shadow-sm"
+        className="planner-drag-activator block min-h-14 w-full min-w-0 rounded-lg border border-neutral-300 p-3 text-left text-neutral-950 shadow-sm"
         style={{
           background: themedTint(projectColor(task.projectId)),
           opacity: isDragging ? 0.4 : 1,

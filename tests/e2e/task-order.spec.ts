@@ -1,4 +1,5 @@
 import { picker, finishPicker } from "./filter-helpers";
+import { openOrderActions } from "./order-helpers";
 import { randomUUID } from "node:crypto";
 import type { Page } from "@playwright/test";
 import { test, expect } from "./fixtures";
@@ -64,7 +65,7 @@ const rowIds = (page: Page) =>
       rows.map((row) => (row as HTMLElement).dataset.orderTask),
     );
 
-test("sibling moves and mouse handles persist only their own scope and keep canonical editors separate", async ({
+test("sibling compact actions and whole-row drags persist only their own scope and keep canonical editors separate", async ({
   page,
   context,
   isMobile,
@@ -77,9 +78,11 @@ test("sibling moves and mouse handles persist only their own scope and keep cano
       statusOrSchedule++;
     if (r.method() === "POST" && r.url().endsWith("/task-order")) orderWrites++;
   });
+  await openOrderActions(page, "Order A");
   const move = page.getByRole("button", {
     name: "Move down: Order A",
     exact: true,
+    includeHidden: true,
   });
   if (isMobile) await move.tap();
   else await move.click();
@@ -88,18 +91,14 @@ test("sibling moves and mouse handles persist only their own scope and keep cano
     .toEqual([roots[1].id, roots[0].id, roots[2].id]);
   if (!isMobile) {
     const source = page.getByRole("button", {
-        name: "Drag to reorder: Order C",
+        name: "Order C",
         exact: true,
       }),
       target = page.locator(`[data-order-target="${roots[1].id}"]`);
     await source.scrollIntoViewIfNeeded();
     const a = (await source.boundingBox())!,
       b = (await target.boundingBox())!;
-    await drag(
-      page,
-      { x: a.x + 20, y: a.y + 20 },
-      { x: b.x + 20, y: b.y + 20 },
-    );
+    await drag(page, { x: a.x + 20, y: a.y + 20 }, { x: b.x + 20, y: b.y + 8 });
     await expect
       .poll(() => rowIds(page))
       .toEqual([roots[2].id, roots[1].id, roots[0].id]);
@@ -108,14 +107,24 @@ test("sibling moves and mouse handles persist only their own scope and keep cano
   await page
     .getByRole("button", { name: "Expand task: Order A", exact: true })
     .click();
+  await openOrderActions(page, "Child A1");
   await page
-    .getByRole("button", { name: "Move down: Child A1", exact: true })
+    .getByRole("button", {
+      name: "Move down: Child A1",
+      exact: true,
+      includeHidden: true,
+    })
     .click();
   await expect
     .poll(async () => (await scope(page, ws.id, "task/" + roots[0].id)).ids)
     .toEqual([c2.id, c1.id]);
+  await openOrderActions(page, "Child A1");
   await page
-    .getByRole("button", { name: "Move up: Child A1", exact: true })
+    .getByRole("button", {
+      name: "Move up: Child A1",
+      exact: true,
+      includeHidden: true,
+    })
     .focus();
   await page.keyboard.press("Enter");
   await expect
@@ -124,24 +133,55 @@ test("sibling moves and mouse handles persist only their own scope and keep cano
   if (!isMobile) {
     const before = orderWrites,
       source = page.getByRole("button", {
-        name: "Drag to reorder: Order B",
+        name: "Order B",
         exact: true,
       }),
       target = page.locator(`[data-order-target="${c1.id}"]`);
     await source.scrollIntoViewIfNeeded();
     const a = (await source.boundingBox())!,
       b = (await target.boundingBox())!;
-    await drag(
-      page,
-      { x: a.x + 20, y: a.y + 20 },
-      { x: b.x + 20, y: b.y + 20 },
+    await page.mouse.move(a.x + 20, a.y + 20);
+    await page.mouse.down();
+    await page.mouse.move(a.x + 32, a.y + 20, { steps: 3 });
+    await page.mouse.move(b.x + 20, b.y + 20, { steps: 24 });
+    // The parent subtree shifts during the new live insertion preview. Land
+    // on the actual child, rather than its obsolete pre-preview coordinates.
+    await page.evaluate(() =>
+      Promise.all(
+        document
+          .getAnimations()
+          .map((animation) => animation.finished.catch(() => {})),
+      ),
+    );
+    const child = (await target.boundingBox())!;
+    const point = { x: child.x + 20, y: child.y + 20 };
+    await page.mouse.move(point.x, point.y, { steps: 12 });
+    expect(
+      await page.evaluate(
+        (p) =>
+          document
+            .elementFromPoint(p.x, p.y)
+            ?.closest<HTMLElement>("[data-order-task]")?.dataset.orderTask,
+        point,
+      ),
+    ).toBe(c1.id);
+    await page.mouse.up();
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        ),
     );
     await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(
+      page.getByRole("region", { name: "Unconfirmed ordering", exact: true }),
+    ).toHaveCount(0);
     expect(orderWrites).toBe(before);
     const handle = (await source.boundingBox())!;
     await page.mouse.move(handle.x + 20, handle.y + 20);
     await page.mouse.down();
     await page.mouse.move(handle.x + 45, handle.y + 40, { steps: 4 });
+    await expect(page.locator('[data-gesture-active="true"]')).toHaveCount(1);
     await page.keyboard.press("Escape");
     await page.mouse.up();
     expect(orderWrites).toBe(before);
@@ -202,12 +242,21 @@ test("uncertain order receipts keep other drafts and cannot undo a later collabo
     await route.abort();
   });
   try {
+    await openOrderActions(page, "Order A");
     await page
-      .getByRole("button", { name: "Move down: Order A", exact: true })
+      .getByRole("button", {
+        name: "Move down: Order A",
+        exact: true,
+        includeHidden: true,
+      })
       .click();
     await arrived;
     await expect(
-      page.getByRole("button", { name: "Move up: Order B", exact: true }),
+      page.getByRole("button", {
+        name: "Move up: Order B",
+        exact: true,
+        includeHidden: true,
+      }),
     ).toBeDisabled();
     await page.getByRole("link", { name: "Board", exact: true }).click();
     await page
@@ -276,7 +325,11 @@ test("filtered or incomplete sibling views disable ordering and do not discard u
   const filter = await picker(page, "Tags");
   await filter.getByRole("checkbox", { name: /^Important \(/ }).check();
   await expect(
-    page.getByRole("button", { name: "Move down: Order A", exact: true }),
+    page.getByRole("button", {
+      name: "Move down: Order A",
+      exact: true,
+      includeHidden: true,
+    }),
   ).toBeDisabled();
   await expect(
     page
@@ -290,7 +343,11 @@ test("filtered or incomplete sibling views disable ordering and do not discard u
     .click();
   await finishPicker(page);
   await expect(
-    page.getByRole("button", { name: "Move down: Order A", exact: true }),
+    page.getByRole("button", {
+      name: "Move down: Order A",
+      exact: true,
+      includeHidden: true,
+    }),
   ).toBeEnabled();
   await page.route("**/task-order", async (route) => {
     const response = await route.fetch(),
@@ -311,22 +368,35 @@ test("filtered or incomplete sibling views disable ordering and do not discard u
     ),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Move down: Order A", exact: true }),
+    page.getByRole("button", {
+      name: "Move down: Order A",
+      exact: true,
+      includeHidden: true,
+    }),
   ).toBeDisabled();
   await page.unroute("**/task-order");
   await page
     .getByRole("button", { name: "Refresh planning", exact: true })
     .click();
   await expect(
-    page.getByRole("button", { name: "Move down: Order A", exact: true }),
+    page.getByRole("button", {
+      name: "Move down: Order A",
+      exact: true,
+      includeHidden: true,
+    }),
   ).toBeEnabled();
   const current = await scope(page, ws.id, "project/" + project.id);
   const newTask = await post(page, `/api/workspaces/${ws.id}/tasks`, {
     title: "Concurrent sibling",
     projectId: project.id,
   });
+  await openOrderActions(page, "Order A");
   await page
-    .getByRole("button", { name: "Move down: Order A", exact: true })
+    .getByRole("button", {
+      name: "Move down: Order A",
+      exact: true,
+      includeHidden: true,
+    })
     .click();
   await expect(
     page.getByRole("region", { name: "Unconfirmed ordering", exact: true }),

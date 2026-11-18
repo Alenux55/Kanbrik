@@ -1,6 +1,6 @@
 # 026: Long-press dragging, compact rows and live insertion feedback
 
-Status: Planned on 2026-11-16 from owner feedback after accepted `499cfd3`. Implement after 025 is integrated and independently reviewed. Not implemented; no application tests were run for this specification.
+Status: Independent review on 2026-11-17 found one P2 in the staged candidate above accepted `7d4fa4c`: native saved-event dragging auto-scrolls the page outside Calendar. Hold 026 import/deployment until [the correction](026-review-fixes.md) and independent re-review. Coordinator checks passed 178 backend and 34 focused browser cases/four intentional Android mouse-only skips; the separate outside-pointer reproduction remains negative. No runtime correction, commit, push or deployment was performed by review.
 
 Suggested model: GPT-6.1 Sol, High effort. This is a recommendation, not agent configuration.
 
@@ -57,3 +57,72 @@ Read AGENTS.md, README, product/architecture/current handoff, tasks 008/011/013/
 ## Handoff and boundaries
 
 No schema/API shape, ownership/status semantics, new ordering scope, recurrence, offline saving or deployment is assigned. A compatible sortable helper from the established stack may be justified if needed; verify installed-version compatibility and record any dependency/lockfile change. Preserve source/server ordering and calendar contracts. Record adopted thresholds, actual checks/skips, visual/touch evidence and limitations; update implemented documentation only after verification. Stage task-owned changes and return for independent review. Owner commits/pushes/deploys.
+
+## Independent review — 2026-11-17
+
+Reviewed staged 026 source/tests above accepted `7d4fa4c`, preserving the prior seven coordinator inputs. One actionable P2: Calendar's native saved-event engine still includes window auto-scrolling, while the new bounds exist only in the custom palette sensor. FullCalendar's installed interaction source defaults `scrollQuery` to window and `.fc-scroller`; the current configuration does not restrict it. A native held event outside `[data-calendar-gesture-region]` moves the whole page. See [026 review correction](026-review-fixes.md) for source locations, a concrete reproduction, required scope and acceptance. **026 is not accepted; hold its import/deployment pending correction and re-review.**
+
+Independent `npm run check`, `npm run db:validate`, guarded Prisma migration status (**16 applied, none pending**) and `npm run build -- --webpack` passed. Full backend/unit verification after build passed **178/178 across 20 files**, exit 0:
+
+```powershell
+node .local/task014-command.mjs integration --reporter=json --outputFile=.local/coordinator-review026-tests.json
+```
+
+Independent affected browser verification passed **34 cases / zero failures / four intentional Android mouse-only skips, 38 total, 8.4 minutes, exit 0**:
+
+```powershell
+node .local/task014-command.mjs browser touch-gestures.spec.ts drag-cancellation.spec.ts task-order.spec.ts stable-save-feedback.spec.ts tag-recovery.spec.ts calendar-drop-preview.spec.ts calendar-gesture-review.spec.ts --grep 'Projects whole-row|Board genuine|Calendar palette hold previews|Saved Calendar events|retires a pending hold|Projects edge scrolling|compact keyboard Move|hold retires on a range|account switch retires|sibling moves|uncertain order|filtered or incomplete sibling|held Calendar save|confirmed create and Remove|real drop, native move|failed verification conceals|Board 503 recovery|live blank-slot|real Calendar drops'
+```
+
+All 20 added touch/cancellation cases passed on applicable desktop/Pixel 7 profiles. Existing order receipts/filter guards, stable save/Retry, desktop tag recovery, compact preview and native no-popup cases also passed. Historical mouse-only Android skips remain. No existing assertion was removed or weakened by review. These passing cases do not cover the confirmed outside-pointer native engine behavior.
+
+Separate independent command: `node .local/review026-native-boundary.mjs`. On owned app 3115, both a real desktop mouse drag and genuine Chromium/CDP Pixel 7 touch drag showed a native event mirror, then held viewport `(5,5)` outside Calendar for 850 ms. Document scroll changed **471 → 266** and **1140 → 935**, respectively. Both moved upward 205 px; Escape/cancel produced zero PATCH writes and retained block revision 1. The ignored script records sanitized geometry/counts only, cleans up its generated accounts/workspaces/blocks and stops its owned app. This is a reproduced defect, not a passing boundary regression.
+
+The supplied final full-browser log was inspected and records **226 passes / 14 intentional skips, 240 total, 51.4 minutes**. That remains separately attributed implementer evidence; no coordinator full-suite rerun is claimed. Representative supplied/regenerated Light/System-dark/reduced-motion captures were inspected for insertion/layout/containment. Physical Android, other engines/screen readers, Ubuntu/proxy/TLS/provider, fresh install/audit/container/default bundler and deployment/production restore remain unverified. The guarded process-only 15432 adapter leaves saved environments unchanged. No schema/dependency/API change or new migration exists; all 16 existing migrations remain required. Review services are stopped and listeners checked. Documentation only is updated/staged; no runtime correction, commit, push or deployment was performed.
+
+## Implementation progress — 2026-11-16
+
+These are historical notes from incomplete attempts. The completed results and final limitations are recorded below.
+
+The original seven staged coordinator documents are preserved; their patch is saved under ignored `.local/task026-coordinator-input.patch`. Scope is 026 only, with no deployment or schema/API change. The first genuine Pixel 7/CDP hold/move regression ran against the accepted pre-026 build and failed as expected: the Item 1/3/2 sibling list did not preview Item 1/2/3 before release. That failed baseline is recorded in `.local/task026-baseline-touch.log`; it is not a passing feature result or proof of the precise highlighting cause.
+
+Implementation uses the existing dnd-kit public sensor lifecycle and installed FullCalendar v6 touch support, without a new dependency. Adopted initial thresholds are 350 ms touch hold, 8 px movement tolerance/mouse activation and 6 px sibling midpoint hysteresis. These are implementation choices to verify, not new owner-confirmed settings. The first lint/type attempt exposed one strict function-return inference error and an unused test import while scenarios were being added; final checks are pending. Full integration, touch/visual evidence and limitations will be recorded after verification.
+
+Early browser attempts are separately recorded: the first touch selection was **four passed / four failed, eight total, 2.0 minutes**; the first interaction/filter/order selection was **18 passed / four failed, 22 total, 5.1 minutes**; the following correction selection was **five passed / three failed, eight total, 2.1 minutes**. These are not green full-suite results. The actual touch-start/move/end Board/native Calendar check then passed **2/2 in 37.8 seconds**, including a measured Calendar pane scroll from 500 to 610 and touch move/resize/cancel. The initial CDP synthetic-scroll command did not demonstrate native scrolling and is not counted as a passing scroll proof. Test fixtures now deliberately start the Board card in Backlog and keep source/target within the viewport.
+
+Visual inspection caught viewport-based FLIP measurements briefly moving Projects rows over the page heading. Layout offsets relative to each sibling list and order-only animation keys replace those measurements; nested subtrees do not apply the parent's displacement twice. The outer dnd-kit overlay wrapper also needs pointer transparency, not only its child, so native hit testing/edge scrolling can reach underlying rows/panes. That correction is prepared; the broader 44-case run is still on its preceding build. Six placement/cancellation/native-generation unit checks passed. Completed final reruns, screenshots and service cleanup are still required before review.
+
+## Completion handoff — 2026-11-17
+
+Implemented **026 only** above independently accepted `7d4fa4c`. The original seven staged coordinator documents are preserved; 025's staged acceptance patch still matches the initial snapshot. The established pinned stack is reused without package/lockfile, API, schema, migration or saved-environment changes. All **16 existing migrations** remain required. Source/test file hashes match the final tested build; changes are staged for independent review.
+
+Projects now uses whole-row click/tap editing and deliberate mouse/touch dragging, with named compact Actions → Move up/down commands. A **350 ms** stationary touch hold, **8 px** pre-hold tolerance/mouse distance and **6 px** frozen-midpoint hysteresis are adopted implementation defaults, not additional confirmed product policy. Reversible preview displaces keyed neighbours while preserving an expanded subtree once. List-relative finite animation honours reduced motion. Hover writes nothing; no-op/cancel writes nothing; release saves at most one existing revision/request-key/beforeId-or-null sibling operation. Project-root/same-parent boundaries, complete-set/filter guards, identity and retained uncertainty/conflict receipts are unchanged.
+
+Board keeps workspace-status-only movement. Calendar palette touch retains selected-source, blank-slot/empty-block, one-elapsed-hour, 15-minute snap, duration, assignment and DST rules. Native saved events support hold/move, selected-handle hold/resize and short-tap editing. Input-generation leases reject obsolete native completions; interrupted presses can recreate only the grid, while ordinary saves preserve 025's grid. Scoped nonselection, native pre-hold swipes, bounded region scrolling, modal/context/account cancellation and consumed trailing clicks retain explicit controls and subsequent intentional editing. No Board manual order, reparenting, automatic reservation displacement or offline saving is added.
+
+### Completed verification
+
+| Actual check | Result |
+| --- | --- |
+| `npm run check` | Lint and strict types passed; `.local/task026-final-check.log`. |
+| `npm run build -- --webpack` | Passed on the final runtime; `.local/task026-final-build.log`. |
+| `npm run db:validate` | Valid schema; `.local/task026-schema.log`. |
+| Guarded test `prisma migrate status` | 16 applied migrations, none pending; `.local/task026-migration-status.log`. |
+| Complete `npm test` equivalent | **178/178 backend/unit checks across 20 files, 30.11 seconds, exit 0**; `.local/task026-final-backend.log`. Includes six new sibling/gesture ownership unit checks and existing real PostgreSQL/HTTP permissions, ordering, status, scheduling and relationship coverage. |
+| Complete `npm run test:e2e` equivalent | **226 passed / zero failed / 14 intentional Android mouse-only skips, 240 cases across 33 files, 51.4 minutes, exit 0**; `.local/task026-final-full-browser.log`. All **120 desktop** and **106 applicable Pixel 7** cases passed, including all 20 new gesture/cancellation cases without new skips. |
+
+The equivalents use this checkout's existing ignored `.local/task014-command.mjs integration` / `browser` / Prisma adapter, supplying a guarded test URL on loopback **15432** because Windows reserves saved port **55432**. Saved `.env` files/credentials are unchanged; the README's standard commands remain authoritative on a normal target. No database reset, fresh install or new audit was run.
+
+The final run includes task-order, Board, tag recovery, Calendar/gesture-review/drop-preview/presentation, mobile surfaces, compact filters, dialog history, Trash, session isolation and stable-save feedback. New cases dispatch genuine Chromium touch start/move/end/cancel events, not a mouse with a mobile viewport. They prove actual pre-hold scrolling, second-finger cancellation, selected-event tap/move/resize, first/last/midpoint reversal and physical neighbour displacement before release, zero hover writes/one release operation, bounded edge scrolling, context/account interruption and retained independent input. Existing mouse-only Android skips remain; they were not removed to claim touch support.
+
+### Corrections and separately attributed attempts
+
+Final focused Projects expanded/nested/first-last/owner-example and native saved-event verification passed **8/8, no skips, 2.0 minutes**, exit 0 (`.local/task026-verified-focus.log`). The rebuilt Calendar boundary selection ran twice per profile: **six passes/two intentional Android mouse-only skips, eight total, 2.0 minutes**, exit 0 (`.local/task026-scroll-boundary-corrections.log`). The preceding Board/Calendar fixture correction passed **three cases/one intentional skip, four total, 1.1 minutes** (`.local/task026-full-corrections.log`). These are separate from the completed full run.
+
+Earlier attempts are not claimed green: the broader interaction/session/stable-save run had **37 passes/six failures/one skip, 44 total, 10.0 minutes** (`.local/task026-integrated-focus.log`). Two complete-suite attempts were deliberately stopped: **24 completed cases, 22 passes/two failures**, then **23 completed cases, 22 passes/one failure** (`.local/task026-interrupted-full-browser.log`, `.local/task026-interrupted-second-full-browser.log`). The first exposed legacy inputs: a second mouse press while still held and old slot coordinates after scrolling. The tests now use keyboard modal activation during a held mouse and remeasure the intended slot without weakening cancellation/zero-write/exact interval assertions. The second exposed real document edge scrolling outside the Calendar; fallback scrolling is now confined to its Calendar region, with a stationary outside-pointer assertion. Both desktop repetitions and the final complete run pass that correction. Earlier overlay interception, list-relative measurement, lost initial mouse delta, native selected-event tap/delay and old-native-callback problems were also corrected. Historical failed probes above remain distinct from passing evidence; the highlighting symptom's precise cause was not established by the failed baseline alone.
+
+### Visual evidence, limits and cleanup
+
+Inspected Light sibling/Board/palette/native-event and System-dark/reduced-motion expanded held-state captures on desktop/Pixel 7, including fresh final-run mobile sibling/palette/resized-event images. Rows remain within their container, neighbours visibly displace, an expanded subtree appears once, compact Actions remain reachable and there is no page-heading overlap. Bounded scroll and unchanged document dimensions are also asserted. Ignored `.local/task026-{desktop,android}-*.png` captures contain generated disposable planner data only. Authentication screenshots/traces/videos remain disabled.
+
+Touch verification is Chromium Pixel 7 emulation, **not physical Android**. Other engines/screen readers, Ubuntu/proxy/TLS/Mailcow/provider delivery, fresh install/audit/default-bundler/container checks, deployment and production restore remain unverified. The portable database started for this task is stopped; application/SMTP/database listeners are closed on **3100–3126 and 15432/15434/15435**. No production server, provider, commit or push was touched. Independent coordinator review is the next gate; no later roadmap task is assigned. Proposed commit message: **feat: add touch dragging and live sibling insertion feedback**.

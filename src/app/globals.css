@@ -144,15 +144,30 @@ body {
 [data-session-state="checking"] dialog::backdrop {
   visibility: hidden !important;
 }
+.planner-drag-activator {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  cursor: grab;
+}
+[data-gesture-active="true"],
+[data-gesture-active="true"] > [data-drag-activator] {
+  cursor: grabbing;
+  outline: 2px solid var(--accent-text);
+  outline-offset: 2px;
+}
 .session-veil {
   position: fixed;
   inset: 0;
   z-index: 100;
   pointer-events: auto;
   background-color: var(--canvas);
-  background-image: linear-gradient(var(--border-subtle) 1px, transparent 1px),
+  background-image:
+    linear-gradient(var(--border-subtle) 1px, transparent 1px),
     linear-gradient(90deg, var(--border-subtle) 1px, transparent 1px);
-  background-size: 100% 5rem, 12.5% 100%;
+  background-size:
+    100% 5rem,
+    12.5% 100%;
 }
 input,
 textarea,
