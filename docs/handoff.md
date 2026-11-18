@@ -1,4 +1,16 @@
-# Coordinator handoff — 2026-11-17
+# Coordinator handoff — 2026-11-18
+
+## Task 026 native-scroll correction handoff — 2026-11-18
+
+**The native-scroll correction is implemented, verified and staged for independent re-review**, above the clean owner-committed feature/review baseline **`0bd6f8d`**. Accepted 025 remains `7d4fa4c`. This addresses only [026's native-scroll P2](tasks/026-review-fixes.md); no API, schema/migration, package/lockfile, saved environment, server/provider or deployment change is introduced. All 16 existing migrations remain required. **The P2 is not independently closed; keep import/deployment on hold until coordinator re-review.**
+
+FullCalendar's supported `dragScroll=false` disables its native auto-scroller. A shared bounded step preserves custom palette/Projects/Board rules, while native move/resize can scroll only its current Calendar pane after physical movement. Its point/frame retires with the existing ready/context/session-bound press; leave/end/interruption cannot resume scrolling. Native saves additionally require movement from their own current input generation, rejecting the observed stationary-selection interval change. Explicit controls, duration/DST, revision/receipt, assignment and 025's ordinary-save geometry/concealment remain intact.
+
+Final lint/types, Webpack, valid schema and **16 applied migrations/none pending** passed. Complete backend/unit passed **178/178 across 20 files, 31.39 seconds**, exit 0. The final complete browser suite passed **236 cases / zero failures / 14 intentional Android mouse-only skips, 250 total across 34 files, 54.5 minutes**, exit 0: **all 125 desktop and all 111 applicable Pixel 7 cases**, including all ten new native-scroll cases without new skips. The five changed source/test files match their tested hashes. The complete run includes affected native/palette Calendar, touch/cancellation, order, stable-save/session and tag-recovery coverage.
+
+The unchanged reviewer probe first reproduced **-205 px desktop / -207 px Pixel 7** on the initial build. Its final implementer rerun reports **471 → 471 desktop / 1140 → 1140 Pixel 7**, zero PATCH writes/revision 1 while outside Calendar. New move/resize regressions assert both document axes/pane positions/dimensions remain unchanged outside all viewport edges; inside-pane scrolling still saves the final interval once. Pending/selected/second-finger/modal/range/session/account interruption cases preserve zero canceled writes and revision 1. This implementer evidence is separate from independent review. Earlier two six-pass/four-failure selections, the eight-pass/two-failure selection and final 2/2 interruption correction remain accurately recorded in [the correction handoff](tasks/026-review-fixes.md#correction-handoff--2026-11-18).
+
+Touch evidence is genuine Chromium/CDP Pixel 7 emulation, **not physical Android**. Other engines/screen readers, Ubuntu/proxy/TLS/provider operation, fresh install/audit/container/default-bundler and deployment/production restore remain unverified. The process-only guarded 15432 test adaptation leaves saved environments unchanged. Owned app/SMTP/database services are stopped with no listeners on **3100–3126 or 15432/15434/15435**. No commit, push or production action performed. No later feature is assigned. Proposed commit: **fix: bound native Calendar drag and resize scrolling**.
 
 ## Task 026 review: hold import for native-scroll P2 — 2026-11-17
 

@@ -7,6 +7,7 @@ import {
   type RefObject,
 } from "react";
 import { dragActivation, NativeGestureLease } from "@/lib/planner-drag";
+import { scrollPlannerRegion } from "@/lib/planner-scroll";
 import { usePlannerSession } from "./planner-session";
 
 // FullCalendar owns saved-event touch dragging. Retire its pending timers by
@@ -32,10 +33,12 @@ export function useCalendarTouch({
   const [revision, setRevision] = useState(0);
   const [lease] = useState(session.capture);
   const [native] = useState(() => new NativeGestureLease());
+  const [presses] = useState(() => new WeakMap<Event, { moved: boolean }>());
   const state = useRef<{
     source: HTMLElement;
     x: number;
     y: number;
+    point: { x: number; y: number };
     at: number;
     touch: boolean;
     moved: boolean;
@@ -44,7 +47,7 @@ export function useCalendarTouch({
     selected: boolean;
     timer?: ReturnType<typeof setTimeout>;
   } | null>(null);
-  const ended = useRef<{ token: number } | null>(null);
+  const ended = useRef<{ token: number; moved: boolean } | null>(null);
   const tapHandler = useRef(onTap);
   const previous = useRef<unknown[]>([]);
   const ready = useRef<() => boolean>(() => false);
@@ -130,7 +133,15 @@ export function useCalendarTouch({
         (!state.current.source.isConnected || !ready.current())
       )
         retire.current(true);
-      if (state.current) frame = requestAnimationFrame(tick);
+      if (state.current) {
+        if (active.current && state.current.moved && !canceled.current)
+          scrollPlannerRegion(
+            state.current.point,
+            "calendar-event",
+            root.current,
+          );
+        frame = requestAnimationFrame(tick);
+      }
     };
     const down = (event: PointerEvent) => {
       if (event.pointerType === "touch" && !event.isPrimary) {
@@ -148,6 +159,7 @@ export function useCalendarTouch({
         source,
         x: event.clientX,
         y: event.clientY,
+        point: { x: event.clientX, y: event.clientY },
         at: performance.now(),
         touch: event.pointerType === "touch",
         moved: false,
@@ -160,6 +172,7 @@ export function useCalendarTouch({
     };
     const move = (event: PointerEvent) => {
       const press = state.current;
+      if (press) press.point = { x: event.clientX, y: event.clientY };
       if (
         press &&
         Math.hypot(event.clientX - press.x, event.clientY - press.y) >
@@ -214,7 +227,10 @@ export function useCalendarTouch({
     };
     const stamp = (event: Event) => {
       const press = state.current ?? ended.current;
-      if (press) native.stamp(event, press.token);
+      if (press) {
+        native.stamp(event, press.token);
+        presses.set(event, press);
+      }
       const selected = state.current;
       if (
         event.type === "touchstart" &&
@@ -251,6 +267,7 @@ export function useCalendarTouch({
             changedTouches: [...original.changedTouches],
           });
           native.stamp(replay, selected.token);
+          presses.set(replay, selected);
           original.target!.dispatchEvent(replay);
         }, dragActivation.touchDelay);
       }
@@ -312,6 +329,11 @@ export function useCalendarTouch({
       window.removeEventListener("popstate", cancel);
       window.removeEventListener("blur", cancel);
     };
-  }, [session, root, active, canceled, suppressClick, native]);
-  return { revision, owns: native.owns };
+  }, [session, root, active, canceled, suppressClick, native, presses]);
+  return {
+    revision,
+    owns: native.owns,
+    moved: (event?: Event) =>
+      !!event && native.owns(event) && presses.get(event)?.moved === true,
+  };
 }

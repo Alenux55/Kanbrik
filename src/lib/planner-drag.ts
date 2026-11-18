@@ -1,5 +1,6 @@
 import type { Activators, SensorProps } from "@dnd-kit/core";
 import type { Point } from "./calendar-drop";
+import { scrollPlannerRegion } from "./planner-scroll";
 
 export const dragActivation = {
   touchDelay: 350,
@@ -187,64 +188,12 @@ export class PlannerSensor {
     if (this.finished) return;
     if (!this.valid()) return this.cancel();
     if (this.active && this.props.options.guard.point)
-      this.scroll(this.props.options.guard.point);
+      scrollPlannerRegion(
+        this.props.options.guard.point,
+        this.props.options.scroll,
+      );
     this.frame = requestAnimationFrame(this.tick);
   };
-  private scroll(point: Point) {
-    const mode = this.props.options.scroll;
-    const hit = document.elementFromPoint(point.x, point.y);
-    let target = hit?.closest<HTMLElement>("[data-drag-scroll],.fc-scroller");
-    if (
-      target &&
-      target.scrollHeight <= target.clientHeight &&
-      target.scrollWidth <= target.clientWidth
-    )
-      target = null;
-    if (
-      !target &&
-      mode !== "board" &&
-      (mode !== "calendar" || hit?.closest("[data-calendar-gesture-region]"))
-    )
-      target = document.scrollingElement as HTMLElement;
-    if (!target) return;
-    const documentScroll = target === document.scrollingElement;
-    const rect = documentScroll
-      ? { left: 0, top: 0, right: innerWidth, bottom: innerHeight }
-      : target.getBoundingClientRect();
-    const speed = (value: number, min: number, max: number) =>
-      value < min + 35
-        ? -Math.ceil((min + 35 - value) / 5)
-        : value > max - 35
-          ? Math.ceil((value - max + 35) / 5)
-          : 0;
-    const axis = target.dataset.dragScroll;
-    const x =
-      axis === "y" || documentScroll
-        ? 0
-        : speed(
-            point.x,
-            Math.max(0, rect.left),
-            Math.min(innerWidth, rect.right),
-          );
-    const y =
-      axis === "x"
-        ? 0
-        : speed(
-            point.y,
-            Math.max(0, rect.top),
-            Math.min(innerHeight, rect.bottom),
-          );
-    if (
-      point.x >= Math.max(0, rect.left) &&
-      point.x <= Math.min(innerWidth, rect.right) &&
-      point.y >= Math.max(0, rect.top) &&
-      point.y <= Math.min(innerHeight, rect.bottom)
-    )
-      target.scrollBy(
-        Math.max(-12, Math.min(12, x)),
-        Math.max(-12, Math.min(12, y)),
-      );
-  }
   private suppressReleaseClick() {
     const click = (event: Event) => {
       event.preventDefault();

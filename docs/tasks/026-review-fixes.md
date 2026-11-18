@@ -1,6 +1,6 @@
 # 026 review correction: bound native Calendar event scrolling
 
-Status: Ready for implementation on 2026-11-17. Independent review of the staged 026 candidate above accepted `7d4fa4c` confirmed one P2. Hold import/deployment of 026 until this correction and independent re-review. Accepted 025 remains unchanged. This document assigns the correction, not a later feature.
+Status: Correction implemented, verified and staged on 2026-11-18 above owner-committed `0bd6f8d`. Ready for independent re-review; the P2 is not independently closed and import/deployment remains on hold until that review.
 
 ## Outcome and inputs
 
@@ -40,3 +40,40 @@ The probe removed only its generated fixture accounts/workspaces/blocks and stop
 ## Completion handoff
 
 Record the final approach, exact source/test checks, results, earlier failures and limits here and in 026/current handoff. Stage task-owned corrections and return for independent re-review before owner integration/deployment. Do not mark the original P2 closed solely from the implementer's passing regression. No runtime correction, commit, push or deployment was performed by this review.
+
+## Correction handoff — 2026-11-18
+
+Implemented this P2 only above the clean owner-committed feature/review baseline **`0bd6f8d`**. Accepted 025 remains `7d4fa4c`. No package/lockfile, API, schema/migration, environment, server/provider or deployment change. All 16 existing migrations remain required. The five changed source/test files match the final tested hashes; all task-owned corrections/documentation are staged. No commit or push performed.
+
+### Approach
+
+FullCalendar v6's supported `dragScroll=false` disables its native window/pane auto-scroller for saved-event move and resize. The existing custom step is extracted to `src/lib/planner-scroll.ts`, preserving Projects/Board/palette rules. Native events share that step with a stricter mode: only a scrollable `.fc-scroller` under the current Calendar root is eligible; there is no document fallback. The held point must remain inside its visible pane bounds, the press must have physically moved, and the existing ready/context/session lifetime must still own it. Release, cancellation, leave and interrupted replacement stop further steps. No private mutable calendar internals or node_modules patches are used.
+
+Native callbacks also require physical movement from their own current press, using weak event-to-press references plus the existing generation lease. Intermediate tests observed a 15-minute move from a stationary selection hold; those callbacks now revert without saving. A stationary hold can expose selected resize handles, while genuine move/resize still saves once. Existing duration/DST, revision/receipt, assignment, explicit control and account checks remain. Ordinary completed saves retain 025's mounted grid and scroll/concealment protections.
+
+### Actual verification
+
+| Check | Result |
+| --- | --- |
+| `npm run check` | Lint and strict types passed; `.local/task026-fix-check.log`. |
+| `npm run build -- --webpack` | Passed on the final runtime; `.local/task026-fix-build.log`. |
+| `npm run db:validate` and guarded Prisma migration status | Valid schema; **16 applied migrations, none pending**; `.local/task026-fix-schema.log`, `.local/task026-fix-migrations.log`. |
+| Complete backend/unit suite | **178/178 across 20 files, 31.39 seconds, exit 0**; `.local/task026-fix-full-backend.log`. |
+| Complete integrated browser suite | **236 passed / zero failed / 14 intentional Android mouse-only skips, 250 cases across 34 files, 54.5 minutes, exit 0**; `.local/task026-fix-full-browser.log`. All **125 desktop** and **111 applicable Pixel 7** cases passed, including all ten new native-scroll cases without new skips. |
+| Unchanged reviewer probe rerun by implementer | **Desktop 471 → 471; Pixel 7 1140 → 1140**, outside Calendar, zero PATCH writes and revision 1; `.local/task026-fix-final-probe.log`. This is not independent re-review. |
+
+Commands follow README, with this checkout's existing ignored process-only adapter: `node .local/task014-command.mjs integration`, `browser`, and `node_modules/prisma/build/index.js migrate status`. The guarded test URL uses loopback **15432** because saved **55432** is Windows-reserved; saved `.env`/credentials remain unchanged. The unchanged isolated probe is `node .local/review026-native-boundary.mjs`; it creates/deletes only generated fixture accounts/workspaces/blocks and closes its owned app.
+
+The new cases use a real desktop mouse and actual Chromium/CDP Pixel 7 touch start/move/end/cancel events. Both move and resize assert stationary outside top/bottom/side holds preserve both document scroll axes, pane positions and document dimensions. Positive cases prove actual inside-pane scrolling, unchanged window position, correct snapped final interval/duration, zero hover writes and one valid release write. Pending holds, selected-event resize, second fingers, modal, range, failed session and account changes retain zero canceled writes and original revision; subsequent obsolete releases cannot resume scrolling or save. The complete run also includes existing palette boundaries, sibling/Board scrolling/order, Calendar/DST/recovery, stable-save/session and tag-recovery cases.
+
+### Earlier evidence and corrections
+
+Before correction, the unchanged reviewer probe reproduced desktop **471 → 266 (-205 px)** and Pixel 7 **1139 → 932 (-207 px)**, zero writes/revision 1 (`.local/task026-fix-baseline.log`). Those are negative baseline observations, not passing boundaries. The first and second native selections each finished **six passes/four failures, 5.1 minutes** (`.local/task026-fix-first-native.log`, `.local/task026-fix-second-native.log`). The third finished **eight passes/two failures, 2.8 minutes** (`.local/task026-fix-third-native.log`): all move/resize cases passed; range checks were snapshotting temporary loading geometry. The corrected interruption selection then passed **2/2, no skips, 52.7 seconds**, exit 0 (`.local/task026-fix-fourth-interruptions.log`). All ten passed freshly in the final complete run above.
+
+Corrections include the movement-qualified native save guard, waiting for authorized range reads before measuring stationary post-interruption geometry, honoring installed v6's 500 ms compatibility-mouse delay after touch, and releasing an already interrupted press without sending Escape into the newly opened modal. Relevant zero-scroll/no-write/revision/interval assertions remain intact. One intermediate type-only failure in the retained end-event movement shape was corrected before the final passing check/build. No earlier red selection is claimed green.
+
+### Limits, cleanup and next step
+
+Touch evidence is genuine Chromium Pixel 7 emulation, **not physical Android**. Other engines/screen readers, Ubuntu/proxy/TLS/provider operation, fresh install/audit/container/default-bundler, deployment and production restore remain unverified. No authentication screenshots/traces/videos were captured. The task-owned portable database is stopped and application/SMTP/database listeners are closed on **3100–3126 and 15432/15434/15435**. No production server or provider was touched.
+
+Return this staged correction for **independent coordinator re-review**. Passing implementer tests and the unchanged probe do not independently close the P2; keep import/deployment on hold until re-review. Proposed commit message: **fix: bound native Calendar drag and resize scrolling**.

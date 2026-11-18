@@ -1265,6 +1265,7 @@ function CalendarScope({
                   height="max(380px, min(70vh, 650px))"
                   eventLongPressDelay={dragActivation.touchDelay}
                   dragRevertDuration={0}
+                  dragScroll={false}
                   slotMinTime="00:00:00"
                   scrollTime="09:00:00"
                   snapDuration="00:15:00"
@@ -1340,7 +1341,7 @@ function CalendarScope({
                   }}
                   eventDrop={(info) => {
                     if (
-                      !nativeTouch.owns(info.jsEvent) ||
+                      !nativeTouch.moved(info.jsEvent) ||
                       canceledGesture.current ||
                       !alive.current ||
                       session.getSnapshot().phase !== "ready" ||
@@ -1396,7 +1397,7 @@ function CalendarScope({
                   }}
                   eventResize={(info) => {
                     if (
-                      !nativeTouch.owns(info.jsEvent) ||
+                      !nativeTouch.moved(info.jsEvent) ||
                       canceledGesture.current ||
                       !alive.current ||
                       session.getSnapshot().phase !== "ready" ||
